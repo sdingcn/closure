@@ -1,11 +1,11 @@
 # expr
 Expr is a dynamically-typed, interpreted, functional, toy programming language written in Python. The main purpose of this project is to illustrate the basic implementation of interpreters.
 
-## interpreter dependencies
+## dependencies
 
 The only dependency is Python. Any version of Python 3.x should work.
 
-## language syntax
+## syntax
 
 ```
 <var> := [a-zA-Z]+ ; except for reserved keywords
