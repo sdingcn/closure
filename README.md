@@ -1,5 +1,5 @@
 # expr
-Expr is a dynamically-typed, interpreted, functional, toy programming language with mark-and-sweep garbage collection. The main purpose of this project is to illustrate the implementation of interpreters.
+Expr is a dynamically-typed, interpreted, functional, toy programming language with mark-and-sweep garbage collection.
 
 ## dependencies
 
@@ -10,35 +10,74 @@ The only dependency is Python. Any version of Python 3.x should work.
 ```
 <var> := [a-zA-Z]+ ; except for reserved keywords
 
-<int> := [+-]?0 | [+-]?[1-9][0-9]* ;
+<int> := [+-]?0 | [+-]?[1-9][0-9]*
 
-<binop> := + | - | * | / | % | = | < ;
+<built-in> := + | - | * | / | % | == | < | get | put | error
+
+<var-list> := epsilon | <var> <var-list>
+
+<var-expr-list> := epsilon | <var> = <expr> <var-expr-list>
+
+<expr-list> := epsilon | <expr> <expr-list>
 
 <expr> := <int>
-        | <binop>
-        | lambda <var> <expr>
-        | letrec <var> <expr> <expr>
-        | if <expr> <expr> <expr>
-        | call <expr> <expr>
-        | seq <expr> <expr>
-        | <var> ;
+        | lambda ( <var-list> ) { <expr> }
+        | letrec ( <var-expr-list> ) { <expr> }
+        | if <expr> then <expr> else <expr>
+        | [ <expr> <expr-list> ] ; function call
+        | <built-in>
+        | <var>
 ```
 
-All functions are curried one-parameter functions. The full semantic reference is the interpreter itself.
+There are two types of objects: closure, integer.
+
+All variables are pointers pointing to locations of objects in a globally-maintained resizable array. Garbage collection compress this array and is triggered for every 100 function returns.
+
+All functions are closures (including built-in ones, which are closures with the empty environment).
+
+The evaluation order of function arguemnts is left-to-right.
+
+You can implement lists using closures (illustrated below in the example).
+
+The full semantic reference is the interpreter itself.
 
 ## usage
 
 `python3 interpreter.py` reads code from `stdin` and writes the result to `stdout`.
 
-### example
+### example 1 (gcd)
+
+### example 2 (sequence)
+
+### example 3 (list and sorting)
 
 ```
-letrec
-  gcd
-    lambda a
-      lambda b
-        if = b 0
-          a
-          call call gcd b % a b
-  call call gcd 8 12
+letrec (
+  null = lambda (x) {
+    if [== x 0] then 1 else [error]
+  }
+  cons = lambda (head tail) {
+    letrec (
+      h = head
+      t = tail
+    ) {
+      lambda (x) {
+        if [== x 0] then 0
+        else if [== x 1] then h
+        else if [== x 2] then t
+        else [error]
+      }
+    }
+  }
+  isnull = lambda (list) {
+    [list 0]
+  }
+  car = lambda (list) {
+    [list 1]
+  }
+  cdr = lambda (list) {
+    [list 2]
+  }
+) {
+}
 ```
