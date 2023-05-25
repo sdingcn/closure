@@ -1,5 +1,4 @@
 # expr
-Expr is a dynamically-typed, interpreted, functional, toy programming language with mark-and-sweep garbage collection.
 
 ## dependencies
 
