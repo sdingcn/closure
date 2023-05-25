@@ -1,10 +1,14 @@
 import sys
 from collections import deque
 
+# lexing
+
 def lex(source):
     chars = deque(source)
+
     def next_token():
         pass
+
     tokens = deque()
     while True:
         token = next_token()
@@ -14,50 +18,120 @@ def lex(source):
             break
     return tokens
 
-class Var:
-    pass
+# parsing
 
 class Int:
-    pass
+    def __init__(self, value):
+        self.value = value
 
-class Binop:
-    pass
+class Var:
+    def __init__(self, name):
+        self.name = name
 
-class Expr:
-    pass
+class Lambda:
+    def __init__(self, var_list, expr_list):
+        self.var_list = var_list
+        self.expr_list = expr_list
+
+class Letrec:
+    def __init__(self, var_expr_list, expr):
+        self.var_expr_list = var_expr_list
+        self.expr = expr
+
+class If:
+    def __init__(self, cond, branch1, branch2):
+        self.cond = cond
+        self.branch1 = branch1
+        self.branch2 = branch2
+
+class Call:
+    def __init__(self, fun, arg_list):
+        self.fun = fun
+        self.arg_list = arg_list
+
+class Seq:
+    def __init__(self, expr_list):
+        self.expr_list = expr_list
 
 def parse(tokens):
-    def parse_var():
-        pass
+
+    def is_int(s):
+        try:
+            int(s)
+            return True
+        except ValueError:
+            return False
+
+    def is_var(s):
+        return s.isalpha()
+
     def parse_int():
         pass
-    def parse_binop():
-        pass
-    def parse_expr():
-        pass
-    return parse_expr()
 
-def interpret(tree, env):
-    if type(tree) == Var:
+    def parse_var():
         pass
-    elif type(tree) == Int:
+
+    def parse_lambda():
         pass
-    elif type(tree) == Op:
+
+    def parse_letrec():
         pass
-    elif type(tree) == Expr:
+
+    def parse_if():
         pass
-    else:
+
+    def parse_call():
         pass
+
+    def parse_seq():
+        pass
+
+    if is_int(tokens[0]):
+        return parse_int()
+    elif is_var(tokens[0]):
+        return parse_var()
+    elif tokens[0] == 'lambda':
+        return parse_lambda()
+    elif tokens[0] == 'letrec':
+        return parse_letrec()
+    elif tokens[0] == 'if':
+        return parse_if()
+    elif tokens[0] == '(':
+        return parse_call()
+    elif tokens[0] == '[':
+        return parse_seq()
+
+# interpreting
+
+class Integer:
+    pass
+
+class Closure:
+    pass
+
+class Void:
+    pass
+
+class Frame:
+    pass
+
+def interpret(tree):
+    store = {}
+    stack = []
+
+# main entry
 
 def main():
     source = sys.stdin.read()
     tokens = lex(source)
     tree = parse(tokens)
-    result = interpret(tree, [])
-    if type(result) == int:
-        print(result)
-    else:
-        print('function')
+    result = interpret(tree)
+    if type(result) == Integer:
+        print(result.value)
+    elif type(result) == Closure:
+        print('Closure')
+    elif type(result) == Void:
+        print('Void')
 
 if __name__ == '__main__':
     main()
