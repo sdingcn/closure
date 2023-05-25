@@ -12,7 +12,7 @@ The only dependency is Python. Any version of Python 3.x should work.
 
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
 
-<built-in> := + | - | * | / | % | == | < | get | put | error
+<built-in> := + | - | * | / | % | == | < | void | get | put | gc | error
 
 <var-list> := epsilon | <var> <var-list>
 
@@ -21,21 +21,22 @@ The only dependency is Python. Any version of Python 3.x should work.
 <expr-list> := epsilon | <expr> <expr-list>
 
 <expr> := <int>
+        | <built-in>
         | lambda ( <var-list> ) { <expr> }
         | letrec ( <var-expr-list> ) { <expr> }
         | if <expr> then <expr> else <expr>
-        | [ <expr> <expr-list> ] ; function call
-        | <built-in>
+        | ( <expr> <expr-list> ) ; function call
+        | [ <expr> <expr-list> ] ; sequence
         | <var>
 ```
 
-There are two types of objects: closure, integer.
+There are two types of objects: closure, integer. All objects are immutable.
 
-All variables are pointers pointing to locations of objects in a globally-maintained resizable array. Garbage collection compress this array and is triggered for every 100 function returns.
+All variables are pointers pointing to locations of objects in a globally-maintained resizable array. Binding a variable to another variable only copies the address. Garbage collection compress this array and can only be triggered by the call to `gc`.
 
 All functions are closures (including built-in ones, which are closures with the empty environment).
 
-The evaluation order of function arguemnts is left-to-right.
+The evaluation order of `letrec` bindings, function calls, and sequence, is left-to-right.
 
 You can implement lists using closures (illustrated below in the example).
 
@@ -45,16 +46,14 @@ The full semantic reference is the interpreter itself.
 
 `python3 interpreter.py` reads code from `stdin` and writes the result to `stdout`.
 
-### example 1 (gcd)
-
-### example 2 (sequence)
-
-### example 3 (list and sorting)
+### example (sorting)
 
 ```
 letrec (
-  null = lambda (x) {
-    if [== x 0] then 1 else [error]
+  null = lambda () {
+    lambda (x) {
+      if (== x 0) then 1 else (error)
+    }
   }
   cons = lambda (head tail) {
     letrec (
@@ -62,21 +61,29 @@ letrec (
       t = tail
     ) {
       lambda (x) {
-        if [== x 0] then 0
-        else if [== x 1] then h
-        else if [== x 2] then t
-        else [error]
+        if (== x 0) then 0
+        else if (== x 1) then h
+        else if (== x 2) then t
+        else (error)
       }
     }
   }
   isnull = lambda (list) {
-    [list 0]
+    (list 0)
   }
   car = lambda (list) {
-    [list 1]
+    (list 1)
   }
   cdr = lambda (list) {
-    [list 2]
+    (list 2)
+  }
+  getlist = lambda (n) {
+    if (== n 0) then (null)
+    else (cons (get) (getlist (- n 1)))
+  }
+  putlist = lambda (list) {
+    if (isnull list) then (void)
+    else [(put (car list)) (putlist (cdr list))]
   }
 ) {
 }
