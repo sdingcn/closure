@@ -44,7 +44,7 @@ The full semantic reference is the interpreter itself.
 
 ## usage
 
-`python3 interpreter.py` reads code from `stdin` and writes the result to `stdout`.
+`python3 interpreter.py <source>` runs the Expr code in the file `<source>`.
 
 ### example (sorting)
 
