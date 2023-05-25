@@ -7,12 +7,14 @@ The only dependency is Python. Any version of Python 3.x should work.
 
 ## syntax
 
+The design goal is to make the language core as small as possible, with most features implementable as functions.
+
 ```
-<var> := [a-zA-Z]+ ; except for reserved keywords
+<var> := [a-zA-Z]+ ; except for reserved keywords and built-in names
 
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
 
-<built-in> := + | - | * | / | % | == | < | void | get | put | gc | error
+<built-in> := + | - | * | / | % | < | void | get | put | gc | error
 
 <var-list> := epsilon | <var> <var-list>
 
@@ -30,15 +32,13 @@ The only dependency is Python. Any version of Python 3.x should work.
         | <var>
 ```
 
-There are two types of objects: closure, integer. All objects are immutable.
+There are three types of objects: closure, integer, void (with only one value obtainable by calling `void`). All objects are immutable.
 
-All variables are pointers pointing to locations of objects in a globally-maintained resizable array. Binding a variable to another variable only copies the address. Garbage collection compress this array and can only be triggered by the call to `gc`.
+All variables are pointers pointing to locations of objects in a globally-maintained resizable array. Binding a variable to another variable only copies the address. Garbage collection compress the global array and can only be triggered by calling `gc`.
 
 All functions are closures (including built-in ones, which are closures with the empty environment).
 
 The evaluation order of `letrec` bindings, function calls, and sequence, is left-to-right.
-
-You can implement lists using closures (illustrated below in the example).
 
 The full semantic reference is the interpreter itself.
 
@@ -50,6 +50,15 @@ The full semantic reference is the interpreter itself.
 
 ```
 letrec (
+  eq = lambda (a b) {
+    if (< (+ (< a b) (< b a)) 1) then 1 else 0
+  }
+  leq = lambda (a b) {
+    if (< b a) then 0 else 1
+  }
+  gt = lambda (a b) {
+    if (leq a b) then 0 else 1
+  }
   null = lambda () {
     lambda (x) {
       if (== x 0) then 1 else (error)
@@ -77,6 +86,10 @@ letrec (
   cdr = lambda (list) {
     (list 2)
   }
+  len = lambda (list) {
+    if (isnull list) then 0
+    else (+ 1 (len (cdr list)))
+  }
   getlist = lambda (n) {
     if (== n 0) then (null)
     else (cons (get) (getlist (- n 1)))
@@ -85,6 +98,51 @@ letrec (
     if (isnull list) then (void)
     else [(put (car list)) (putlist (cdr list))]
   }
+  filterleq = lambda (v list) {
+    if (isnull list) then (null)
+    else letrec (
+      head = (car list)
+      tail = (cdr list)
+    ) {
+      if (leq head v) then (cons head (filterleq v tail))
+      else (filterleq v tail)
+    }
+  }
+  filtergt = lambda (v list) {
+    if (isnull list) then (null)
+    else letrec (
+      head = (car list)
+      tail = (cdr list)
+    ) {
+      if (gt head v) then (cons head (filtergt v tail))
+      else (filtergt v tail)
+    }
+  }
+  concat = lambda (list1 list2) {
+    if (isnull list1) then list2
+    else letrec (
+      head = (car list1)
+      tail = (cdr list1)
+    ) {
+      (cons head (concat tail list2))
+    }
+  }
+  quicksort = lambda (list) {
+    if (isnull list) then (null)
+    else letrec (
+      head = (car list)
+      tail = (cdr list)
+      left = (filterleq head tail)
+      right = (filtergt head tail)
+    ) {
+      (concat left (concat (cons head (null)) right))
+    }
+  }
 ) {
+  letrec (
+    n = (get)
+  ) {
+    (putlist (quicksort (getlist n)))
+  }
 }
 ```
