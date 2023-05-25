@@ -34,7 +34,7 @@ The design goal is to make the language core as small as possible, with most fea
 
 There are three types of objects: closure, integer, void (with only one value obtainable by calling `void`). All objects are immutable.
 
-All variables are pointers pointing to locations of objects in a globally-maintained resizable array. Binding a variable to another variable only copies the address. Garbage collection compress the global array and can only be triggered by calling `gc`.
+All variables are keys of a global Python dictionary, which maps keys to Expr objects. Binding a variable to another variable only copies the key. Variables are immutable once bound. Garbage collection removes dictionary entries unreachable from the current call stack, and can only be triggered by calling `gc`.
 
 All functions are closures (including built-in ones, which are closures with the empty environment).
 
