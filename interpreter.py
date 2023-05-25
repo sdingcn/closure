@@ -20,7 +20,7 @@ class Var:
 class Int:
     pass
 
-class Op:
+class Binop:
     pass
 
 class Expr:
@@ -31,7 +31,7 @@ def parse(tokens):
         pass
     def parse_int():
         pass
-    def parse_op():
+    def parse_binop():
         pass
     def parse_expr():
         pass
