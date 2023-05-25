@@ -25,7 +25,7 @@ The design goal is to make the language core as small as possible, with most fea
 Built-in functions: + - * / % < void get put gc error
 ```
 
-There are three types of objects: closure, integer, void (with only one value obtainable by calling `void`). All objects are immutable.
+There are three types of objects: integer, closure, void (with only one value obtainable by calling `void`). All objects are immutable.
 
 All variables are keys of a global Python dictionary, which maps keys to Expr objects. Binding a variable to another variable only copies the key. Variables are immutable once bound. Garbage collection removes dictionary entries unreachable from the current call stack, and can only be triggered by calling `gc`.
 
