@@ -27,7 +27,7 @@ Built-in functions: + - * / % < void get put gc error
 
 There are three types of objects: integer, closure, void (with only one value obtainable by calling `void`). All objects are immutable.
 
-All variables are bound to keys (locations) of a global Python dictionary, which maps keys to Expr objects. Binding a variable to another variable only copies the key/location. Variables are immutable once bound. Garbage collection removes dictionary entries unreachable from the current call stack, and can only be triggered by calling `gc`.
+All variables are bound to keys (locations) of a global Python dictionary, which maps keys to Expr objects. Binding a variable always creates a new location, including binding to another variable. Variables are immutable once bound. Garbage collection removes dictionary entries unreachable from the current call stack, and can only be triggered by calling `gc`.
 
 All functions are closures (including built-in ones, which are closures with the empty environment).
 
