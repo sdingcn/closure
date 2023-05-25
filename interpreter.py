@@ -97,7 +97,7 @@ def parse(tokens):
         tokens.popleft() # (
         var_list = []
         while tokens[0].isalpha():
-            var_list.append(tokens.popleft())
+            var_list.append(parse_var())
         tokens.popleft() # )
         tokens.popleft() # {
         expr = parse_expr()
@@ -109,7 +109,7 @@ def parse(tokens):
         tokens.popleft() # (
         var_expr_list = []
         while tokens[0].isalpha():
-            v = tokens.popleft()
+            v = parse_var()
             tokens.popleft() # =
             e = parse_expr()
             var_expr_list.append((v, e))
