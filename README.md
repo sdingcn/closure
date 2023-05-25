@@ -12,16 +12,18 @@ The only dependency is Python. Any version of Python 3.x should work.
 
 <int> := [+-]?0 | [+-]?[1-9][0-9]* ;
 
-<op> := + | - | * | / | = | < ;
+<binop> := + | - | * | / | ^ | = | < ;
 
-<expr> := <var> | <int> | <op>
-        | ( lambda ( <var> ) <expr> )
-        | ( letrec ( <var> <expr> ) <expr> )
-        | ( if <expr> <expr> <expr> )
-        | ( call <expr> <expr> ) ;
+<expr> := <int>
+        | <binop> <expr> <expr>
+        | lambda <var> <expr>
+        | letrec <var> <expr> <expr>
+        | if <expr> <expr> <expr>
+        | call <expr> <expr>
+        | <var> ;
 ```
 
-The semantics should be intuitive, and the full semantic reference is the interpreter itself.
+All functions are curried one-parameter functions. The full semantic reference is the interpreter itself.
 
 ## usage
 
@@ -30,4 +32,11 @@ The semantics should be intuitive, and the full semantic reference is the interp
 ### example
 
 ```
+letrec
+  factorial
+    lambda x
+      if < x 2
+        1
+        * x call factorial - x 1
+  call factorial 10
 ```
