@@ -14,22 +14,15 @@ The design goal is to make the language core as small as possible, with most fea
 
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
 
-<built-in> := + | - | * | / | % | < | void | get | put | gc | error
-
-<var-list> := epsilon | <var> <var-list>
-
-<var-expr-list> := epsilon | <var> = <expr> <var-expr-list>
-
-<expr-list> := epsilon | <expr> <expr-list>
-
 <expr> := <int>
-        | <built-in>
-        | lambda ( <var-list> ) { <expr> }
-        | letrec ( <var-expr-list> ) { <expr> }
+        | <var> ; including built-in functions
+        | lambda ( <var> *) { <expr> }
+        | letrec ( <var> = <expr> *) { <expr> }
         | if <expr> then <expr> else <expr>
-        | ( <expr> <expr-list> ) ; function call
-        | [ <expr> <expr-list> ] ; sequence
-        | <var>
+        | ( <expr> <expr>* ) ; function call
+        | [ <expr> <expr>* ] ; sequence
+
+Built-in functions: + - * / % < void get put gc error
 ```
 
 There are three types of objects: closure, integer, void (with only one value obtainable by calling `void`). All objects are immutable.
