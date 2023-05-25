@@ -10,9 +10,9 @@ The only dependency is Python. Any version of Python 3.x should work.
 The design goal is to make the language core as small as possible, with most features implementable as functions.
 
 ```
-<var> := [a-zA-Z]+ ; except for reserved keywords and built-in names
-
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
+
+<var> := [a-zA-Z]+ ; except for reserved keywords and built-in names
 
 <expr> := <int>
         | <var> ; including built-in functions
