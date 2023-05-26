@@ -201,6 +201,13 @@ class Frame:
 
 def interpret(tree):
     store = {}
+    location = 0
+
+    def new(value):
+        store[location] = value
+        location += 1
+        return location
+
     stack = []
     env = []
 
@@ -231,10 +238,6 @@ def interpret(tree):
     def recurse(node, env):
         pass
 
-    def install_builtin():
-        pass
-
-    install_builtin()
     return recurse(tree, env)
 
 # main entry
