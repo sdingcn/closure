@@ -11,17 +11,19 @@ The design goal is to make the language small, with most features implementable 
 ```
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
 
-<var> := [a-zA-Z]+ ; except for reserved keywords and built-in function names
+<intrinsic> := + | - | * | / | % | < | void | get | put | gc | error
+
+<var> := [a-zA-Z]+ ; except for keywords and built-in function names
 
 <expr> := <int>
         | <var>
         | lambda ( <var> *) { <expr> }
         | letrec ( <var> = <expr> *) { <expr> }
         | if <expr> then <expr> else <expr>
-        | ( <expr> <expr>* ) ; function call, where built-in functions are interpreted directly
+        | ( <intrinsic> <expr>* ) ; intrinsic call
+        | ( <expr> <expr>* ) ; function call
         | [ <expr> <expr>* ] ; sequence
 
-Built-in functions: + - * / % < void get put gc error
 ```
 
 There are three types of objects: integer, closure, void (with only one value obtainable by calling `void`).

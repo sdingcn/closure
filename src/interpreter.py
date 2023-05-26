@@ -1,6 +1,22 @@
 import sys
 from collections import deque
 
+# intrinsics
+
+IMAP = {
+    '+': ,
+    '-': ,
+    '*': ,
+    '/': ,
+    '%': ,
+    '<': ,
+    'void': ,
+    'get': ,
+    'put': ,
+    'gc': ,
+    'error':
+}
+
 # lexer
 
 def lex(source: str) -> deque[str]:
@@ -71,6 +87,12 @@ class If(Expr):
         self.branch1 = branch1
         self.branch2 = branch2
 
+class IntrinsicCall(Expr):
+
+    def __init__(self, intrinsic: str, arg_list: list[Expr]):
+        self.intrinsic = intrinsic
+        self.arg_list = arg_list
+
 class Call(Expr):
 
     def __init__(self, fun: Expr, arg_list: list[Expr]):
@@ -90,6 +112,9 @@ def parse(tokens: deque[str]) -> Node:
             return True
         except ValueError:
             return False
+
+    def is_intrinsic(s: str) -> bool:
+        return s in []
 
     def is_var(s: str) -> bool:
         return s.isalpha()
