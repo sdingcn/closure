@@ -40,35 +40,42 @@ def lex(source):
 # parsing
 
 class Int:
+
     def __init__(self, value):
         self.value = value
 
 class Var:
+
     def __init__(self, name):
         self.name = name
 
 class Lambda:
+
     def __init__(self, var_list, expr):
         self.var_list = var_list
         self.expr = expr
 
 class Letrec:
+
     def __init__(self, var_expr_list, expr):
         self.var_expr_list = var_expr_list
         self.expr = expr
 
 class If:
+
     def __init__(self, cond, branch1, branch2):
         self.cond = cond
         self.branch1 = branch1
         self.branch2 = branch2
 
 class Call:
+
     def __init__(self, fun, arg_list):
         self.fun = fun
         self.arg_list = arg_list
 
 class Seq:
+
     def __init__(self, expr_list):
         self.expr_list = expr_list
 
@@ -166,21 +173,69 @@ def parse(tokens):
 # interpreting
 
 class Integer:
-    pass
+
+    def __init__(self, value):
+        self.value = value
 
 class Closure:
-    pass
+
+    def __init__(self, env, fun):
+        self.env = env
+        self.fun = fun
 
 class Void:
-    pass
+
+    def __init__(self):
+        pass
 
 class Frame:
-    pass
+
+    def __init__(self):
+        self.env = []
+
+    def push(self, var, loc):
+        self.env.append((var, loc))
+
+    def pop(self):
+        self.env.pop()
 
 def interpret(tree):
     store = {}
     stack = []
     env = []
+
+    def collect():
+        visited = set()
+
+        def mark(location):
+            visited.add(location)
+            if type(store[location]) == Closure:
+                for var, loc in store[location].env:
+                    if loc not in visited:
+                        mark(loc)
+
+        def sweep():
+            to_remove = set()
+            for k, v in store.items():
+                if k not in visited:
+                    to_remove.add(k)
+            for k in to_remove:
+                del store[k]
+
+        for frame in stack:
+            for var, loc in frame.env:
+                mark(loc)
+        n = sweep()
+        sys.stderr.write('GC: collected {} locations\n'.format(n))
+
+    def recurse(node, env):
+        pass
+
+    def install_builtin():
+        pass
+
+    install_builtin()
+    return recurse(tree, env)
 
 # main entry
 
