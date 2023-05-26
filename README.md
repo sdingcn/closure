@@ -40,4 +40,4 @@ The full semantic reference is the interpreter itself.
 
 ### example (sorting)
 
-[quicksort.expr](quicksort.expr)
+[quicksort.expr](test/quicksort.expr)
