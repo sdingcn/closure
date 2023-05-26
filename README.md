@@ -14,11 +14,11 @@ The design goal is to make the language core as small as possible, with most fea
 <var> := [a-zA-Z]+ ; except for reserved keywords and built-in names
 
 <expr> := <int>
-        | <var> ; including built-in functions
+        | <var>
         | lambda ( <var> *) { <expr> }
         | letrec ( <var> = <expr> *) { <expr> }
         | if <expr> then <expr> else <expr>
-        | ( <expr> <expr>* ) ; function call
+        | ( <expr> <expr>* ) ; function call, where built-in functions are interpreted directly
         | [ <expr> <expr>* ] ; sequence
 
 Built-in functions: + - * / % < void get put gc error
