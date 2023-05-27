@@ -9,7 +9,7 @@ Python >= 3.9
 ```
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
 
-<intrinsic> := + | - | * | / | % | < | void | get | put | gc | error
+<intrinsic> := + | - | * | / | % | < | void | get | put | gc | exit
 
 <var> := [a-zA-Z]+ ; except for keywords and intrinsic function names
 

@@ -14,7 +14,7 @@ def lex(source: str) -> deque[str]:
                 token = ''
                 while chars and chars[0].isdigit():
                     token += chars.popleft()
-            elif chars[0] in ('-', '+') and chars[1].isdigit():
+            elif chars[0] in ('-', '+') and (len(chars) > 1 and chars[1].isdigit()):
                 token = chars.popleft()
                 while chars and chars[0].isdigit():
                     token += chars.popleft()
@@ -24,6 +24,8 @@ def lex(source: str) -> deque[str]:
                     token += chars.popleft()
             elif chars[0] in ('(', ')', '{', '}', '[', ']', '+', '-', '*', '/', '%', '<'):
                 token = chars.popleft()
+            else:
+                sys.exit('[Expr Lexer] error: unrecognized character')
             return token
         else:
             return ''
@@ -90,18 +92,18 @@ class Seq(Expr):
 
 def parse(tokens: deque[str]) -> Node:
     
-    def is_int(s: str) -> bool:
+    def is_int(token: str) -> bool:
         try:
-            int(s)
+            int(token)
             return True
         except ValueError:
             return False
 
-    def is_intrinsic(s: str) -> bool:
-        return s in { '+', '-', '*', '/', '%', '<', 'void', 'get', 'put', 'gc', 'error' }
+    def is_intrinsic(token: str) -> bool:
+        return token in { '+', '-', '*', '/', '%', '<', 'void', 'get', 'put', 'gc', 'exit' }
 
-    def is_var(s: str) -> bool:
-        return s.isalpha()
+    def is_var(token: str) -> bool:
+        return token.isalpha()
 
     def parse_int() -> Int:
         value = int(tokens.popleft())
@@ -171,6 +173,8 @@ def parse(tokens: deque[str]) -> Node:
         while tokens[0] != ']':
             expr_list.append(parse_expr())
         tokens.popleft() # ]
+        if len(expr_list) == 0:
+            sys.exit('[Expr Parser] error: zero-length sequence')
         return Seq(expr_list)
 
     def parse_expr() -> Expr:
@@ -191,8 +195,13 @@ def parse(tokens: deque[str]) -> Node:
                 return parse_call()
         elif tokens[0] == '[':
             return parse_seq()
+        else:
+            sys.exit('[Expr Parser] error: unrecognized expression')
     
-    return parse_expr()
+    try:
+        return parse_expr()
+    except IndexError:
+        sys.exit('[Expr Parser] error: incomplete expression')
 
 # runtime
 
@@ -223,9 +232,47 @@ class Frame:
 class Runtime:
 
     def __init__(self):
-        self.stack = []
+        self.stack = [Frame()]
         self.store = {}
         self.location = 0
+
+        def get() -> int:
+            while True:
+                char = sys.stdin.read(1)
+                if char in ('-', '+') or char.isdigit():
+                    s = char
+                    while sys.stdin.peek(1).isdigit():
+                        s += sys.stdin.read(1)
+                    return int(s)
+                elif char.isspace():
+                    continue
+                else:
+                    sys.exit('[Expr Runtime] error: unsupported input')
+    
+        def collect(stack: list[Frame], store: dict[int, Value]) -> None:
+            visited = set()
+
+            def mark(loc: int) -> None:
+                visited.add(loc)
+                if type(store[loc]) == Closure:
+                    for v, l in store[loc].env:
+                        if l not in visited:
+                            mark(l)
+
+            def sweep() -> None:
+                to_remove = set()
+                for k, v in store.items():
+                    if k not in visited:
+                        to_remove.add(k)
+                for k in to_remove:
+                    del store[k]
+
+            for frame in stack:
+                for v, l in frame.env:
+                    mark(l)
+            n = sweep()
+            sys.stderr.write(f'[Expr Runtime] message: GC released {n} objects\n')
+
         self.intrinsics = {
             '+': lambda a, b : a + b,
             '-': lambda a, b : a - b,
@@ -234,51 +281,17 @@ class Runtime:
             '%': lambda a, b : a % b,
             '<': lambda a, b : a < b,
             'void': lambda : Void(),
-            'get': self.get,
+            'get': get,
             'put': lambda a : print(a),
-            'gc': self.collect,
-            'error' lambda : sys.exit('[Expr Runtime] Execution stopped by the "error" intrinsic function'):
+            'gc': lambda : collect(self.stack, self.store),
+            'exit' lambda : sys.exit('[Expr Runtime] message: execution stopped by the "exit" intrinsic function')
         }
 
-    def get(self) -> int:
-        while True:
-            char = sys.stdin.read(1)
-            if char in ('-', '+') or char.isdigit():
-                s = char
-                while sys.stdin.peek(1).isdigit():
-                    s += sys.stdin.read(1)
-                return int(s)
-            else:
-                continue
 
     def new(self, value: Value) -> int:
-        self.store[location] = value
+        self.store[self.location] = value
         self.location += 1
         return self.location
-    
-    def collect() -> None:
-        visited = set()
-
-        def mark(loc: int) -> None:
-            visited.add(loc)
-            if type(self.store[loc]) == Closure:
-                for v, l in self.store[loc].env:
-                    if l not in visited:
-                        mark(l)
-
-        def sweep() -> None:
-            to_remove = set()
-            for k, v in self.store.items():
-                if k not in visited:
-                    to_remove.add(k)
-            for k in to_remove:
-                del self.store[k]
-
-        for frame in self.stack:
-            for v, l in frame.env:
-                mark(l)
-        n = sweep()
-        sys.stderr.write(f'[Expr Runtime] GC collected {n} locations\n')
 
 # interpreter
 
@@ -289,7 +302,7 @@ def interpret(tree: Expr) -> Value:
         for i in range(len(env) - 1, -1, -1):
             if env[i][0] == var:
                 return env[i][1]
-        sys.exit('[Expr Runtime] Undefined variable')
+        sys.exit('[Expr Runtime] error: undefined variable')
 
     def evaluate(node: Expr, env: list[tuple[str, int]]) -> Value:
         if type(node) == Int:
@@ -302,16 +315,18 @@ def interpret(tree: Expr) -> Value:
             new_env = env[:]
             for v, e in node.var_expr_list:
                 loc = runtime.new(Void())
-                new_env.append((v, loc))
+                new_env.append((v.name, loc))
             for v, e in node.var_expr_list:
-                runtime.store[var_to_location(v, new_env)] = evaluate(e, new_env[:])
+                runtime.store[var_to_location(v.name, new_env)] = evaluate(e, new_env[:])
             old_env = runtime.stack[-1].env
-            runtime.stack[-1].env = new_env
+            runtime.stack[-1].env = new_env[:]
             value = evaluate(node.expr, new_env[:])
             runtime.stack[-1].env = old_env
             return value
         elif type(node) == If:
             c = evaluate(node.cond, env[:])
+            if type(c) != Integer:
+                sys.exit('[Expr Runtime] error: "if" condition does not evaluate to an integer')
             if c.value != 0:
                 return evaluate(node.branch1, env[:])
             else:
@@ -320,24 +335,29 @@ def interpret(tree: Expr) -> Value:
             arg_vals = []
             for arg in node.arg_list:
                 arg_vals.append(evaluate(arg, env[:]))
-            return runtime.intrinsics[node.intrinsic](*arg_vals)
+            try:
+                return runtime.intrinsics[node.intrinsic](*arg_vals)
+            except TypeError:
+                sys.exit('[Expr Runtime] error: wrong number of arguments given to an intrinsic function')
         elif type(node) == Call:
             closure = evaluate(node.callee, env[:])
             new_env = closure.env[:]
             n_args = len(closure.fun.var_list)
+            if n_args != len(node.arg_list):
+                sys.exit('[Expr Runtime] error: wrong number of arguments given to a lambda')
             for i in range(n_args):
-                new_env.append((closure.fun.var_list[i], runtime.new(evaluate(node.arg_list[i], env[:]))))
+                new_env.append((closure.fun.var_list[i].name, runtime.new(evaluate(node.arg_list[i], env[:]))))
             runtime.stack.append(Frame(new_env[:]))
             value = evaluate(closure.fun.expr, new_env[:])
             runtime.stack.pop()
             return value
         elif type(node) == Seq:
-            v = None
+            value = None
             for e in node.expr_list:
-                v = evaluate(e, env[:])
-            return v
+                value = evaluate(e, env[:])
+            return value
         else:
-            sys.exit('[Expr Runtime] unrecognized expression')
+            sys.exit('[Expr Runtime] error: unrecognized AST node')
 
     return evaluate(tree, [])
 
@@ -353,6 +373,8 @@ def main(source) -> None:
         print('Closure')
     elif type(result) == Void:
         print('Void')
+    else:
+        sys.exit('[Expr Main] error: unknown evaluation result')
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
