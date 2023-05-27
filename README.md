@@ -4,7 +4,7 @@
 
 Python >= 3.9
 
-## syntax
+## syntax and semantics
 
 ```
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
@@ -31,13 +31,13 @@ Binding a variable generally creates a new location, except for binding to anoth
 Variables are immutable once bound.
 Garbage collection removes store entries unreachable from the current call stack, and can only be triggered by `gc`, which returns the number of locations retrieved.
 Lambdas are lexically scoped and are thus evaluated to closures.
-Common data structures (e.g. lists) can be implemented using closures (see `test/quicksort.expr`).
+Common data structures (e.g. lists) can be implemented using closures (see [test/quicksort.expr](test/quicksort.expr)).
 The evaluation order of `letrec` bindings, calls, and sequence, is left-to-right.
 `get`/`put` reads/writes one line each time where each line contains one integer.
 `exit` stops the execution immediately.
 The full semantic reference is the interpreter itself.
 
-## usage
+## interpreter usage
 
 `python3 src/interpreter.py run <file>` runs the code in `<file>`.
 
