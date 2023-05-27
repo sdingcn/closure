@@ -419,7 +419,6 @@ def interpret(tree: Expr) -> Value:
 def main(source) -> None:
     tokens = lex(source)
     tree = parse(tokens)
-    print(tree)
     result = interpret(tree)
     if type(result) == Integer:
         print(result.value)

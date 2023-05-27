@@ -24,14 +24,14 @@ Python >= 3.9
 
 ```
 
-There are three types of objects: integer, closure, void (with only one value obtainable by calling `void`).
+Support 3 types of objects: integer, closure, void (with only one value obtainable by calling `void`).
 Objects are immutable.
 Variables are bound to locations in a global store, which maps locations to objects.
-Binding a variable generally creates a new location, except for binding to another variable where only the location is copied.
+Binding a variable generally creates a new location, except for binding to another variable.
 Variables are immutable once bound.
 Garbage collection removes store entries unreachable from the current call stack, and can only be triggered by `gc`.
 Lambdas are lexically scoped and are thus evaluated to closures.
-Common data structures (e.g. lists) can be implemented using closures (see `test/` for examples).
+Common data structures (e.g. lists) can be implemented using closures (see `test/quicksort.expr`).
 The evaluation order of `letrec` bindings, calls, and sequence, is left-to-right.
 The full semantic reference is the interpreter itself.
 
