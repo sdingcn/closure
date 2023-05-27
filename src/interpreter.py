@@ -397,7 +397,7 @@ def interpret(tree: Expr) -> Value:
             new_env = closure.env[:]
             n_args = len(closure.fun.var_list)
             if n_args != len(node.arg_list):
-                sys.exit('[Expr Runtime] error: wrong number of arguments given to a lambda')
+                sys.exit(f'[Expr Runtime] error: wrong number of arguments given to the lambda "{str(closure.fun)}"')
             for i in range(n_args):
                 new_env.append((closure.fun.var_list[i].name, runtime.new(evaluate(node.arg_list[i], env[:]))))
             runtime.stack.append(Frame(new_env[:]))
@@ -419,6 +419,7 @@ def interpret(tree: Expr) -> Value:
 def main(source) -> None:
     tokens = lex(source)
     tree = parse(tokens)
+    print(tree)
     result = interpret(tree)
     if type(result) == Integer:
         print(result.value)
