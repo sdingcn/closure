@@ -293,9 +293,10 @@ class Runtime:
 
         def get() -> Integer:
             try:
-                return Integer(int(input().strip()))
+                s = input().strip()
+                return Integer(int(s))
             except ValueError:
-                sys.exit('[Expr Runtime] error: unsupported input')
+                sys.exit(f'[Expr Runtime] error: unsupported input "{s}"')
 
         def put(a: Integer) -> Void:
             print(a.value)
@@ -377,7 +378,7 @@ def interpret(tree: Expr) -> Value:
         elif type(node) == If:
             c = evaluate(node.cond, env[:])
             if type(c) != Integer:
-                sys.exit('[Expr Runtime] error: "if" condition does not evaluate to an integer')
+                sys.exit('[Expr Runtime] error: an "if" condition does not evaluate to an integer')
             if c.value != 0:
                 return evaluate(node.branch1, env[:])
             else:
@@ -397,7 +398,7 @@ def interpret(tree: Expr) -> Value:
             new_env = closure.env[:]
             n_args = len(closure.fun.var_list)
             if n_args != len(node.arg_list):
-                sys.exit(f'[Expr Runtime] error: wrong number of arguments given to the lambda "{str(closure.fun)}"')
+                sys.exit(f'[Expr Runtime] error: wrong number of arguments given to the lambda "{closure.fun}"')
             for i in range(n_args):
                 new_env.append((closure.fun.var_list[i].name, runtime.new(evaluate(node.arg_list[i], env[:]))))
             runtime.stack.append(Frame(new_env[:]))
@@ -410,7 +411,7 @@ def interpret(tree: Expr) -> Value:
                 value = evaluate(e, env[:])
             return value
         else:
-            sys.exit('[Expr Runtime] error: unrecognized AST node')
+            sys.exit(f'[Expr Runtime] error: unrecognized AST node "{node}"')
 
     return evaluate(tree, [])
 
@@ -428,11 +429,11 @@ def main(option: str, source: str) -> None:
         elif type(result) == Void:
             print('Void')
         else:
-            sys.exit('[Expr Main] error: unknown evaluation result')
+            sys.exit(f'[Expr Main] error: unknown evaluation result "{result}"')
     elif option == 'dump-ast':
         print(tree)
     else:
-        sys.exit('[Expr Main] error: unknown command-line option')
+        sys.exit(f'[Expr Main] error: unknown command-line option "{option}"')
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:

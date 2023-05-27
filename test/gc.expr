@@ -1,9 +1,12 @@
 [
+(put (gc))
 letrec (a = 1) { (void) }
 letrec (a = 2) { (void) }
 (put (gc))
 letrec (a = 3) { (void) }
 letrec (a = 4) { (void) }
 letrec (a = 5) { [(put (gc)) (void)] }
+(put (gc))
+letrec (f = lambda (x) { [(put (gc)) (void)] }) { (f 0) }
 (put (gc))
 ]
