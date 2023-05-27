@@ -220,12 +220,6 @@ class Frame:
     def __init__(self):
         self.env = []
 
-    def push(self, var: str, loc: int) -> None:
-        self.env.append((var, loc))
-
-    def pop(self) -> None:
-        self.env.pop()
-
 class Runtime:
 
     def __init__(self):
@@ -256,12 +250,6 @@ class Runtime:
                 return int(s)
             else:
                 continue
-
-    def push(self, frame: Frame) -> None:
-        self.stack.append(frame)
-
-    def pop(self) -> None:
-        self.stack.pop()
 
     def new(self, value: Value) -> int:
         self.store[location] = value
@@ -317,7 +305,11 @@ def interpret(tree: Expr) -> Value:
                 new_env.append((v, loc))
             for v, e in node.var_expr_list:
                 runtime.store[var_to_location(v, new_env)] = evaluate(e, new_env[:])
-            return evaluate(node.expr, new_env[:])
+            old_env = runtime.stack[-1].env
+            runtime.stack[-1].env = new_env
+            value = evaluate(node.expr, new_env[:])
+            runtime.stack[-1].env = old_env
+            return value
         elif type(node) == If:
             c = evaluate(node.cond, env[:])
             if c.value != 0:
@@ -335,7 +327,10 @@ def interpret(tree: Expr) -> Value:
             n_args = len(closure.fun.var_list)
             for i in range(n_args):
                 new_env.append((closure.fun.var_list[i], runtime.new(evaluate(node.arg_list[i], env[:]))))
-            return evaluate(closure.fun.expr, new_env[:])
+            runtime.stack.append(Frame(new_env[:]))
+            value = evaluate(closure.fun.expr, new_env[:])
+            runtime.stack.pop()
+            return value
         elif type(node) == Seq:
             v = None
             for e in node.expr_list:
