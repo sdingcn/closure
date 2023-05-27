@@ -416,21 +416,30 @@ def interpret(tree: Expr) -> Value:
 
 # main entry
 
-def main(source) -> None:
+def main(option: str, source: str) -> None:
     tokens = lex(source)
     tree = parse(tokens)
-    result = interpret(tree)
-    if type(result) == Integer:
-        print(result.value)
-    elif type(result) == Closure:
-        print('Closure')
-    elif type(result) == Void:
-        print('Void')
+    if option == 'run':
+        result = interpret(tree)
+        if type(result) == Integer:
+            print(result.value)
+        elif type(result) == Closure:
+            print('Closure')
+        elif type(result) == Void:
+            print('Void')
+        else:
+            sys.exit('[Expr Main] error: unknown evaluation result')
+    elif option == 'dump-ast':
+        print(tree)
     else:
-        sys.exit('[Expr Main] error: unknown evaluation result')
+        sys.exit('[Expr Main] error: unknown command-line option')
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        sys.exit(f'Usage: python3 {sys.argv[0]} <source-file>')
-    with open(sys.argv[1], 'r') as f:
-        main(f.read())
+    if len(sys.argv) != 3:
+        sys.exit(
+            'Usage\n'
+            f'python3 {sys.argv[0]} run <source-file>'
+            f'python3 {sys.argv[0]} dump-ast <source-file>'
+        )
+    with open(sys.argv[2], 'r') as f:
+        main(sys.argv[1], f.read())

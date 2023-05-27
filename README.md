@@ -37,4 +37,6 @@ The full semantic reference is the interpreter itself.
 
 ## usage
 
-`python3 interpreter.py <file>` runs code in `<file>`.
+`python3 src/interpreter.py run <file>` runs the code in `<file>`.
+
+`python3 src/interpreter.py dump-ast <file>` dumps the AST of the code in `<file>`.
