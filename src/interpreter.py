@@ -79,8 +79,8 @@ class Icall(Expr):
 
 class Call(Expr):
 
-    def __init__(self, fun: Expr, arg_list: list[Expr]):
-        self.fun = fun
+    def __init__(self, callee: Expr, arg_list: list[Expr]):
+        self.callee = callee
         self.arg_list = arg_list
 
 class Seq(Expr):
@@ -158,12 +158,12 @@ def parse(tokens: deque[str]) -> Node:
 
     def parse_call() -> Call:
         tokens.popleft() # (
-        fun = parse_expr()
+        callee = parse_expr()
         arg_list = []
         while tokens[0] != ')':
             arg_list.append(parse_expr())
         tokens.popleft() # )
-        return Call(fun, arg_list)
+        return Call(callee, arg_list)
 
     def parse_seq() -> Seq:
         tokens.popleft() # [
@@ -295,11 +295,56 @@ class Runtime:
 # interpreter
 
 def interpret(tree: Expr) -> Value:
+    runtime = Runtime()
 
-    def recurse(node: Expr, env: list[tuple[str, int]]) -> Value:
-        pass
+    def var_to_location(var: str, env: list[tuple[str, int]]) -> int:
+        for i in range(len(env) - 1, -1, -1):
+            if env[i][0] == var:
+                return env[i][1]
+        sys.exit('[Expr Runtime] Undefined variable')
 
-    return recurse(tree, [])
+    def evaluate(node: Expr, env: list[tuple[str, int]]) -> Value:
+        if type(node) == Int:
+            return Integer(node.value)
+        elif type(node) == Var:
+            return runtime.store[var_to_location(node.name, env)]
+        elif type(node) == Lambda:
+            return Closure(env[:], node)
+        elif type(node) == Letrec:
+            new_env = env[:]
+            for v, e in node.var_expr_list:
+                loc = runtime.new(Void())
+                new_env.append((v, loc))
+            for v, e in node.var_expr_list:
+                runtime.store[var_to_location(v, new_env)] = evaluate(e, new_env[:])
+            return evaluate(node.expr, new_env[:])
+        elif type(node) == If:
+            c = evaluate(node.cond, env[:])
+            if c.value != 0:
+                return evaluate(node.branch1, env[:])
+            else:
+                return evaluate(node.branch2, env[:])
+        elif type(node) == Icall:
+            arg_vals = []
+            for arg in node.arg_list:
+                arg_vals.append(evaluate(arg, env[:]))
+            return runtime.intrinsics[node.intrinsic](*arg_vals)
+        elif type(node) == Call:
+            closure = evaluate(node.callee, env[:])
+            new_env = closure.env[:]
+            n_args = len(closure.fun.var_list)
+            for i in range(n_args):
+                new_env.append((closure.fun.var_list[i], runtime.new(evaluate(node.arg_list[i], env[:]))))
+            return evaluate(closure.fun.expr, new_env[:])
+        elif type(node) == Seq:
+            v = None
+            for e in node.expr_list:
+                v = evaluate(e, env[:])
+            return v
+        else:
+            sys.exit('[Expr Runtime] unrecognized expression')
+
+    return evaluate(tree, [])
 
 # main entry
 
