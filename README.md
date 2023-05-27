@@ -14,10 +14,10 @@ Python >= 3.9
 <var> := [a-zA-Z]+ ; except for keywords and intrinsic function names
 
 <expr> := <int>
-        | <var>
         | lambda ( <var> *) { <expr> }
         | letrec ( <var> = <expr> *) { <expr> }
         | if <expr> then <expr> else <expr>
+        | <var>
         | ( <intrinsic> <expr>* ) ; intrinsic call
         | ( <expr> <expr>* ) ; function call
         | [ <expr> <expr>* ] ; sequence

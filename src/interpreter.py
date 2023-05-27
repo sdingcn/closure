@@ -1,5 +1,6 @@
 import sys
 from collections import deque
+from typing import Union, Any
 
 # lexer
 
@@ -22,10 +23,10 @@ def lex(source: str) -> deque[str]:
                 token = ''
                 while chars and chars[0].isalpha():
                     token += chars.popleft()
-            elif chars[0] in ('(', ')', '{', '}', '[', ']', '+', '-', '*', '/', '%', '<'):
+            elif chars[0] in ('(', ')', '{', '}', '[', ']', '+', '-', '*', '/', '%', '<', '='):
                 token = chars.popleft()
             else:
-                sys.exit('[Expr Lexer] error: unrecognized character')
+                sys.exit(f'[Expr Lexer] error: unrecognized character "{chars[0]}"')
             return token
         else:
             return ''
@@ -41,18 +42,52 @@ def lex(source: str) -> deque[str]:
 
 # AST and parser
 
+def unfold_to_string(value: Union[list[Any], tuple[Any, ...]]):
+    if type(value) == list:
+        s = '['
+    elif type(value) == tuple:
+        s = '('
+    else:
+        sys.exit('[Expr Internal] error: wrong type of argument given to "unfold_to_string"')
+    for e in value:
+        if type(e) == list or type(e) == tuple:
+            s += unfold_to_string(e)
+        else:
+            s += str(e)
+        s += ' '
+    if s[-1] == ' ':
+        s = s[:-1]
+    if type(value) == list:
+        s += ']'
+    elif type(value) == tuple:
+        s += ')'
+    else:
+        sys.exit('[Expr Internal] error: wrong type of argument given to "unfold_to_string"')
+    return s
+
 class Expr:
-    pass
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return 'Expr'
 
 class Int(Expr):
 
     def __init__(self, value: int):
         self.value = value
 
+    def __str__(self):
+        return f'(Int {self.value})'
+
 class Var(Expr):
 
     def __init__(self, name: str):
         self.name = name
+
+    def __str__(self):
+        return f'(Var "{self.name}")'
 
 class Lambda(Expr):
 
@@ -60,11 +95,17 @@ class Lambda(Expr):
         self.var_list = var_list
         self.expr = expr
 
+    def __str__(self):
+        return f'(Lambda {unfold_to_string(self.var_list)} {str(self.expr)})'
+
 class Letrec(Expr):
 
     def __init__(self, var_expr_list: list[tuple[Var, Expr]], expr: Expr):
         self.var_expr_list = var_expr_list
         self.expr = expr
+
+    def __str__(self):
+        return f'(Letrec {unfold_to_string(self.var_expr_list)} {str(self.expr)})'
 
 class If(Expr):
 
@@ -73,11 +114,17 @@ class If(Expr):
         self.branch1 = branch1
         self.branch2 = branch2
 
+    def __str__(self):
+        return f'(If {str(self.cond)} {str(self.branch1)} {str(self.branch2)})'
+
 class Icall(Expr):
 
     def __init__(self, intrinsic: str, arg_list: list[Expr]):
         self.intrinsic = intrinsic
         self.arg_list = arg_list
+
+    def __str__(self):
+        return f'(Icall {self.intrinsic} {unfold_to_string(self.arg_list)})'
 
 class Call(Expr):
 
@@ -85,12 +132,18 @@ class Call(Expr):
         self.callee = callee
         self.arg_list = arg_list
 
+    def __str__(self):
+        return f'(Call {str(self.callee)} {unfold_to_string(self.arg_list)})'
+
 class Seq(Expr):
 
     def __init__(self, expr_list: list[Expr]):
         self.expr_list = expr_list
 
-def parse(tokens: deque[str]) -> Node:
+    def __str__(self):
+        return f'(Seq {unfold_to_string(self.expr_list)})'
+
+def parse(tokens: deque[str]) -> Expr:
     
     def is_int(token: str) -> bool:
         try:
@@ -108,10 +161,6 @@ def parse(tokens: deque[str]) -> Node:
     def parse_int() -> Int:
         value = int(tokens.popleft())
         return Int(value)
-
-    def parse_var() -> Var:
-        name = tokens.popleft()
-        return Var(name)
 
     def parse_lambda() -> Lambda:
         tokens.popleft() # lambda
@@ -149,6 +198,10 @@ def parse(tokens: deque[str]) -> Node:
         branch2 = parse_expr()
         return If(cond, branch1, branch2)
 
+    def parse_var() -> Var:
+        name = tokens.popleft()
+        return Var(name)
+
     def parse_icall() -> Icall:
         tokens.popleft() # (
         intrinsic = tokens.popleft()
@@ -180,14 +233,14 @@ def parse(tokens: deque[str]) -> Node:
     def parse_expr() -> Expr:
         if is_int(tokens[0]):
             return parse_int()
-        elif is_var(tokens[0]):
-            return parse_var()
         elif tokens[0] == 'lambda':
             return parse_lambda()
         elif tokens[0] == 'letrec':
             return parse_letrec()
         elif tokens[0] == 'if':
             return parse_if()
+        elif is_var(tokens[0]):
+            return parse_var()
         elif tokens[0] == '(':
             if is_intrinsic(tokens[1]):
                 return parse_icall()
@@ -196,7 +249,7 @@ def parse(tokens: deque[str]) -> Node:
         elif tokens[0] == '[':
             return parse_seq()
         else:
-            sys.exit('[Expr Parser] error: unrecognized expression')
+            sys.exit(f'[Expr Parser] error: unrecognized expression starting with "{tokens[0]}"')
     
     try:
         return parse_expr()
@@ -206,7 +259,9 @@ def parse(tokens: deque[str]) -> Node:
 # runtime
 
 class Value:
-    pass
+    
+    def __init__(self):
+        pass
 
 class Integer(Value):
 
@@ -226,30 +281,27 @@ class Void(Value):
 
 class Frame:
 
-    def __init__(self):
-        self.env = []
+    def __init__(self, env):
+        self.env = env
 
 class Runtime:
 
     def __init__(self):
-        self.stack = [Frame()]
+        self.stack = [Frame([])]
         self.store = {}
         self.location = 0
 
-        def get() -> int:
-            while True:
-                char = sys.stdin.read(1)
-                if char in ('-', '+') or char.isdigit():
-                    s = char
-                    while sys.stdin.peek(1).isdigit():
-                        s += sys.stdin.read(1)
-                    return int(s)
-                elif char.isspace():
-                    continue
-                else:
-                    sys.exit('[Expr Runtime] error: unsupported input')
+        def get() -> Integer:
+            try:
+                return Integer(int(input().strip()))
+            except ValueError:
+                sys.exit('[Expr Runtime] error: unsupported input')
+
+        def put(a: Integer) -> Void:
+            print(a.value)
+            return Void()
     
-        def collect(stack: list[Frame], store: dict[int, Value]) -> None:
+        def collect(stack: list[Frame], store: dict[int, Value]) -> Void:
             visited = set()
 
             def mark(loc: int) -> None:
@@ -272,26 +324,27 @@ class Runtime:
                     mark(l)
             n = sweep()
             sys.stderr.write(f'[Expr Runtime] message: GC released {n} objects\n')
+            return Void()
 
         self.intrinsics = {
-            '+': lambda a, b : a + b,
-            '-': lambda a, b : a - b,
-            '*': lambda a, b : a * b,
-            '/': lambda a, b : a / b,
-            '%': lambda a, b : a % b,
-            '<': lambda a, b : a < b,
+            '+': lambda a, b : Integer(a.value + b.value),
+            '-': lambda a, b : Integer(a.value - b.value),
+            '*': lambda a, b : Integer(a.value * b.value),
+            '/': lambda a, b : Integer(a.value / b.value),
+            '%': lambda a, b : Integer(a.value % b.value),
+            '<': lambda a, b : Integer(a.value < b.value),
             'void': lambda : Void(),
             'get': get,
-            'put': lambda a : print(a),
+            'put': put,
             'gc': lambda : collect(self.stack, self.store),
-            'exit' lambda : sys.exit('[Expr Runtime] message: execution stopped by the "exit" intrinsic function')
+            'exit': lambda : sys.exit('[Expr Runtime] message: execution stopped by the "exit" intrinsic function')
         }
 
 
     def new(self, value: Value) -> int:
         self.store[self.location] = value
         self.location += 1
-        return self.location
+        return self.location - 1
 
 # interpreter
 
@@ -302,13 +355,11 @@ def interpret(tree: Expr) -> Value:
         for i in range(len(env) - 1, -1, -1):
             if env[i][0] == var:
                 return env[i][1]
-        sys.exit('[Expr Runtime] error: undefined variable')
+        sys.exit(f'[Expr Runtime] error: undefined variable "{var}"')
 
     def evaluate(node: Expr, env: list[tuple[str, int]]) -> Value:
         if type(node) == Int:
             return Integer(node.value)
-        elif type(node) == Var:
-            return runtime.store[var_to_location(node.name, env)]
         elif type(node) == Lambda:
             return Closure(env[:], node)
         elif type(node) == Letrec:
@@ -331,14 +382,16 @@ def interpret(tree: Expr) -> Value:
                 return evaluate(node.branch1, env[:])
             else:
                 return evaluate(node.branch2, env[:])
+        elif type(node) == Var:
+            return runtime.store[var_to_location(node.name, env)]
         elif type(node) == Icall:
             arg_vals = []
             for arg in node.arg_list:
                 arg_vals.append(evaluate(arg, env[:]))
             try:
                 return runtime.intrinsics[node.intrinsic](*arg_vals)
-            except TypeError:
-                sys.exit('[Expr Runtime] error: wrong number of arguments given to an intrinsic function')
+            except TypeError as e:
+                sys.exit(f'[Expr Runtime] error: wrong number/type of arguments given to the intrinsic function "{node.intrinsic}"')
         elif type(node) == Call:
             closure = evaluate(node.callee, env[:])
             new_env = closure.env[:]
