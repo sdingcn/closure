@@ -301,7 +301,7 @@ class Runtime:
             print(a.value)
             return Void()
     
-        def collect(stack: list[Frame], store: dict[int, Value]) -> Void:
+        def collect(stack: list[Frame], store: dict[int, Value]) -> Integer:
             visited = set()
 
             def mark(loc: int) -> None:
@@ -311,20 +311,20 @@ class Runtime:
                         if l not in visited:
                             mark(l)
 
-            def sweep() -> None:
+            def sweep() -> int:
                 to_remove = set()
                 for k, v in store.items():
                     if k not in visited:
                         to_remove.add(k)
                 for k in to_remove:
                     del store[k]
+                return len(to_remove)
 
             for frame in stack:
                 for v, l in frame.env:
                     mark(l)
             n = sweep()
-            sys.stderr.write(f'[Expr Runtime] message: GC released {n} objects\n')
-            return Void()
+            return Integer(n)
 
         self.intrinsics = {
             '+': lambda a, b : Integer(a.value + b.value),
