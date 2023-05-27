@@ -1,22 +1,6 @@
 import sys
 from collections import deque
 
-# intrinsics
-
-IMAP = {
-    '+': ,
-    '-': ,
-    '*': ,
-    '/': ,
-    '%': ,
-    '<': ,
-    'void': ,
-    'get': ,
-    'put': ,
-    'gc': ,
-    'error':
-}
-
 # lexer
 
 def lex(source: str) -> deque[str]:
@@ -87,7 +71,7 @@ class If(Expr):
         self.branch1 = branch1
         self.branch2 = branch2
 
-class IntrinsicCall(Expr):
+class Icall(Expr):
 
     def __init__(self, intrinsic: str, arg_list: list[Expr]):
         self.intrinsic = intrinsic
@@ -105,7 +89,7 @@ class Seq(Expr):
         self.expr_list = expr_list
 
 def parse(tokens: deque[str]) -> Node:
-
+    
     def is_int(s: str) -> bool:
         try:
             int(s)
@@ -114,7 +98,7 @@ def parse(tokens: deque[str]) -> Node:
             return False
 
     def is_intrinsic(s: str) -> bool:
-        return s in []
+        return s in { '+', '-', '*', '/', '%', '<', 'void', 'get', 'put', 'gc', 'error' }
 
     def is_var(s: str) -> bool:
         return s.isalpha()
@@ -163,6 +147,15 @@ def parse(tokens: deque[str]) -> Node:
         branch2 = parse_expr()
         return If(cond, branch1, branch2)
 
+    def parse_icall() -> Icall:
+        tokens.popleft() # (
+        intrinsic = tokens.popleft()
+        arg_list = []
+        while tokens[0] != ')':
+            arg_list.append(parse_expr())
+        tokens.popleft() # )
+        return Icall(intrinsic, arg_list)
+
     def parse_call() -> Call:
         tokens.popleft() # (
         fun = parse_expr()
@@ -192,13 +185,16 @@ def parse(tokens: deque[str]) -> Node:
         elif tokens[0] == 'if':
             return parse_if()
         elif tokens[0] == '(':
-            return parse_call()
+            if is_intrinsic(tokens[1]):
+                return parse_icall()
+            else:
+                return parse_call()
         elif tokens[0] == '[':
             return parse_seq()
     
     return parse_expr()
 
-# runtime classes
+# runtime
 
 class Value:
     pass
@@ -230,44 +226,75 @@ class Frame:
     def pop(self) -> None:
         self.env.pop()
 
-# garbage collector
+class Runtime:
 
-def collect(store: dict[int, Value], stack: list[tuple[str, int]]) -> None:
-    visited = set()
+    def __init__(self):
+        self.stack = []
+        self.store = {}
+        self.location = 0
+        self.intrinsics = {
+            '+': lambda a, b : a + b,
+            '-': lambda a, b : a - b,
+            '*': lambda a, b : a * b,
+            '/': lambda a, b : a / b,
+            '%': lambda a, b : a % b,
+            '<': lambda a, b : a < b,
+            'void': lambda : Void(),
+            'get': self.get,
+            'put': lambda a : print(a),
+            'gc': self.collect,
+            'error' lambda : sys.exit('[Expr Runtime] Execution stopped by the "error" intrinsic function'):
+        }
 
-    def mark(location: int) -> None:
-        visited.add(location)
-        if type(store[location]) == Closure:
-            for var, loc in store[location].env:
-                if loc not in visited:
-                    mark(loc)
+    def get(self) -> int:
+        while True:
+            char = sys.stdin.read(1)
+            if char in ('-', '+') or char.isdigit():
+                s = char
+                while sys.stdin.peek(1).isdigit():
+                    s += sys.stdin.read(1)
+                return int(s)
+            else:
+                continue
 
-    def sweep() -> None:
-        to_remove = set()
-        for k, v in store.items():
-            if k not in visited:
-                to_remove.add(k)
-        for k in to_remove:
-            del store[k]
+    def push(self, frame: Frame) -> None:
+        self.stack.append(frame)
 
-    for frame in stack:
-        for var, loc in frame.env:
-            mark(loc)
-    n = sweep()
-    sys.stderr.write(f'GC: collected {n} locations\n')
+    def pop(self) -> None:
+        self.stack.pop()
+
+    def new(self, value: Value) -> int:
+        self.store[location] = value
+        self.location += 1
+        return self.location
+    
+    def collect() -> None:
+        visited = set()
+
+        def mark(loc: int) -> None:
+            visited.add(loc)
+            if type(self.store[loc]) == Closure:
+                for v, l in self.store[loc].env:
+                    if l not in visited:
+                        mark(l)
+
+        def sweep() -> None:
+            to_remove = set()
+            for k, v in self.store.items():
+                if k not in visited:
+                    to_remove.add(k)
+            for k in to_remove:
+                del self.store[k]
+
+        for frame in self.stack:
+            for v, l in frame.env:
+                mark(l)
+        n = sweep()
+        sys.stderr.write(f'[Expr Runtime] GC collected {n} locations\n')
 
 # interpreter
 
 def interpret(tree: Expr) -> Value:
-    store = {}
-    location = 0
-
-    def new(value: Value) -> int:
-        store[location] = value
-        location += 1
-        return location
-
-    stack = []
 
     def recurse(node: Expr, env: list[tuple[str, int]]) -> Value:
         pass
