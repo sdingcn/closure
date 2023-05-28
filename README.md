@@ -33,7 +33,7 @@ Garbage collection removes store entries unreachable from the current call stack
 Lambdas are lexically scoped and are thus evaluated to closures.
 Common data structures (e.g. lists) can be (awkwardly) implemented using closures
 (see [test/quicksort.expr](test/quicksort.expr)).
-Some OOP features (e.g. inheritance) can also be (awkwardly) implemented using closures
+Some limited forms of OOP features (e.g. inheritance) can also be (awkwardly) implemented using closures
 (see [test/oop-inheritance.expr](test/oop-inheritance.expr)).
 The evaluation order of `letrec` bindings, calls, and sequence, is left-to-right.
 `get`/`put` reads/writes one line each time where each line contains one integer.
