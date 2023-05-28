@@ -41,7 +41,7 @@ def main():
         print('.')
         if not check_io(*test):
             sys.exit(f'Failed on test "{test}"')
-    sys.exit('All tests passed, but return nonzero')
+    print('All tests passed')
 
 if __name__ == '__main__':
     main()
