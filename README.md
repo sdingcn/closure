@@ -1,5 +1,7 @@
 # expr
 
+[Tests](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
+
 ## dependencies
 
 Python >= 3.9
