@@ -47,3 +47,5 @@ The full semantic reference is the interpreter itself.
 `python3 src/interpreter.py run <file>` runs the code in `<file>`.
 
 `python3 src/interpreter.py dump-ast <file>` dumps the AST of the code in `<file>`.
+
+`python3 test.py` runs all tests.
