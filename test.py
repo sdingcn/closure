@@ -19,8 +19,6 @@ def main():
         ('test/abs.expr', ['0'], ['0']),
         ('test/abs.expr', ['-501'], ['501']),
 
-        ('test/garbage-collection.expr', [], ['0', '2', '2', '1', '0', '2', '0', '3', 'Void']),
-
         ('test/gcd.expr', ['100', '0'], ['100', 'Void']),
         ('test/gcd.expr', ['0', '100'], ['100', 'Void']),
         ('test/gcd.expr', ['30', '30'], ['30', 'Void']),
@@ -35,7 +33,13 @@ def main():
         ('test/quicksort.expr', ['1', '303'], ['303', 'Void']),
         ('test/quicksort.expr', ['3', '1', '3', '7'], ['1', '3', '7', 'Void']),
         ('test/quicksort.expr', ['5', '5', '4', '3', '2', '1'], ['1', '2', '3', '4', '5', 'Void']),
-        ('test/quicksort.expr', ['6', '8', '-1', '3', '0', '6', '-5'], ['-5', '-1', '0', '3', '6', '8', 'Void'])
+        ('test/quicksort.expr', ['6', '8', '-1', '3', '0', '6', '-5'], ['-5', '-1', '0', '3', '6', '8', 'Void']),
+
+        ('test/lexical-scope.expr', [], ['1']),
+
+        ('test/garbage-collection.expr', [], ['0', '2', '2', '1', '0', '2', '0', '3', 'Void']),
+
+        ('test/continuation.expr', [], ['3', '2', '1', '1', '2', '3', '3', '2', '1', '300'])
     ]
     for test in tests:
         print('.')

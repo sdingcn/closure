@@ -1,0 +1,14 @@
+letrec (
+  eq = lambda (a b) {
+    if (< (+ (< a b) (< b a)) 1) then 1 else 0
+  }
+  recur = lambda (n k) {
+    if (eq n 0) then (k 200)
+    else [(put n) (recur (- n 1) k) (put n)]
+  }
+) {
+  [
+    (recur 3 lambda (x) { (void) })
+    (+ 100 (callcc lambda (k) { (recur 3 k) }))
+  ]
+}

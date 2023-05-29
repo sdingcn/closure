@@ -1,0 +1,7 @@
+letrec (
+  f = letrec (a = 1) {
+    lambda () { a }
+  }
+) {
+  letrec (a = 2) { (f) }
+}
