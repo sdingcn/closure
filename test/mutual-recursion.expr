@@ -1,11 +1,11 @@
 letrec (
   f = lambda (x) {
-    if (< x 0) then (void)
-    else [(put x) (g (- x 1))]
+    if (lt x 0) then (void)
+    else [(put x) (g (sub x 1))]
   }
   g = lambda (x) {
-    if (< x 0) then (void)
-    else [(put x) (f (- x 1))]
+    if (lt x 0) then (void)
+    else [(put x) (f (sub x 1))]
   }
 ) {
   (f 10)

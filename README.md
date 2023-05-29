@@ -14,7 +14,7 @@ Python >= 3.9
 ```
 
 ```
-<intrinsic> := + | - | * | / | % | < | void | get | put | gc | callcc | exit
+<intrinsic> := add | sub | mul | div | mod | lt | void | get | put | gc | callcc | exit
 <var-list> := epsilon | <var> <var-list>
 <var-expr-list> := epsilon | <var> = <expr> <var-expr-list>
 <expr-list> := epsilon | <expr> <expr-list>
@@ -23,8 +23,7 @@ Python >= 3.9
         | letrec ( <var-expr-list> ) { <expr> }
         | if <expr> then <expr> else <expr>
         | <var>
-        | ( <intrinsic> <expr-list> ) ; intrinsic call
-        | ( <expr> <expr-list> ) ; function call
+        | ( <intrinsic> <expr-list> ) ; intrinsic / lambda / continuation call
         | [ <expr> <expr-list> ] ; sequence
 ```
 
@@ -35,7 +34,6 @@ Python >= 3.9
 | letrec and (mutual) recursion | complete |
 | mark-and-sweep garbage collection | in progress |
 | first-class continuations | not started |
-| ? | ? |
 
 The full semantic reference is the interpreter itself.
 

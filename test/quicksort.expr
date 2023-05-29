@@ -1,9 +1,9 @@
 letrec (
   eq = lambda (a b) {
-    if (< (+ (< a b) (< b a)) 1) then 1 else 0
+    if (lt (add (lt a b) (lt b a)) 1) then 1 else 0
   }
   leq = lambda (a b) {
-    if (< b a) then 0 else 1
+    if (lt b a) then 0 else 1
   }
   gt = lambda (a b) {
     if (leq a b) then 0 else 1
@@ -37,11 +37,11 @@ letrec (
   }
   len = lambda (list) {
     if (isnull list) then 0
-    else (+ 1 (len (cdr list)))
+    else (add 1 (len (cdr list)))
   }
   getlist = lambda (n) {
     if (eq n 0) then (null)
-    else (cons (get) (getlist (- n 1)))
+    else (cons (get) (getlist (sub n 1)))
   }
   putlist = lambda (list) {
     if (isnull list) then (void)

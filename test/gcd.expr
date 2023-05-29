@@ -1,9 +1,9 @@
 letrec (
   eq = lambda (a b) {
-    if (< (+ (< a b) (< b a)) 1) then 1 else 0
+    if (lt (add (lt a b) (lt b a)) 1) then 1 else 0
   }
   gcd = lambda (a b) {
-    if (eq b 0) then a else (gcd b (% a b))
+    if (eq b 0) then a else (gcd b (mod a b))
   }
 ) {
   (put (gcd (get) (get)))

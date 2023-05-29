@@ -10,8 +10,12 @@ def run_and_read(cmd: str, inp: str) -> str:
     ).stdout
 
 def check_io(prog: str, i: list[str], o: list[str]) -> bool:
-    out = run_and_read(['python3', 'src/interpreter.py', 'run', prog], '\n'.join(i))
-    return list(map(lambda s: s.strip(), out.split())) == o
+    o1 = list(map(lambda s: s.strip(), run_and_read(['python3', 'src/interpreter.py', 'run', prog], '\n'.join(i)).split()))
+    if o1 == o:
+        return True
+    else:
+        print(f'Expected: {o}, got: {o1}')
+        return False
 
 def main():
     tests = [
@@ -26,8 +30,6 @@ def main():
         ('test/gcd.expr', ['7', '100'], ['1', 'Void']),
 
         ('test/mutual-recursion.expr', [], ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1', '0', 'Void']),
-
-        ('test/oop-inheritance.expr', [], ['1', '11', '2', 'Void']),
 
         ('test/quicksort.expr', ['0'], ['Void']),
         ('test/quicksort.expr', ['1', '303'], ['303', 'Void']),

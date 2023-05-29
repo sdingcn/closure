@@ -23,7 +23,7 @@ def lex(source: str) -> deque[str]:
                 token = ''
                 while chars and chars[0].isalpha():
                     token += chars.popleft()
-            elif chars[0] in ('(', ')', '{', '}', '[', ']', '+', '-', '*', '/', '%', '<', '='):
+            elif chars[0] in ('(', ')', '{', '}', '[', ']', '='):
                 token = chars.popleft()
             else:
                 sys.exit(f'[Expr Lexer] error: unrecognized character "{chars[0]}"')
@@ -117,15 +117,6 @@ class If(Expr):
     def __str__(self):
         return f'(If {str(self.cond)} {str(self.branch1)} {str(self.branch2)})'
 
-class Icall(Expr):
-
-    def __init__(self, intrinsic: str, arg_list: list[Expr]):
-        self.intrinsic = intrinsic
-        self.arg_list = arg_list
-
-    def __str__(self):
-        return f'(Icall {self.intrinsic} {unfold_to_string(self.arg_list)})'
-
 class Call(Expr):
 
     def __init__(self, callee: Expr, arg_list: list[Expr]):
@@ -151,9 +142,6 @@ def parse(tokens: deque[str]) -> Expr:
             return True
         except ValueError:
             return False
-
-    def is_intrinsic(token: str) -> bool:
-        return token in { '+', '-', '*', '/', '%', '<', 'void', 'get', 'put', 'gc', 'exit' }
 
     def is_var(token: str) -> bool:
         return token.isalpha()
@@ -202,15 +190,6 @@ def parse(tokens: deque[str]) -> Expr:
         name = tokens.popleft()
         return Var(name)
 
-    def parse_icall() -> Icall:
-        tokens.popleft() # (
-        intrinsic = tokens.popleft()
-        arg_list = []
-        while tokens[0] != ')':
-            arg_list.append(parse_expr())
-        tokens.popleft() # )
-        return Icall(intrinsic, arg_list)
-
     def parse_call() -> Call:
         tokens.popleft() # (
         callee = parse_expr()
@@ -242,10 +221,7 @@ def parse(tokens: deque[str]) -> Expr:
         elif is_var(tokens[0]):
             return parse_var()
         elif tokens[0] == '(':
-            if is_intrinsic(tokens[1]):
-                return parse_icall()
-            else:
-                return parse_call()
+            return parse_call()
         elif tokens[0] == '[':
             return parse_seq()
         else:
@@ -328,12 +304,12 @@ class Runtime:
             return Integer(n)
 
         self.intrinsics = {
-            '+': lambda a, b : Integer(a.value + b.value),
-            '-': lambda a, b : Integer(a.value - b.value),
-            '*': lambda a, b : Integer(a.value * b.value),
-            '/': lambda a, b : Integer(a.value / b.value),
-            '%': lambda a, b : Integer(a.value % b.value),
-            '<': lambda a, b : Integer(a.value < b.value),
+            'add': lambda a, b : Integer(a.value + b.value),
+            'sub': lambda a, b : Integer(a.value - b.value),
+            'mul': lambda a, b : Integer(a.value * b.value),
+            'div': lambda a, b : Integer(a.value / b.value),
+            'mod': lambda a, b : Integer(a.value % b.value),
+            'lt': lambda a, b : Integer(a.value < b.value),
             'void': lambda : Void(),
             'get': get,
             'put': put,
@@ -352,7 +328,7 @@ class Runtime:
 def interpret(tree: Expr) -> Value:
     runtime = Runtime()
 
-    def var_to_location(var: str, env: list[tuple[str, int]]) -> int:
+    def lookup(var: str, env: list[tuple[str, int]]) -> int:
         for i in range(len(env) - 1, -1, -1):
             if env[i][0] == var:
                 return env[i][1]
@@ -369,7 +345,7 @@ def interpret(tree: Expr) -> Value:
                 loc = runtime.new(Void())
                 new_env.append((v.name, loc))
             for v, e in node.var_expr_list:
-                runtime.store[var_to_location(v.name, new_env)] = evaluate(e, new_env[:])
+                runtime.store[lookup(v.name, new_env)] = evaluate(e, new_env[:])
             old_env = runtime.stack[-1].env
             runtime.stack[-1].env = new_env[:]
             value = evaluate(node.expr, new_env[:])
@@ -384,27 +360,28 @@ def interpret(tree: Expr) -> Value:
             else:
                 return evaluate(node.branch2, env[:])
         elif type(node) == Var:
-            return runtime.store[var_to_location(node.name, env)]
-        elif type(node) == Icall:
-            arg_vals = []
-            for arg in node.arg_list:
-                arg_vals.append(evaluate(arg, env[:]))
-            try:
-                return runtime.intrinsics[node.intrinsic](*arg_vals)
-            except TypeError as e:
-                sys.exit(f'[Expr Runtime] error: wrong number/type of arguments given to the intrinsic function "{node.intrinsic}"')
+            return runtime.store[lookup(node.name, env)]
         elif type(node) == Call:
-            closure = evaluate(node.callee, env[:])
-            new_env = closure.env[:]
-            n_args = len(closure.fun.var_list)
-            if n_args != len(node.arg_list):
-                sys.exit(f'[Expr Runtime] error: wrong number of arguments given to the lambda "{closure.fun}"')
-            for i in range(n_args):
-                new_env.append((closure.fun.var_list[i].name, runtime.new(evaluate(node.arg_list[i], env[:]))))
-            runtime.stack.append(Frame(new_env[:]))
-            value = evaluate(closure.fun.expr, new_env[:])
-            runtime.stack.pop()
-            return value
+            if type(node.callee) == Var and node.callee.name in runtime.intrinsics:
+                arg_vals = []
+                for arg in node.arg_list:
+                    arg_vals.append(evaluate(arg, env[:]))
+                try:
+                    return runtime.intrinsics[node.callee.name](*arg_vals)
+                except TypeError as e:
+                    sys.exit(f'[Expr Runtime] error: wrong number/type of arguments given to the intrinsic function "{node.intrinsic}"')
+            else:
+                closure = evaluate(node.callee, env[:])
+                new_env = closure.env[:]
+                n_args = len(closure.fun.var_list)
+                if n_args != len(node.arg_list):
+                    sys.exit(f'[Expr Runtime] error: wrong number of arguments given to the lambda "{closure.fun}"')
+                for i in range(n_args):
+                    new_env.append((closure.fun.var_list[i].name, runtime.new(evaluate(node.arg_list[i], env[:]))))
+                runtime.stack.append(Frame(new_env[:]))
+                value = evaluate(closure.fun.expr, new_env[:])
+                runtime.stack.pop()
+                return value
         elif type(node) == Seq:
             value = None
             for e in node.expr_list:
