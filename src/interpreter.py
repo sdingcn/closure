@@ -42,7 +42,7 @@ def lex(source: str) -> deque[str]:
 
 # AST and parser
 
-def unfold_to_string(value: Union[list[Any], tuple[Any, ...]]):
+def unfold_to_string(value: Union[list[Any], tuple[Any, ...]]) -> str:
     if type(value) == list:
         s = '['
     elif type(value) == tuple:
@@ -70,7 +70,7 @@ class Expr:
     def __init__(self):
         pass
 
-    def __str__(self):
+    def __str__(self) -> str:
         return 'Expr'
 
 class Int(Expr):
@@ -78,7 +78,7 @@ class Int(Expr):
     def __init__(self, value: int):
         self.value = value
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'(Int {self.value})'
 
 class Var(Expr):
@@ -86,7 +86,7 @@ class Var(Expr):
     def __init__(self, name: str):
         self.name = name
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'(Var "{self.name}")'
 
 class Lambda(Expr):
@@ -95,7 +95,7 @@ class Lambda(Expr):
         self.var_list = var_list
         self.expr = expr
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'(Lambda {unfold_to_string(self.var_list)} {str(self.expr)})'
 
 class Letrec(Expr):
@@ -104,7 +104,7 @@ class Letrec(Expr):
         self.var_expr_list = var_expr_list
         self.expr = expr
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'(Letrec {unfold_to_string(self.var_expr_list)} {str(self.expr)})'
 
 class If(Expr):
@@ -114,7 +114,7 @@ class If(Expr):
         self.branch1 = branch1
         self.branch2 = branch2
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'(If {str(self.cond)} {str(self.branch1)} {str(self.branch2)})'
 
 class Call(Expr):
@@ -123,7 +123,7 @@ class Call(Expr):
         self.callee = callee
         self.arg_list = arg_list
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'(Call {str(self.callee)} {unfold_to_string(self.arg_list)})'
 
 class Seq(Expr):
@@ -131,7 +131,7 @@ class Seq(Expr):
     def __init__(self, expr_list: list[Expr]):
         self.expr_list = expr_list
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'(Seq {unfold_to_string(self.expr_list)})'
 
 def parse(tokens: deque[str]) -> Expr:
@@ -257,10 +257,10 @@ class Void(Value):
 
 class Frame:
 
-    def __init__(self, env):
+    def __init__(self, env: list[tuple[str, int]]):
         self.env = env
 
-class Runtime:
+class Cont:
 
     def __init__(self):
         self.stack = [Frame([])]
@@ -326,7 +326,7 @@ class Runtime:
 # interpreter
 
 def interpret(tree: Expr) -> Value:
-    runtime = Runtime()
+    cont = Cont()
 
     def lookup(var: str, env: list[tuple[str, int]]) -> int:
         for i in range(len(env) - 1, -1, -1):
@@ -342,14 +342,14 @@ def interpret(tree: Expr) -> Value:
         elif type(node) == Letrec:
             new_env = env[:]
             for v, e in node.var_expr_list:
-                loc = runtime.new(Void())
+                loc = cont.new(Void())
                 new_env.append((v.name, loc))
             for v, e in node.var_expr_list:
-                runtime.store[lookup(v.name, new_env)] = evaluate(e, new_env[:])
-            old_env = runtime.stack[-1].env
-            runtime.stack[-1].env = new_env[:]
+                cont.store[lookup(v.name, new_env)] = evaluate(e, new_env[:])
+            old_env = cont.stack[-1].env
+            cont.stack[-1].env = new_env[:]
             value = evaluate(node.expr, new_env[:])
-            runtime.stack[-1].env = old_env
+            cont.stack[-1].env = old_env
             return value
         elif type(node) == If:
             c = evaluate(node.cond, env[:])
@@ -360,14 +360,14 @@ def interpret(tree: Expr) -> Value:
             else:
                 return evaluate(node.branch2, env[:])
         elif type(node) == Var:
-            return runtime.store[lookup(node.name, env)]
+            return cont.store[lookup(node.name, env)]
         elif type(node) == Call:
-            if type(node.callee) == Var and node.callee.name in runtime.intrinsics:
+            if type(node.callee) == Var and node.callee.name in cont.intrinsics:
                 arg_vals = []
                 for arg in node.arg_list:
                     arg_vals.append(evaluate(arg, env[:]))
                 try:
-                    return runtime.intrinsics[node.callee.name](*arg_vals)
+                    return cont.intrinsics[node.callee.name](*arg_vals)
                 except TypeError as e:
                     sys.exit(f'[Expr Runtime] error: wrong number/type of arguments given to the intrinsic function "{node.intrinsic}"')
             else:
@@ -377,10 +377,10 @@ def interpret(tree: Expr) -> Value:
                 if n_args != len(node.arg_list):
                     sys.exit(f'[Expr Runtime] error: wrong number of arguments given to the lambda "{closure.fun}"')
                 for i in range(n_args):
-                    new_env.append((closure.fun.var_list[i].name, runtime.new(evaluate(node.arg_list[i], env[:]))))
-                runtime.stack.append(Frame(new_env[:]))
+                    new_env.append((closure.fun.var_list[i].name, cont.new(evaluate(node.arg_list[i], env[:]))))
+                cont.stack.append(Frame(new_env[:]))
                 value = evaluate(closure.fun.expr, new_env[:])
-                runtime.stack.pop()
+                cont.stack.pop()
                 return value
         elif type(node) == Seq:
             value = None
