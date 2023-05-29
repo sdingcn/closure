@@ -10,36 +10,33 @@ Python >= 3.9
 
 ```
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
-
-<intrinsic> := + | - | * | / | % | < | void | get | put | gc | exit
-
 <var> := [a-zA-Z]+ ; except for keywords and intrinsic function names
-
-<expr> := <int>
-        | lambda ( <var> *) { <expr> }
-        | letrec ( <var> = <expr> *) { <expr> }
-        | if <expr> then <expr> else <expr>
-        | <var>
-        | ( <intrinsic> <expr>* ) ; intrinsic call
-        | ( <expr> <expr>* ) ; function call
-        | [ <expr> <expr>* ] ; sequence
-
 ```
 
-Support 3 types of objects: integer, closure, void (with only one value obtainable by calling `void`).
-Objects are immutable.
-Variables are bound to locations in a global store, which maps locations to objects.
-Binding a variable generally creates a new location, except for binding to another variable.
-Variables are immutable once bound.
-Garbage collection removes store entries unreachable from the current call stack, and can only be triggered by `gc`, which returns the number of locations retrieved.
-Lambdas are lexically scoped and are thus evaluated to closures.
-Common data structures (e.g. lists) can be (awkwardly) implemented using closures
-(see [test/quicksort.expr](test/quicksort.expr)).
-Some limited forms of OOP features (e.g. inheritance) can also be (awkwardly) implemented using closures
-(see [test/oop-inheritance.expr](test/oop-inheritance.expr)).
-The evaluation order of `letrec` bindings, calls, and sequence, is left-to-right.
-`get`/`put` reads/writes one line each time where each line contains one integer.
-`exit` stops the execution immediately.
+```
+<intrinsic> := + | - | * | / | % | < | void | get | put | gc | callcc | exit
+<var-list> := epsilon | <var> <var-list>
+<var-expr-list> := epsilon | <var> = <expr> <var-expr-list>
+<expr-list> := epsilon | <expr> <expr-list>
+<expr> := <int>
+        | lambda ( <var-list> ) { <expr> }
+        | letrec ( <var-expr-list> ) { <expr> }
+        | if <expr> then <expr> else <expr>
+        | <var>
+        | ( <intrinsic> <expr-list> ) ; intrinsic call
+        | ( <expr> <expr-list> ) ; function call
+        | [ <expr> <expr-list> ] ; sequence
+```
+
+| feature | status |
+| --- | --- |
+| first-class functions | complete |
+| lexical scope and closures | complete |
+| letrec and (mutual) recursion | complete |
+| mark-and-sweep garbage collection | in progress |
+| first-class continuations | not started |
+| ? | ? |
+
 The full semantic reference is the interpreter itself.
 
 ## interpreter usage
