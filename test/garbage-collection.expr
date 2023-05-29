@@ -9,4 +9,6 @@ letrec (a = 5) { [(put (gc)) (void)] }
 (put (gc))
 letrec (f = lambda (x) { [(put (gc)) (void)] }) { (f 0) }
 (put (gc))
+letrec (f = lambda (x y) { (+ x y) }) { (f 1 (put (gc))) }
+(put (gc))
 ]
