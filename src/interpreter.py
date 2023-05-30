@@ -257,76 +257,60 @@ class Void(Value):
 
 class Frame:
 
-    def __init__(self, env: list[tuple[str, int]]):
-        self.env = env
+    def __init__(self,
+            fun: Union[None, Lambda],
+            env0: list[tuple[str, int]],
+            arg: list[tuple[str, int]],
+            ret: Union[None, Call],
+            local: list[tuple[str, int]]
+        ):
+        self.fun = fun
+        self.env0 = env0
+        self.arg = arg
+        self.ret = ret
+        self.local = local
 
-class Cont:
+class State:
 
     def __init__(self):
-        self.stack = [Frame([])]
+        self.stack = [Frame(None, [], [], None, [])]
         self.store = {}
         self.location = 0
-
-        def get() -> Integer:
-            try:
-                s = input().strip()
-                return Integer(int(s))
-            except ValueError:
-                sys.exit(f'[Expr Runtime] error: unsupported input "{s}"')
-
-        def put(a: Integer) -> Void:
-            print(a.value)
-            return Void()
-    
-        def collect(stack: list[Frame], store: dict[int, Value]) -> Integer:
-            visited = set()
-
-            def mark(loc: int) -> None:
-                visited.add(loc)
-                if type(store[loc]) == Closure:
-                    for v, l in store[loc].env:
-                        if l not in visited:
-                            mark(l)
-
-            def sweep() -> int:
-                to_remove = set()
-                for k, v in store.items():
-                    if k not in visited:
-                        to_remove.add(k)
-                for k in to_remove:
-                    del store[k]
-                return len(to_remove)
-
-            for frame in stack:
-                for v, l in frame.env:
-                    mark(l)
-            n = sweep()
-            return Integer(n)
-
-        self.intrinsics = {
-            'add': lambda a, b : Integer(a.value + b.value),
-            'sub': lambda a, b : Integer(a.value - b.value),
-            'mul': lambda a, b : Integer(a.value * b.value),
-            'div': lambda a, b : Integer(a.value / b.value),
-            'mod': lambda a, b : Integer(a.value % b.value),
-            'lt': lambda a, b : Integer(a.value < b.value),
-            'void': lambda : Void(),
-            'get': get,
-            'put': put,
-            'gc': lambda : collect(self.stack, self.store),
-            'exit': lambda : sys.exit('[Expr Runtime] message: execution stopped by the "exit" intrinsic function')
-        }
-
 
     def new(self, value: Value) -> int:
         self.store[self.location] = value
         self.location += 1
         return self.location - 1
 
+    def collect(self) -> int:
+        visited = set()
+
+        def mark(loc: int) -> None:
+            visited.add(loc)
+            if type(self.store[loc]) == Closure:
+                for v, l in self.store[loc].env:
+                    if l not in visited:
+                        mark(l)
+
+        def sweep() -> int:
+            to_remove = set()
+            for k, v in self.store.items():
+                if k not in visited:
+                    to_remove.add(k)
+            for k in to_remove:
+                del self.store[k]
+            return len(to_remove)
+
+        for frame in self.stack:
+            for v, l in frame.env0 + frame.arg + frame.local:
+                mark(l)
+        return sweep()
+
 # interpreter
 
 def interpret(tree: Expr) -> Value:
-    cont = Cont()
+    intrinsics = ['add', 'sub', 'mul', 'div', 'mod', 'lt', 'void', 'get', 'put', 'gc', 'exit']
+    state = State()
 
     def lookup(var: str, env: list[tuple[str, int]]) -> int:
         for i in range(len(env) - 1, -1, -1):
@@ -342,14 +326,11 @@ def interpret(tree: Expr) -> Value:
         elif type(node) == Letrec:
             new_env = env[:]
             for v, e in node.var_expr_list:
-                loc = cont.new(Void())
+                loc = state.new(Void())
                 new_env.append((v.name, loc))
             for v, e in node.var_expr_list:
-                cont.store[lookup(v.name, new_env)] = evaluate(e, new_env[:])
-            old_env = cont.stack[-1].env
-            cont.stack[-1].env = new_env[:]
+                state.store[lookup(v.name, new_env)] = evaluate(e, new_env[:])
             value = evaluate(node.expr, new_env[:])
-            cont.stack[-1].env = old_env
             return value
         elif type(node) == If:
             c = evaluate(node.cond, env[:])
@@ -360,16 +341,39 @@ def interpret(tree: Expr) -> Value:
             else:
                 return evaluate(node.branch2, env[:])
         elif type(node) == Var:
-            return cont.store[lookup(node.name, env)]
+            return state.store[lookup(node.name, env)]
         elif type(node) == Call:
-            if type(node.callee) == Var and node.callee.name in cont.intrinsics:
+            if type(node.callee) == Var and node.callee.name in intrinsics:
                 arg_vals = []
                 for arg in node.arg_list:
                     arg_vals.append(evaluate(arg, env[:]))
-                try:
-                    return cont.intrinsics[node.callee.name](*arg_vals)
-                except TypeError as e:
-                    sys.exit(f'[Expr Runtime] error: wrong number/type of arguments given to the intrinsic function "{node.intrinsic}"')
+                if node.callee.name == 'add':
+                    return Integer(arg_vals[0].value + arg_vals[1].value)
+                elif node.callee.name == 'sub':
+                    return Integer(arg_vals[0].value - arg_vals[1].value)
+                elif node.callee.name == 'mul':
+                    return Integer(arg_vals[0].value * arg_vals[1].value)
+                elif node.callee.name == 'div':
+                    return Integer(arg_vals[0].value / arg_vals[1].value)
+                elif node.callee.name == 'mod':
+                    return Integer(arg_vals[0].value % arg_vals[1].value)
+                elif node.callee.name == 'lt':
+                    return Integer(arg_vals[0].value < arg_vals[1].value)
+                elif node.callee.name == 'void':
+                    return Void()
+                elif node.callee.name == 'get':
+                    try:
+                        s = input().strip()
+                        return Integer(int(s))
+                    except ValueError:
+                        sys.exit(f'[Expr Runtime] error: unsupported input "{s}"')
+                elif node.callee.name == 'put':
+                    print(arg_vals[0].value)
+                    return Void()
+                elif node.callee.name == 'gc':
+                    return Integer(state.collect())
+                elif node.callee.name == 'exit':
+                    sys.exit('[Expr Runtime] message: execution stopped by the "exit" intrinsic function')
             else:
                 closure = evaluate(node.callee, env[:])
                 new_env = closure.env[:]
@@ -377,10 +381,10 @@ def interpret(tree: Expr) -> Value:
                 if n_args != len(node.arg_list):
                     sys.exit(f'[Expr Runtime] error: wrong number of arguments given to the lambda "{closure.fun}"')
                 for i in range(n_args):
-                    new_env.append((closure.fun.var_list[i].name, cont.new(evaluate(node.arg_list[i], env[:]))))
-                cont.stack.append(Frame(new_env[:]))
+                    new_env.append((closure.fun.var_list[i].name, state.new(evaluate(node.arg_list[i], env[:]))))
+                state.stack.append(Frame(closure.fun, closure.env[:], [], node, []))
                 value = evaluate(closure.fun.expr, new_env[:])
-                cont.stack.pop()
+                state.stack.pop()
                 return value
         elif type(node) == Seq:
             value = None
