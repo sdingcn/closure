@@ -3,9 +3,54 @@ from collections import deque
 from typing import Union, Any
 from copy import deepcopy
 
+# helper functions
+
+def unfold(value: Union[list[Any], tuple[Any, ...], set[Any], dict[Any]]) -> str:
+    if type(value) == list:
+        s = '['
+    elif type(value) == tuple:
+        s = '('
+    elif type(value) in [set, dict]:
+        s = '{'
+    else:
+        sys.exit('[Expr Internal Error] unsupported argument given to "unfold"')
+    if type(value) in [list, tuple, set]:
+        for v in value:
+            if type(v) in [list, tuple, set, dict]:
+                s += unfold(v)
+            else:
+                s += str(v)
+            s += ', '
+        if s[-2:] == ', ':
+            s = s[:-2]
+    else:
+        for k, v in value.items():
+            if type(k) == tuple:
+                s += unfold(k)
+            else:
+                s += str(k)
+            s += ': '
+            if type(v) in [list, tuple, set, dict]:
+                s += unfold(v)
+            else:
+                s += str(v)
+            s += ', '
+        if s[-2:] == ', ':
+            s = s[:-2]
+    if type(value) == list:
+        s += ']'
+    elif type(value) == tuple:
+        s += ')'
+    else:
+        s = '}'
+    return s
+
+def truncate(v: Any) -> str:
+    return str(v)[:30] + '...'
+
 # lexer
 
-def lex(source: str) -> deque[str]:
+def lex(source: str, debug: bool) -> deque[str]:
     chars = deque(source)
 
     def next_token() -> str:
@@ -27,7 +72,7 @@ def lex(source: str) -> deque[str]:
             elif chars[0] in ('(', ')', '{', '}', '[', ']', '='):
                 token = chars.popleft()
             else:
-                sys.exit(f'[Expr Lexer] error: unrecognized character "{chars[0]}"')
+                sys.exit(f'[Expr Lexer Error] unrecognized character "{chars[0]}"')
             return token
         else:
             return ''
@@ -35,6 +80,8 @@ def lex(source: str) -> deque[str]:
     tokens = deque()
     while True:
         token = next_token()
+        if debug:
+            sys.stderr.write(f'[Expr Debug] read token {token}\n')
         if token:
             tokens.append(token)
         else:
@@ -42,29 +89,6 @@ def lex(source: str) -> deque[str]:
     return tokens
 
 # AST and parser
-
-def unfold_to_string(value: Union[list[Any], tuple[Any, ...]]) -> str:
-    if type(value) == list:
-        s = '['
-    elif type(value) == tuple:
-        s = '('
-    else:
-        sys.exit('[Expr Internal] error: wrong type of argument given to "unfold_to_string"')
-    for e in value:
-        if type(e) == list or type(e) == tuple:
-            s += unfold_to_string(e)
-        else:
-            s += str(e)
-        s += ' '
-    if s[-1] == ' ':
-        s = s[:-1]
-    if type(value) == list:
-        s += ']'
-    elif type(value) == tuple:
-        s += ')'
-    else:
-        sys.exit('[Expr Internal] error: wrong type of argument given to "unfold_to_string"')
-    return s
 
 class Expr:
 
@@ -90,7 +114,7 @@ class Var(Expr):
         self.name = name
 
     def __str__(self) -> str:
-        return f'(Var "{self.name}")'
+        return f'(Var {self.name})'
 
 class Lambda(Expr):
 
@@ -100,7 +124,7 @@ class Lambda(Expr):
         self.expr = expr
 
     def __str__(self) -> str:
-        return f'(Lambda {unfold_to_string(self.var_list)} {str(self.expr)})'
+        return f'(Lambda {unfold(self.var_list)} {self.expr})'
 
 class Letrec(Expr):
 
@@ -110,7 +134,7 @@ class Letrec(Expr):
         self.expr = expr
 
     def __str__(self) -> str:
-        return f'(Letrec {unfold_to_string(self.var_expr_list)} {str(self.expr)})'
+        return f'(Letrec {unfold(self.var_expr_list)} {self.expr})'
 
 class If(Expr):
 
@@ -121,7 +145,7 @@ class If(Expr):
         self.branch2 = branch2
 
     def __str__(self) -> str:
-        return f'(If {str(self.cond)} {str(self.branch1)} {str(self.branch2)})'
+        return f'(If {self.cond} {self.branch1} {self.branch2})'
 
 class Call(Expr):
 
@@ -131,7 +155,7 @@ class Call(Expr):
         self.arg_list = arg_list
 
     def __str__(self) -> str:
-        return f'(Call {str(self.callee)} {unfold_to_string(self.arg_list)})'
+        return f'(Call {self.callee} {unfold(self.arg_list)})'
 
 class Seq(Expr):
 
@@ -140,9 +164,9 @@ class Seq(Expr):
         self.expr_list = expr_list
 
     def __str__(self) -> str:
-        return f'(Seq {unfold_to_string(self.expr_list)})'
+        return f'(Seq {unfold(self.expr_list)})'
 
-def parse(tokens: deque[str]) -> Expr:
+def parse(tokens: deque[str], debug: bool) -> Expr:
     
     def is_int(token: str) -> bool:
         try:
@@ -155,11 +179,15 @@ def parse(tokens: deque[str]) -> Expr:
         return token.isalpha()
 
     def parse_int() -> Int:
+        if debug:
+            sys.stderr.write('[Expr Debug] entered Int\n')
         value = int(tokens.popleft())
         node = Int(None, value)
         return node
 
     def parse_lambda() -> Lambda:
+        if debug:
+            sys.stderr.write('[Expr Debug] entered Lambda\n')
         tokens.popleft() # lambda
         tokens.popleft() # (
         var_list = []
@@ -176,6 +204,8 @@ def parse(tokens: deque[str]) -> Expr:
         return node
 
     def parse_letrec() -> Letrec:
+        if debug:
+            sys.stderr.write('[Expr Debug] entered Letrec\n')
         tokens.popleft() # letrec
         tokens.popleft() # (
         var_expr_list = []
@@ -196,6 +226,8 @@ def parse(tokens: deque[str]) -> Expr:
         return node
 
     def parse_if() -> If:
+        if debug:
+            sys.stderr.write('[Expr Debug] entered If\n')
         tokens.popleft() # if
         cond = parse_expr()
         tokens.popleft() # then
@@ -209,11 +241,15 @@ def parse(tokens: deque[str]) -> Expr:
         return node
 
     def parse_var() -> Var:
+        if debug:
+            sys.stderr.write('[Expr Debug] entered Var\n')
         name = tokens.popleft()
         node = Var(None, name)
         return node
 
     def parse_call() -> Call:
+        if debug:
+            sys.stderr.write('[Expr Debug] entered Call\n')
         tokens.popleft() # (
         callee = parse_expr()
         arg_list = []
@@ -227,13 +263,15 @@ def parse(tokens: deque[str]) -> Expr:
         return node
 
     def parse_seq() -> Seq:
+        if debug:
+            sys.stderr.write('[Expr Debug] entered Seq\n')
         tokens.popleft() # [
         expr_list = []
         while tokens[0] != ']':
             expr_list.append(parse_expr())
         tokens.popleft() # ]
         if len(expr_list) == 0:
-            sys.exit('[Expr Parser] error: zero-length sequence')
+            sys.exit('[Expr Parser Error] zero-length sequence')
         node = Seq(None, expr_list)
         for e in node.expr_list:
             e.parent = node
@@ -255,12 +293,12 @@ def parse(tokens: deque[str]) -> Expr:
         elif tokens[0] == '[':
             return parse_seq()
         else:
-            sys.exit(f'[Expr Parser] error: unrecognized expression starting with "{tokens[0]}"')
+            sys.exit(f'[Expr Parser Error] unrecognized expression starting with "{tokens[0]}"')
     
     try:
         return parse_expr()
     except IndexError:
-        sys.exit('[Expr Parser] error: incomplete expression')
+        sys.exit('[Expr Parser Error] incomplete expression')
 
 # runtime classes
 
@@ -269,10 +307,16 @@ class Value:
     def __init__(self):
         pass
 
+    def __str__(self) -> str:
+        return 'value'
+
 class Integer(Value):
 
     def __init__(self, value: int):
         self.value = value
+
+    def __str__(self) -> str:
+        return str(self.value)
 
 class Closure(Value):
 
@@ -280,10 +324,16 @@ class Closure(Value):
         self.env = env
         self.fun = fun
 
+    def __str__(self) -> str:
+        return f'(closure {unfold(self.env)} {self.fun})'
+
 class Void(Value):
 
     def __init__(self):
         pass
+
+    def __str__(self) -> str:
+        return 'void'
 
 # the layer class for the evaluation stack; each layer contains the expression currently under evaluation
 class Layer:
@@ -299,10 +349,16 @@ class Layer:
         self.pc = pc # program counter (the i-th step of evaluating this layer)
         self.local = local
 
+    def __str__(self) -> str:
+        return f'(layer {unfold(self.env)} {self.expr} {self.pc} {unfold(self.local)})'
+
 class Continuation(Value):
 
     def __init__(self, stack: list[Layer]):
         self.stack = stack
+
+    def __str__(self) -> str:
+        return f'(continuation {unfold(self.stack)})'
 
 # the global state
 class State:
@@ -311,6 +367,9 @@ class State:
         self.stack = [Layer([], expr, 0, {})]
         self.store = {}
         self.location = 0
+
+    def __str__(self) -> str:
+        return f'(state {unfold(self.stack)} {unfold(self.store)} {self.location})'
 
     def new(self, value: Value) -> int:
         self.store[self.location] = value
@@ -347,14 +406,14 @@ def lexical_lookup(var: str, env: list[tuple[str, int]]) -> int:
     for i in range(len(env) - 1, -1, -1):
         if env[i][0] == var:
             return env[i][1]
-    sys.exit(f'[Expr Runtime] error: undefined variable "{var}"')
+    sys.exit(f'[Expr Runtime Error] undefined variable "{var}"')
 
-def dynamic_lookup(var: str, stack: list[Layer]) -> int:
+def dynamic_lookup(var: str, stack: list[Layer]) -> int: # TODO
     pass
 
 # interpreter
 
-def interpret(tree: Expr) -> Value:
+def interpret(tree: Expr, debug: bool) -> Value:
     intrinsics = ['add', 'sub', 'mul', 'div', 'mod', 'lt', 'void', 'get', 'put', 'callcc', 'exit']
     state = State(tree)
     value = None
@@ -366,12 +425,18 @@ def interpret(tree: Expr) -> Value:
         layer = state.stack[-1]
         node = layer.expr
         if type(node) == Int:
+            if debug:
+                sys.stderr.write(f'[Expr Debug] evaluating Int\n')
             value = Integer(node.value)
             state.stack.pop()
         elif type(node) == Lambda:
+            if debug:
+                sys.stderr.write(f'[Expr Debug] evaluating Lambda\n')
             value = Closure(layer.env, node)
             state.stack.pop()
         elif type(node) == Letrec:
+            if debug:
+                sys.stderr.write(f'[Expr Debug] evaluating Letrec\n')
             if layer.pc == 0:
                 layer.local['new_env'] = layer.env[:]
                 for v, e in node.var_expr_list:
@@ -394,6 +459,8 @@ def interpret(tree: Expr) -> Value:
             else:
                 state.stack.pop()
         elif type(node) == If:
+            if debug:
+                sys.stderr.write(f'[Expr Debug] evaluating If\n')
             if layer.pc == 0:
                 state.stack.append(Layer(layer.env[:], node.cond, 0, {}))
                 layer.pc += 1
@@ -406,9 +473,13 @@ def interpret(tree: Expr) -> Value:
             else:
                 state.stack.pop()
         elif type(node) == Var:
+            if debug:
+                sys.stderr.write(f'[Expr Debug] evaluating Var\n')
             value = state.store[lexical_lookup(node.name, layer.env)]
             state.stack.pop()
         elif type(node) == Call:
+            if debug:
+                sys.stderr.write(f'[Expr Debug] evaluating Call\n')
             if type(node.callee) == Var and node.callee.name in intrinsics:
                 if layer.pc == 0:
                     layer.local['arg_vals'] = []
@@ -440,7 +511,7 @@ def interpret(tree: Expr) -> Value:
                             s = input()
                             value = Integer(int(s.strip()))
                         except ValueError:
-                            sys.exit(f'[Expr Runtime] error: unsupported input "{s}"')
+                            sys.exit(f'[Expr Runtime Error] unsupported input "{s}"')
                     elif node.callee.name == 'put':
                         print(layer.local['arg_vals'][0].value)
                         value = Void()
@@ -449,9 +520,12 @@ def interpret(tree: Expr) -> Value:
                         state.stack.append(Layer(layer.local['arg_vals'][0].env[:]
                             + [(layer.local['arg_vals'][0].fun.var_list[0].name, state.new(Continuation(deepcopy(state.stack))))],
                             layer.local['arg_vals'][0].fun.expr, 0, {}))
+                        if debug:
+                            sys.stderr.write('[Expr Debug] captured continuation\n')
                         continue
                     elif node.callee.name == 'exit':
-                        sys.exit('[Expr Runtime] message: execution stopped by the "exit" intrinsic function')
+                        if debug:
+                            sys.stderr.write('[Expr Debug] execution stopped by the "exit" intrinsic function\n')
                     state.stack.pop()
             else:
                 if layer.pc == 0:
@@ -477,46 +551,50 @@ def interpret(tree: Expr) -> Value:
                         layer.pc += 1
                     elif type(layer.local['callee']) == Continuation:
                         state.stack = layer.local['callee'].stack
+                        if debug:
+                            sys.stderr.write('[Expr Debug] applied continuation, stack switched\n')
                         continue
                 else:
                     state.stack.pop()
         elif type(node) == Seq:
+            if debug:
+                sys.stderr.write(f'[Expr Debug] evaluating Seq\n')
             if layer.pc < len(node.expr_list):
                 state.stack.append(Layer(layer.env[:], node.expr_list[layer.pc], 0, {}))
                 layer.pc += 1
             else:
                 state.stack.pop()
         else:
-            sys.exit(f'[Expr Runtime] error: unrecognized AST node "{node}"')
+            sys.exit(f'[Expr Runtime Error] unrecognized AST node "{node}"')
 
 # main entry
 
 def main(option: str, source: str) -> None:
-    tokens = lex(source)
-    tree = parse(tokens)
     if option == 'run':
-        result = interpret(tree)
-        if type(result) == Integer:
-            print(result.value)
-        elif type(result) == Closure:
-            print('Closure')
-        elif type(result) == Continuation:
-            print('Continuation')
-        elif type(result) == Void:
-            print('Void')
-        else:
-            sys.exit(f'[Expr Main] error: unknown evaluation result "{result}"')
+        tokens = lex(source, False)
+        tree = parse(tokens, False)
+        result = interpret(tree, False)
+        print(result)
+    elif option == 'debug':
+        sys.stderr.write('[Expr Debug] *** starting lexer ***\n')
+        tokens = lex(source, True)
+        sys.stderr.write('[Expr Debug] *** starting parser ***\n')
+        tree = parse(tokens, True)
+        sys.stderr.write('[Expr Debug] *** starting interpreter ***\n')
+        result = interpret(tree, True)
+        print(result)
     elif option == 'dump-ast':
+        tokens = lex(source, False)
+        tree = parse(tokens, False)
         print(tree)
-    else:
-        sys.exit(f'[Expr Main] error: unknown command-line option "{option}"')
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'debug', 'dump-ast']:
         sys.exit(
-            'Usage\n'
-            f'python3 {sys.argv[0]} run <source-file>'
-            f'python3 {sys.argv[0]} dump-ast <source-file>'
+            'Usage:\n'
+            f'\tpython3 {sys.argv[0]} run <source-file>\n'
+            f'\tpython3 {sys.argv[0]} debug <source-file>\n'
+            f'\tpython3 {sys.argv[0]} dump-ast <source-file>'
         )
     with open(sys.argv[2], 'r') as f:
         main(sys.argv[1], f.read())
