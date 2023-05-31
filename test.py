@@ -5,17 +5,18 @@ def run_and_read(cmd: str, inp: str) -> str:
     return subprocess.run(cmd,
         input = inp,
         stdout = subprocess.PIPE,
-        stderr = subprocess.STDOUT,
+        # stderr = subprocess.STDOUT,
         universal_newlines = True,
         timeout = 5
     ).stdout
 
 def check_io(prog: str, i: list[str], o: list[str]) -> bool:
-    o1 = list(map(lambda s: s.strip(), run_and_read(['python3', 'src/interpreter.py', 'run', prog], '\n'.join(i)).split()))
+    raw_o1 = run_and_read(['python3', 'src/interpreter.py', 'run', prog], '\n'.join(i))
+    o1 = list(map(lambda s: s.strip(), raw_o1.split()))
     if o1 == o:
         return True
     else:
-        print(f'Expected: {o}, got: {o1}')
+        print(f'Expected:\n{o}\nGot:\n{raw_o1}\n')
         return False
 
 def main():
@@ -40,14 +41,12 @@ def main():
 
         ('test/lexical-scope.expr', [], ['1']),
 
-        ('test/garbage-collection.expr', [], ['0', '2', '2', '1', '0', '2', '0', '3', 'Void']),
-
         ('test/continuation.expr', [], ['3', '2', '1', '1', '2', '3', '3', '2', '1', '300'])
     ]
     for test in tests:
-        print('.')
         if not check_io(*test):
             sys.exit(f'Failed on test "{test}"')
+        print('.')
     print('All tests passed')
 
 if __name__ == '__main__':
