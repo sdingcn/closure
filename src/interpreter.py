@@ -75,7 +75,8 @@ class Expr:
 
 class Int(Expr):
 
-    def __init__(self, value: int):
+    def __init__(self, parent: Union[None, Expr], value: int):
+        self.parent = parent
         self.value = value
 
     def __str__(self) -> str:
@@ -83,7 +84,8 @@ class Int(Expr):
 
 class Var(Expr):
 
-    def __init__(self, name: str):
+    def __init__(self, parent: Union[None, Expr], name: str):
+        self.parent = parent
         self.name = name
 
     def __str__(self) -> str:
@@ -91,7 +93,8 @@ class Var(Expr):
 
 class Lambda(Expr):
 
-    def __init__(self, var_list: list[Var], expr: Expr):
+    def __init__(self, parent: Union[None, Expr], var_list: list[Var], expr: Expr):
+        self.parent = parent
         self.var_list = var_list
         self.expr = expr
 
@@ -100,7 +103,8 @@ class Lambda(Expr):
 
 class Letrec(Expr):
 
-    def __init__(self, var_expr_list: list[tuple[Var, Expr]], expr: Expr):
+    def __init__(self, parent: Union[None, Expr], var_expr_list: list[tuple[Var, Expr]], expr: Expr):
+        self.parent = parent
         self.var_expr_list = var_expr_list
         self.expr = expr
 
@@ -109,7 +113,8 @@ class Letrec(Expr):
 
 class If(Expr):
 
-    def __init__(self, cond: Expr, branch1: Expr, branch2: Expr):
+    def __init__(self, parent: Union[None, Expr], cond: Expr, branch1: Expr, branch2: Expr):
+        self.parent = parent
         self.cond = cond
         self.branch1 = branch1
         self.branch2 = branch2
@@ -119,7 +124,8 @@ class If(Expr):
 
 class Call(Expr):
 
-    def __init__(self, callee: Expr, arg_list: list[Expr]):
+    def __init__(self, parent: Union[None, Expr], callee: Expr, arg_list: list[Expr]):
+        self.parent = parent
         self.callee = callee
         self.arg_list = arg_list
 
@@ -128,7 +134,8 @@ class Call(Expr):
 
 class Seq(Expr):
 
-    def __init__(self, expr_list: list[Expr]):
+    def __init__(self, parent: Union[None, Expr], expr_list: list[Expr]):
+        self.parent = parent
         self.expr_list = expr_list
 
     def __str__(self) -> str:
@@ -148,7 +155,8 @@ def parse(tokens: deque[str]) -> Expr:
 
     def parse_int() -> Int:
         value = int(tokens.popleft())
-        return Int(value)
+        node = Int(None, value)
+        return node
 
     def parse_lambda() -> Lambda:
         tokens.popleft() # lambda
@@ -160,7 +168,11 @@ def parse(tokens: deque[str]) -> Expr:
         tokens.popleft() # {
         expr = parse_expr()
         tokens.popleft() # }
-        return Lambda(var_list, expr)
+        node = Lambda(None, var_list, expr)
+        for v in node.var_list:
+            v.parent = node
+        node.expr.parent = node
+        return node
 
     def parse_letrec() -> Letrec:
         tokens.popleft() # letrec
@@ -175,7 +187,12 @@ def parse(tokens: deque[str]) -> Expr:
         tokens.popleft() # {
         expr = parse_expr()
         tokens.popleft() # }
-        return Letrec(var_expr_list, expr)
+        node = Letrec(None, var_expr_list, expr)
+        for v, e in node.var_expr_list:
+            v.parent = node
+            e.parent = node
+        node.expr.parent = node
+        return node
 
     def parse_if() -> If:
         tokens.popleft() # if
@@ -184,11 +201,16 @@ def parse(tokens: deque[str]) -> Expr:
         branch1 = parse_expr()
         tokens.popleft() # else
         branch2 = parse_expr()
-        return If(cond, branch1, branch2)
+        node = If(None, cond, branch1, branch2)
+        node.cond.parent = node
+        node.branch1.parent = node
+        node.branch2.parent = node
+        return node
 
     def parse_var() -> Var:
         name = tokens.popleft()
-        return Var(name)
+        node = Var(None, name)
+        return node
 
     def parse_call() -> Call:
         tokens.popleft() # (
@@ -197,7 +219,11 @@ def parse(tokens: deque[str]) -> Expr:
         while tokens[0] != ')':
             arg_list.append(parse_expr())
         tokens.popleft() # )
-        return Call(callee, arg_list)
+        node = Call(None, callee, arg_list)
+        node.callee.parent = node
+        for a in node.arg_list:
+            a.parent = node
+        return node
 
     def parse_seq() -> Seq:
         tokens.popleft() # [
@@ -207,7 +233,10 @@ def parse(tokens: deque[str]) -> Expr:
         tokens.popleft() # ]
         if len(expr_list) == 0:
             sys.exit('[Expr Parser] error: zero-length sequence')
-        return Seq(expr_list)
+        node = Seq(None, expr_list)
+        for e in node.expr_list:
+            e.parent = node
+        return node
 
     def parse_expr() -> Expr:
         if is_int(tokens[0]):
@@ -232,7 +261,7 @@ def parse(tokens: deque[str]) -> Expr:
     except IndexError:
         sys.exit('[Expr Parser] error: incomplete expression')
 
-# runtime
+# runtime values
 
 class Value:
     
@@ -250,30 +279,41 @@ class Closure(Value):
         self.env = env
         self.fun = fun
 
+class Continuation(Value):
+
+    def __init__(self):
+        pass
+
 class Void(Value):
 
     def __init__(self):
         pass
 
-class Frame:
+# runtime state
+
+class Layer:
 
     def __init__(self,
-            fun: Union[None, Lambda],
-            env0: list[tuple[str, int]],
-            arg: list[tuple[str, int]],
-            ret: Union[None, Call],
-            local: list[tuple[str, int]]
+            env: list[tuple[str, int]],
+            expr: Expr,
+            pc: Union[None, int],
+            local: dict[str, Any]
         ):
-        self.fun = fun
-        self.env0 = env0
-        self.arg = arg
-        self.ret = ret
-        self.local = local
+        self.env = env
+        self.expr = expr
+        # program counter inside the current layer
+        # None means just started (the layer has just been pushed onto the stack)
+        # other value (integer) i means the next step is the i-th step
+        self.pc = pc
+        self.local = local # local variable names start with '#'
 
 class State:
 
-    def __init__(self):
-        self.stack = [Frame(None, [], [], None, [])]
+    def __init__(self, expr: Expr):
+        # this is not a call stack
+        # it is an "evaluation stack" where each layer is a syntax construct
+        # a call stack can be obtained by partitioning the evaluation stack according to function layers
+        self.stack = [Layer([], expr, None, {})]
         self.store = {}
         self.location = 0
 
@@ -282,7 +322,7 @@ class State:
         self.location += 1
         return self.location - 1
 
-    def collect(self) -> int:
+    def collect(self) -> int: # TODO
         visited = set()
 
         def mark(loc: int) -> None:
@@ -301,100 +341,106 @@ class State:
                 del self.store[k]
             return len(to_remove)
 
-        for frame in self.stack:
-            for v, l in frame.env0 + frame.arg + frame.local:
+        for layer in self.stack:
+            for v, l in layer.env:
                 mark(l)
         return sweep()
+
+# runtime pure helper functions
+
+def lexical_lookup(var: str, env: list[tuple[str, int]]) -> int:
+    for i in range(len(env) - 1, -1, -1):
+        if env[i][0] == var:
+            return env[i][1]
+    sys.exit(f'[Expr Runtime] error: undefined variable "{var}"')
 
 # interpreter
 
 def interpret(tree: Expr) -> Value:
-    intrinsics = ['add', 'sub', 'mul', 'div', 'mod', 'lt', 'void', 'get', 'put', 'gc', 'exit']
-    state = State()
+    intrinsics = ['add', 'sub', 'mul', 'div', 'mod', 'lt', 'void', 'get', 'put', 'callcc', 'exit']
+    state = State(tree)
+    value = None
 
-    def lookup(var: str, env: list[tuple[str, int]]) -> int:
-        for i in range(len(env) - 1, -1, -1):
-            if env[i][0] == var:
-                return env[i][1]
-        sys.exit(f'[Expr Runtime] error: undefined variable "{var}"')
-
-    def evaluate(node: Expr, env: list[tuple[str, int]]) -> Value:
-        if type(node) == Int:
-            return Integer(node.value)
-        elif type(node) == Lambda:
-            return Closure(env[:], node)
-        elif type(node) == Letrec:
-            new_env = env[:]
-            for v, e in node.var_expr_list:
-                loc = state.new(Void())
-                new_env.append((v.name, loc))
-            for v, e in node.var_expr_list:
-                state.store[lookup(v.name, new_env)] = evaluate(e, new_env[:])
-            value = evaluate(node.expr, new_env[:])
+    while True:
+        if len(state.stack) == 0:
             return value
-        elif type(node) == If:
-            c = evaluate(node.cond, env[:])
-            if type(c) != Integer:
-                sys.exit('[Expr Runtime] error: an "if" condition does not evaluate to an integer')
-            if c.value != 0:
-                return evaluate(node.branch1, env[:])
+        layer = state.stack[-1]
+        node = layer.expr
+        if type(node) == Int:
+            value = Integer(node.value)
+            state.stack.pop()
+        elif type(node) == Lambda:
+            value = Closure(layer.env, node)
+            state.stack.pop()
+        elif type(node) == Letrec:
+            if layer.pc == None:
+                layer.local['new_env'] = layer.env[:]
+                for v, e in node.var_expr_list:
+                    loc = state.new(Void())
+                    layer.local['new_env'].append((v.name, loc))
+                layer.pc = 0
             else:
-                return evaluate(node.branch2, env[:])
+                if layer.pc < len(node.var_expr_list):
+                    if layer.pc > 0:
+                        last_location = lexical_lookup(node.var_expr_list[layer.pc - 1], layer.local['new_env'])
+                        state.store[last_location] = value
+                    v, e = node.var_expr_list[layer.pc]
+                    state.stack.append(Layer(layer.local['new_env'][:], e, None, {}))
+                    layer.pc += 1
+                elif layer.pc == len(node.var_expr_list):
+                    if layer.pc > 0:
+                        last_location = lexical_lookup(node.var_expr_list[layer.pc - 1], layer.local['new_env'])
+                        state.store[last_location] = value
+                    state.stack.append(Layer(layer.local['new_env'][:], node.expr, None, {}))
+                    layer.pc += 1
+                else:
+                    state.stack.pop()
+        elif type(node) == If:
+            if layer.pc == None:
+                state.stack.append(Layer(layer.env[:], node.cond, None, {}))
+                layer.pc = 0
+            elif layer.pc == 1:
+                if value.value != 0:
+                    state.stack.append(Layer(layer.env[:], node.branch1, None, {}))
+                else:
+                    state.stack.append(Layer(layer.env[:], node.branch2, None, {}))
+                layer.pc += 1
+            else:
+                state.stack.pop()
         elif type(node) == Var:
-            return state.store[lookup(node.name, env)]
+            value = lexical_lookup(node.name, layer.env)
+            state.stack.pop()
         elif type(node) == Call:
             if type(node.callee) == Var and node.callee.name in intrinsics:
-                arg_vals = []
-                for arg in node.arg_list:
-                    arg_vals.append(evaluate(arg, env[:]))
-                if node.callee.name == 'add':
-                    return Integer(arg_vals[0].value + arg_vals[1].value)
-                elif node.callee.name == 'sub':
-                    return Integer(arg_vals[0].value - arg_vals[1].value)
-                elif node.callee.name == 'mul':
-                    return Integer(arg_vals[0].value * arg_vals[1].value)
-                elif node.callee.name == 'div':
-                    return Integer(arg_vals[0].value / arg_vals[1].value)
-                elif node.callee.name == 'mod':
-                    return Integer(arg_vals[0].value % arg_vals[1].value)
-                elif node.callee.name == 'lt':
-                    return Integer(arg_vals[0].value < arg_vals[1].value)
-                elif node.callee.name == 'void':
-                    return Void()
-                elif node.callee.name == 'get':
-                    try:
-                        s = input().strip()
-                        return Integer(int(s))
-                    except ValueError:
-                        sys.exit(f'[Expr Runtime] error: unsupported input "{s}"')
-                elif node.callee.name == 'put':
-                    print(arg_vals[0].value)
-                    return Void()
-                elif node.callee.name == 'gc':
-                    return Integer(state.collect())
-                elif node.callee.name == 'exit':
-                    sys.exit('[Expr Runtime] message: execution stopped by the "exit" intrinsic function')
+                if layer.pc == None:
+                    layer.local['arg_vals'] = []
+                    layer.pc = 0
+                elif layer.pc < len(node.arg_list):
+                    layer.pc += 1
+                elif layer.pc == len(node.arg_list):
+                    if node.callee.name == 'callcc':
+                        pass # this is like calling a function
+                    else:
+                        value = ()
+                        state.stack.pop()
             else:
-                closure = evaluate(node.callee, env[:])
-                new_env = closure.env[:]
-                n_args = len(closure.fun.var_list)
-                if n_args != len(node.arg_list):
-                    sys.exit(f'[Expr Runtime] error: wrong number of arguments given to the lambda "{closure.fun}"')
-                for i in range(n_args):
-                    new_env.append((closure.fun.var_list[i].name, state.new(evaluate(node.arg_list[i], env[:]))))
-                state.stack.append(Frame(closure.fun, closure.env[:], [], node, []))
-                value = evaluate(closure.fun.expr, new_env[:])
-                state.stack.pop()
-                return value
-        elif type(node) == Seq:
-            value = None
-            for e in node.expr_list:
-                value = evaluate(e, env[:])
-            return value
+                if layer.pc == None:
+                    pass
+                    layer.pc = 0
+                elif layer.pc == 0:
+                    layer.local['callee'] = value
+                    layer.pc += 1
+                elif layer.pc <= len(node.arg_list):
+                    layer.pc += 1
+                else:
+                    if type(layer.local['callee']) == Closure:
+                        pass
+                    elif type(layer.local['callee']) == Continuation:
+                        pass
+        elif type(state.pc) == Seq:
+            pass
         else:
             sys.exit(f'[Expr Runtime] error: unrecognized AST node "{node}"')
-
-    return evaluate(tree, [])
 
 # main entry
 
@@ -407,6 +453,8 @@ def main(option: str, source: str) -> None:
             print(result.value)
         elif type(result) == Closure:
             print('Closure')
+        elif type(result) == Continuation:
+            print('Continuation')
         elif type(result) == Void:
             print('Void')
         else:

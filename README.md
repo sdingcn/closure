@@ -14,7 +14,7 @@ Python >= 3.9
 ```
 
 ```
-<intrinsic> := add | sub | mul | div | mod | lt | void | get | put | gc | callcc | exit
+<intrinsic> := add | sub | mul | div | mod | lt | void | get | put | callcc | exit
 <var-list> := epsilon | <var> <var-list>
 <var-expr-list> := epsilon | <var> = <expr> <var-expr-list>
 <expr-list> := epsilon | <expr> <expr-list>
@@ -22,7 +22,7 @@ Python >= 3.9
         | lambda ( <var-list> ) { <expr> }
         | letrec ( <var-expr-list> ) { <expr> }
         | if <expr> then <expr> else <expr>
-        | <var>
+        | <var> ; can hold void, ints, lambdas, continuations, but cannot hold intrinsics
         | ( <intrinsic> <expr-list> ) ; intrinsic / lambda / continuation call
         | [ <expr> <expr-list> ] ; sequence
 ```
@@ -31,6 +31,7 @@ Python >= 3.9
 | --- | --- |
 | first-class functions | complete |
 | lexical scope and closures | complete |
+| dynamic scope | not started |
 | letrec and (mutual) recursion | complete |
 | mark-and-sweep garbage collection | in progress |
 | first-class continuations | not started |

@@ -6,7 +6,8 @@ def run_and_read(cmd: str, inp: str) -> str:
         input = inp,
         stdout = subprocess.PIPE,
         stderr = subprocess.STDOUT,
-        universal_newlines = True
+        universal_newlines = True,
+        timeout = 5
     ).stdout
 
 def check_io(prog: str, i: list[str], o: list[str]) -> bool:
