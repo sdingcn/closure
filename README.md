@@ -34,7 +34,7 @@ Python >= 3.9
 | letrec and (mutual) recursion | complete |
 | fully accessible evaluation context | complete |
 | dynamic scope | in progress |
-| first-class continuations | in progress |
+| first-class continuations | complete |
 | mark-and-sweep garbage collection | in progress |
 
 The full semantic reference is the interpreter itself.

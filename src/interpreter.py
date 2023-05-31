@@ -1,6 +1,7 @@
 import sys
 from collections import deque
 from typing import Union, Any
+from copy import deepcopy
 
 # lexer
 
@@ -444,7 +445,11 @@ def interpret(tree: Expr) -> Value:
                         print(layer.local['arg_vals'][0].value)
                         value = Void()
                     elif node.callee.name == 'callcc': # this is like calling a function
-                        pass # TODO
+                        state.stack.pop()
+                        state.stack.append(Layer(layer.local['arg_vals'][0].env[:]
+                            + [(layer.local['arg_vals'][0].fun.var_list[0].name, state.new(Continuation(deepcopy(state.stack))))],
+                            layer.local['arg_vals'][0].fun.expr, 0, {}))
+                        continue
                     elif node.callee.name == 'exit':
                         sys.exit('[Expr Runtime] message: execution stopped by the "exit" intrinsic function')
                     state.stack.pop()
@@ -469,9 +474,10 @@ def interpret(tree: Expr) -> Value:
                         for i, v in enumerate(layer.local['callee'].fun.var_list):
                             layer.local['new_env'].append((v.name, state.new(layer.local['arg_vals'][i])))
                         state.stack.append(Layer(layer.local['new_env'][:], layer.local['callee'].fun.expr, 0, {}))
+                        layer.pc += 1
                     elif type(layer.local['callee']) == Continuation:
-                        pass # TODO
-                    layer.pc += 1
+                        state.stack = layer.local['callee'].stack
+                        continue
                 else:
                     state.stack.pop()
         elif type(node) == Seq:
