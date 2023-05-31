@@ -424,19 +424,15 @@ def interpret(tree: Expr, debug: bool) -> Value:
             return value
         layer = state.stack[-1]
         node = layer.expr
+        if debug:
+            sys.stderr.write(f'[Expr Debug] evaluating {truncate(node)}\n')
         if type(node) == Int:
-            if debug:
-                sys.stderr.write(f'[Expr Debug] evaluating Int\n')
             value = Integer(node.value)
             state.stack.pop()
         elif type(node) == Lambda:
-            if debug:
-                sys.stderr.write(f'[Expr Debug] evaluating Lambda\n')
             value = Closure(layer.env, node)
             state.stack.pop()
         elif type(node) == Letrec:
-            if debug:
-                sys.stderr.write(f'[Expr Debug] evaluating Letrec\n')
             if layer.pc == 0:
                 layer.local['new_env'] = layer.env[:]
                 for v, e in node.var_expr_list:
@@ -459,8 +455,6 @@ def interpret(tree: Expr, debug: bool) -> Value:
             else:
                 state.stack.pop()
         elif type(node) == If:
-            if debug:
-                sys.stderr.write(f'[Expr Debug] evaluating If\n')
             if layer.pc == 0:
                 state.stack.append(Layer(layer.env[:], node.cond, 0, {}))
                 layer.pc += 1
@@ -473,13 +467,9 @@ def interpret(tree: Expr, debug: bool) -> Value:
             else:
                 state.stack.pop()
         elif type(node) == Var:
-            if debug:
-                sys.stderr.write(f'[Expr Debug] evaluating Var\n')
             value = state.store[lexical_lookup(node.name, layer.env)]
             state.stack.pop()
         elif type(node) == Call:
-            if debug:
-                sys.stderr.write(f'[Expr Debug] evaluating Call\n')
             if type(node.callee) == Var and node.callee.name in intrinsics:
                 if layer.pc == 0:
                     layer.local['arg_vals'] = []
@@ -550,15 +540,13 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         state.stack.append(Layer(layer.local['new_env'][:], layer.local['callee'].fun.expr, 0, {}))
                         layer.pc += 1
                     elif type(layer.local['callee']) == Continuation:
-                        state.stack = layer.local['callee'].stack
+                        state.stack = deepcopy(layer.local['callee'].stack)
                         if debug:
                             sys.stderr.write('[Expr Debug] applied continuation, stack switched\n')
                         continue
                 else:
                     state.stack.pop()
         elif type(node) == Seq:
-            if debug:
-                sys.stderr.write(f'[Expr Debug] evaluating Seq\n')
             if layer.pc < len(node.expr_list):
                 state.stack.append(Layer(layer.env[:], node.expr_list[layer.pc], 0, {}))
                 layer.pc += 1
