@@ -261,7 +261,7 @@ def parse(tokens: deque[str]) -> Expr:
     except IndexError:
         sys.exit('[Expr Parser] error: incomplete expression')
 
-# runtime values
+# runtime classes
 
 class Value:
     
@@ -279,41 +279,35 @@ class Closure(Value):
         self.env = env
         self.fun = fun
 
-class Continuation(Value):
-
-    def __init__(self):
-        pass
-
 class Void(Value):
 
     def __init__(self):
         pass
 
-# runtime state
-
+# the layer class for the evaluation stack; each layer contains the expression currently under evaluation
 class Layer:
 
     def __init__(self,
             env: list[tuple[str, int]],
             expr: Expr,
-            pc: Union[None, int],
-            local: dict[str, Any]
+            pc: int = 0,
+            local: dict[str, Any] = {}
         ):
         self.env = env
         self.expr = expr
-        # program counter inside the current layer
-        # None means just started (the layer has just been pushed onto the stack)
-        # other value (integer) i means the next step is the i-th step
-        self.pc = pc
-        self.local = local # local variable names start with '#'
+        self.pc = pc # program counter (the i-th step of evaluating this layer)
+        self.local = local
 
+class Continuation(Value):
+
+    def __init__(self, stack: list[Layer]):
+        self.stack = stack
+
+# the global state
 class State:
 
     def __init__(self, expr: Expr):
-        # this is not a call stack
-        # it is an "evaluation stack" where each layer is a syntax construct
-        # a call stack can be obtained by partitioning the evaluation stack according to function layers
-        self.stack = [Layer([], expr, None, {})]
+        self.stack = [Layer([], expr)]
         self.store = {}
         self.location = 0
 
@@ -354,6 +348,9 @@ def lexical_lookup(var: str, env: list[tuple[str, int]]) -> int:
             return env[i][1]
     sys.exit(f'[Expr Runtime] error: undefined variable "{var}"')
 
+def dynamic_lookup(var: str, stack: list[Layer]) -> int:
+    pass
+
 # interpreter
 
 def interpret(tree: Expr) -> Value:
@@ -362,6 +359,7 @@ def interpret(tree: Expr) -> Value:
     value = None
 
     while True:
+        # TODO: maybe call GC for every 100 iterations
         if len(state.stack) == 0:
             return value
         layer = state.stack[-1]
@@ -373,32 +371,32 @@ def interpret(tree: Expr) -> Value:
             value = Closure(layer.env, node)
             state.stack.pop()
         elif type(node) == Letrec:
-            if layer.pc == None:
+            if layer.pc == 0:
                 layer.local['new_env'] = layer.env[:]
                 for v, e in node.var_expr_list:
                     loc = state.new(Void())
                     layer.local['new_env'].append((v.name, loc))
-                layer.pc = 0
+                layer.pc += 1
             else:
-                if layer.pc < len(node.var_expr_list):
-                    if layer.pc > 0:
-                        last_location = lexical_lookup(node.var_expr_list[layer.pc - 1], layer.local['new_env'])
+                if layer.pc <= len(node.var_expr_list):
+                    if layer.pc > 1:
+                        last_location = lexical_lookup(node.var_expr_list[layer.pc - 2], layer.local['new_env'])
                         state.store[last_location] = value
-                    v, e = node.var_expr_list[layer.pc]
-                    state.stack.append(Layer(layer.local['new_env'][:], e, None, {}))
+                    v, e = node.var_expr_list[layer.pc - 1]
+                    state.stack.append(Layer(layer.local['new_env'][:], e))
                     layer.pc += 1
-                elif layer.pc == len(node.var_expr_list):
-                    if layer.pc > 0:
-                        last_location = lexical_lookup(node.var_expr_list[layer.pc - 1], layer.local['new_env'])
+                elif layer.pc == len(node.var_expr_list) + 1:
+                    if layer.pc > 1:
+                        last_location = lexical_lookup(node.var_expr_list[layer.pc - 2], layer.local['new_env'])
                         state.store[last_location] = value
-                    state.stack.append(Layer(layer.local['new_env'][:], node.expr, None, {}))
+                    state.stack.append(Layer(layer.local['new_env'][:], node.expr))
                     layer.pc += 1
                 else:
                     state.stack.pop()
         elif type(node) == If:
-            if layer.pc == None:
+            if layer.pc == 0:
                 state.stack.append(Layer(layer.env[:], node.cond, None, {}))
-                layer.pc = 0
+                layer.pc += 1
             elif layer.pc == 1:
                 if value.value != 0:
                     state.stack.append(Layer(layer.env[:], node.branch1, None, {}))
@@ -412,25 +410,25 @@ def interpret(tree: Expr) -> Value:
             state.stack.pop()
         elif type(node) == Call:
             if type(node.callee) == Var and node.callee.name in intrinsics:
-                if layer.pc == None:
+                if layer.pc == 0:
                     layer.local['arg_vals'] = []
-                    layer.pc = 0
-                elif layer.pc < len(node.arg_list):
                     layer.pc += 1
-                elif layer.pc == len(node.arg_list):
+                elif layer.pc <= len(node.arg_list):
+                    layer.pc += 1
+                elif layer.pc == len(node.arg_list) + 1:
                     if node.callee.name == 'callcc':
                         pass # this is like calling a function
                     else:
                         value = ()
                         state.stack.pop()
             else:
-                if layer.pc == None:
+                if layer.pc == 0:
                     pass
-                    layer.pc = 0
-                elif layer.pc == 0:
+                    layer.pc += 1
+                elif layer.pc == 1:
                     layer.local['callee'] = value
                     layer.pc += 1
-                elif layer.pc <= len(node.arg_list):
+                elif layer.pc <= len(node.arg_list) + 1:
                     layer.pc += 1
                 else:
                     if type(layer.local['callee']) == Closure:

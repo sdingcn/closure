@@ -31,10 +31,11 @@ Python >= 3.9
 | --- | --- |
 | first-class functions | complete |
 | lexical scope and closures | complete |
-| dynamic scope | not started |
 | letrec and (mutual) recursion | complete |
+| fully accessible evaluation context | in progress |
+| dynamic scope | in progress |
+| first-class continuations | in progress |
 | mark-and-sweep garbage collection | in progress |
-| first-class continuations | not started |
 
 The full semantic reference is the interpreter itself.
 
