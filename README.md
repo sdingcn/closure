@@ -32,7 +32,7 @@ Python >= 3.9
 | first-class functions | complete |
 | lexical scope and closures | complete |
 | letrec and (mutual) recursion | complete |
-| fully accessible evaluation context | in progress |
+| fully accessible evaluation context | complete |
 | dynamic scope | in progress |
 | first-class continuations | in progress |
 | mark-and-sweep garbage collection | in progress |
