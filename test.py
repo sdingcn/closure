@@ -25,19 +25,19 @@ def main():
         ('test/abs.expr', ['0'], ['0']),
         ('test/abs.expr', ['-501'], ['501']),
 
-        ('test/gcd.expr', ['100', '0'], ['100', 'Void']),
-        ('test/gcd.expr', ['0', '100'], ['100', 'Void']),
-        ('test/gcd.expr', ['30', '30'], ['30', 'Void']),
-        ('test/gcd.expr', ['25', '45'], ['5', 'Void']),
-        ('test/gcd.expr', ['7', '100'], ['1', 'Void']),
+        ('test/gcd.expr', ['100', '0'], ['100', 'void']),
+        ('test/gcd.expr', ['0', '100'], ['100', 'void']),
+        ('test/gcd.expr', ['30', '30'], ['30', 'void']),
+        ('test/gcd.expr', ['25', '45'], ['5', 'void']),
+        ('test/gcd.expr', ['7', '100'], ['1', 'void']),
 
-        ('test/mutual-recursion.expr', [], ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1', '0', 'Void']),
+        ('test/mutual-recursion.expr', [], ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1', '0', 'void']),
 
-        ('test/quicksort.expr', ['0'], ['Void']),
-        ('test/quicksort.expr', ['1', '303'], ['303', 'Void']),
-        ('test/quicksort.expr', ['3', '1', '3', '7'], ['1', '3', '7', 'Void']),
-        ('test/quicksort.expr', ['5', '5', '4', '3', '2', '1'], ['1', '2', '3', '4', '5', 'Void']),
-        ('test/quicksort.expr', ['6', '8', '-1', '3', '0', '6', '-5'], ['-5', '-1', '0', '3', '6', '8', 'Void']),
+        ('test/quicksort.expr', ['0'], ['void']),
+        ('test/quicksort.expr', ['1', '303'], ['303', 'void']),
+        ('test/quicksort.expr', ['3', '1', '3', '7'], ['1', '3', '7', 'void']),
+        ('test/quicksort.expr', ['5', '5', '4', '3', '2', '1'], ['1', '2', '3', '4', '5', 'void']),
+        ('test/quicksort.expr', ['6', '8', '-1', '3', '0', '6', '-5'], ['-5', '-1', '0', '3', '6', '8', 'void']),
 
         ('test/lexical-scope.expr', [], ['1']),
 
