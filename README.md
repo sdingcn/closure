@@ -31,11 +31,9 @@ Python >= 3.9
 | --- | --- |
 | first-class functions | complete |
 | lexical scope and closures | complete |
-| letrec and (mutual) recursion | complete |
-| fully accessible evaluation context | complete |
 | dynamic scope | in progress |
+| letrec and (mutual) recursion | complete |
 | first-class continuations | complete |
-| type tester (0:void, 1:int, 2:closure, 3:continuation) | complete |
 | mark-and-sweep garbage collection | in progress |
 
 The full semantic reference is the interpreter itself.
@@ -43,6 +41,8 @@ The full semantic reference is the interpreter itself.
 ## interpreter usage
 
 `python3 src/interpreter.py run <file>` runs the code in `<file>`.
+
+`python3 src/interpreter.py debug <file>` runs the code in `<file>` and prints (to `stderr`) information about the interpreter's execution.
 
 `python3 src/interpreter.py dump-ast <file>` dumps the AST of the code in `<file>`.
 
