@@ -41,7 +41,9 @@ def main():
 
         ('test/lexical-scope.expr', [], ['1']),
 
-        ('test/continuation.expr', [], ['3', '2', '1', '1', '2', '3', '3', '2', '1', '300'])
+        ('test/continuation.expr', [], ['3', '2', '1', '1', '2', '3', '3', '2', '1', '300']),
+
+        ('test/type.expr', [], ['0', '1', '2', '3', 'void'])
     ]
     for test in tests:
         if not check_io(*test):

@@ -310,6 +310,14 @@ class Value:
     def __str__(self) -> str:
         return 'value'
 
+class Void(Value):
+
+    def __init__(self):
+        pass
+
+    def __str__(self) -> str:
+        return 'void'
+
 class Integer(Value):
 
     def __init__(self, value: int):
@@ -326,14 +334,6 @@ class Closure(Value):
 
     def __str__(self) -> str:
         return f'(closure {unfold(self.env)} {self.fun})'
-
-class Void(Value):
-
-    def __init__(self):
-        pass
-
-    def __str__(self) -> str:
-        return 'void'
 
 # the layer class for the evaluation stack; each layer contains the expression currently under evaluation
 class Layer:
@@ -414,7 +414,7 @@ def dynamic_lookup(var: str, stack: list[Layer]) -> int: # TODO
 # interpreter
 
 def interpret(tree: Expr, debug: bool) -> Value:
-    intrinsics = ['add', 'sub', 'mul', 'div', 'mod', 'lt', 'void', 'get', 'put', 'callcc', 'exit']
+    intrinsics = ['void', 'add', 'sub', 'mul', 'div', 'mod', 'lt', 'get', 'put', 'callcc', 'type', 'exit']
     state = State(tree)
     value = None
 
@@ -482,7 +482,9 @@ def interpret(tree: Expr, debug: bool) -> Value:
                 else:
                     if layer.pc > 1:
                         layer.local['arg_vals'].append(value)
-                    if node.callee.name == 'add':
+                    if node.callee.name == 'void':
+                        value = Void()
+                    elif node.callee.name == 'add':
                         value = Integer(layer.local['arg_vals'][0].value + layer.local['arg_vals'][1].value)
                     elif node.callee.name == 'sub':
                         value = Integer(layer.local['arg_vals'][0].value - layer.local['arg_vals'][1].value)
@@ -494,8 +496,6 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         value = Integer(layer.local['arg_vals'][0].value % layer.local['arg_vals'][1].value)
                     elif node.callee.name == 'lt':
                         value = Integer(1) if layer.local['arg_vals'][0].value < layer.local['arg_vals'][1].value else Integer(0)
-                    elif node.callee.name == 'void':
-                        value = Void()
                     elif node.callee.name == 'get':
                         try:
                             s = input()
@@ -513,6 +513,17 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         if debug:
                             sys.stderr.write('[Expr Debug] captured continuation\n')
                         continue
+                    elif node.callee.name == 'type':
+                        if type(layer.local['arg_vals'][0]) == Void:
+                            value = Integer(0)
+                        elif type(layer.local['arg_vals'][0]) == Integer:
+                            value = Integer(1)
+                        elif type(layer.local['arg_vals'][0]) == Closure:
+                            value = Integer(2)
+                        elif type(layer.local['arg_vals'][0]) == Continuation:
+                            value = Integer(3)
+                        else:
+                            sys.exit(f'[Expr Runtime Error] the "type" intrinsic function found a value of unknown type')
                     elif node.callee.name == 'exit':
                         if debug:
                             sys.stderr.write('[Expr Debug] execution stopped by the "exit" intrinsic function\n')

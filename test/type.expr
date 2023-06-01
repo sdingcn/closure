@@ -1,0 +1,13 @@
+letrec (
+  a = (void)
+  b = 0
+  c = lambda () { (void) }
+  d = (callcc lambda (k) { (k k) })
+) {
+  [
+    (put (type a))
+    (put (type b))
+    (put (type c))
+    (put (type d))
+  ]
+}

@@ -14,7 +14,7 @@ Python >= 3.9
 ```
 
 ```
-<intrinsic> := add | sub | mul | div | mod | lt | void | get | put | callcc | exit
+<intrinsic> := void | add | sub | mul | div | mod | lt | get | put | callcc | type | exit
 <var-list> := epsilon | <var> <var-list>
 <var-expr-list> := epsilon | <var> = <expr> <var-expr-list>
 <expr-list> := epsilon | <expr> <expr-list>
@@ -22,7 +22,7 @@ Python >= 3.9
         | lambda ( <var-list> ) { <expr> }
         | letrec ( <var-expr-list> ) { <expr> }
         | if <expr> then <expr> else <expr>
-        | <var> ; can hold void, ints, lambdas, continuations, but cannot hold intrinsics
+        | <var> ; can hold void, ints, closures, continuations, but cannot hold intrinsics
         | ( <intrinsic> <expr-list> ) ; intrinsic / lambda / continuation call
         | [ <expr> <expr-list> ] ; sequence
 ```
@@ -35,6 +35,7 @@ Python >= 3.9
 | fully accessible evaluation context | complete |
 | dynamic scope | in progress |
 | first-class continuations | complete |
+| type tester (0:void, 1:int, 2:closure, 3:continuation) | complete |
 | mark-and-sweep garbage collection | in progress |
 
 The full semantic reference is the interpreter itself.
