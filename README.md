@@ -22,8 +22,8 @@ Python >= 3.9
         | lambda ( <var-list> ) { <expr> }
         | letrec ( <var-expr-list> ) { <expr> }
         | if <expr> then <expr> else <expr>
-        | <var> ; can hold void, ints, closures, continuations, but cannot hold intrinsics
-        | ( <intrinsic> <expr-list> ) ; intrinsic / lambda / continuation call
+        | <var> ; can hold void, integers, closures, continuations, but cannot hold intrinsics
+        | ( <expr> <expr-list> ) ; intrinsic / closure / continuation call
         | [ <expr> <expr-list> ] ; sequence
 ```
 
@@ -42,7 +42,7 @@ The full semantic reference is the interpreter itself.
 
 `python3 src/interpreter.py run <file>` runs the code in `<file>`.
 
-`python3 src/interpreter.py debug <file>` runs the code in `<file>` and prints (to `stderr`) information about the interpreter's execution.
+`python3 src/interpreter.py debug <file>` runs the code in `<file>` and prints (to `stderr`) information about the interpreter's execution process.
 
 `python3 src/interpreter.py dump-ast <file>` dumps the AST of the code in `<file>`.
 
