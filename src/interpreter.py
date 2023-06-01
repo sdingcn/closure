@@ -45,9 +45,6 @@ def unfold(value: Union[list[Any], tuple[Any, ...], set[Any], dict[Any, Any]]) -
         s = '}'
     return s
 
-def truncate(v: Any) -> str:
-    return str(v)[:30] + '...'
-
 ### lexer
 
 class SourceLocation:
@@ -327,7 +324,7 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
         if not tokens:
             sys.exit(f'[Expr Parser Error] incomplete token stream')
         if debug:
-            sys.stderr.write(f'[Expr Debug] parsing expression starting with {tokens[0]}')
+            sys.stderr.write(f'[Expr Debug] parsing expression starting with {tokens[0]}\n')
         if is_int(tokens[0]):
             return parse_int()
         elif tokens[0].val == 'lambda':
@@ -451,7 +448,7 @@ def lexical_lookup(var: str, env: list[tuple[str, int]]) -> int:
     for i in range(len(env) - 1, -1, -1):
         if env[i][0] == var:
             return env[i][1]
-    sys.exit(f'[Expr Runtime Error] undefined variable "{var}"')
+    sys.exit(f'[Expr Runtime Error] undefined variable {var}')
 
 def dynamic_lookup(var: str, stack: list[Layer]) -> int: # TODO
     pass
@@ -470,7 +467,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
         layer = state.stack[-1]
         node = layer.expr
         if debug:
-            sys.stderr.write(f'[Expr Debug] evaluating {truncate(node)}\n')
+            sys.stderr.write(f'[Expr Debug] evaluating AST node of type {type(node)} at {node.sl}\n')
         if type(node) == Int:
             value = Integer(node.value)
             state.stack.pop()
@@ -546,17 +543,18 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             s = input()
                             value = Integer(int(s.strip()))
                         except ValueError:
-                            sys.exit(f'[Expr Runtime Error] unsupported input "{s}"')
+                            sys.exit(f'[Expr Runtime Error] unsupported input {s}')
                     elif node.callee.name == 'put':
                         print(layer.local['arg_vals'][0].value)
                         value = Void()
                     elif node.callee.name == 'callcc': # this is like calling a function
                         state.stack.pop()
-                        state.stack.append(Layer(layer.local['arg_vals'][0].env[:]
-                            + [(layer.local['arg_vals'][0].fun.var_list[0].name, state.new(Continuation(deepcopy(state.stack))))],
-                            layer.local['arg_vals'][0].fun.expr, 0, {}))
+                        cont = Continuation(deepcopy(state.stack))
                         if debug:
-                            sys.stderr.write('[Expr Debug] captured continuation\n')
+                            sys.stderr.write(f'[Expr Debug] captured continuation {cont}\n')
+                        state.stack.append(Layer(layer.local['arg_vals'][0].env[:]
+                            + [(layer.local['arg_vals'][0].fun.var_list[0].name, state.new(cont))],
+                            layer.local['arg_vals'][0].fun.expr, 0, {}))
                         continue
                     elif node.callee.name == 'type':
                         if type(layer.local['arg_vals'][0]) == Void:
@@ -596,9 +594,10 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         state.stack.append(Layer(layer.local['new_env'][:], layer.local['callee'].fun.expr, 0, {}))
                         layer.pc += 1
                     elif type(layer.local['callee']) == Continuation:
-                        state.stack = deepcopy(layer.local['callee'].stack)
+                        cont = layer.local['callee']
+                        state.stack = deepcopy(cont.stack)
                         if debug:
-                            sys.stderr.write('[Expr Debug] applied continuation, stack switched\n')
+                            sys.stderr.write(f'[Expr Debug] applied continuation {cont}, stack switched\n')
                         continue
                 else:
                     state.stack.pop()
@@ -609,7 +608,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
             else:
                 state.stack.pop()
         else:
-            sys.exit(f'[Expr Runtime Error] unrecognized AST node "{node}"')
+            sys.exit(f'[Expr Runtime Error] unrecognized AST node {node}')
 
 ### main
 
