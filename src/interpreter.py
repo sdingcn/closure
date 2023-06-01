@@ -3,9 +3,9 @@ from collections import deque
 from typing import Union, Any
 from copy import deepcopy
 
-# helper functions
+### helper functions
 
-def unfold(value: Union[list[Any], tuple[Any, ...], set[Any], dict[Any]]) -> str:
+def unfold(value: Union[list[Any], tuple[Any, ...], set[Any], dict[Any, Any]]) -> str:
     if type(value) == list:
         s = '['
     elif type(value) == tuple:
@@ -13,7 +13,7 @@ def unfold(value: Union[list[Any], tuple[Any, ...], set[Any], dict[Any]]) -> str
     elif type(value) in [set, dict]:
         s = '{'
     else:
-        sys.exit('[Expr Internal Error] unsupported argument given to "unfold"')
+        sys.exit('[Expr Internal Error] unsupported argument given to unfold')
     if type(value) in [list, tuple, set]:
         for v in value:
             if type(v) in [list, tuple, set, dict]:
@@ -48,47 +48,75 @@ def unfold(value: Union[list[Any], tuple[Any, ...], set[Any], dict[Any]]) -> str
 def truncate(v: Any) -> str:
     return str(v)[:30] + '...'
 
-# lexer
+### lexer
 
-def lex(source: str, debug: bool) -> deque[str]:
+class SourceLocation:
+
+    def __init__(self, line: int, col: int):
+        self.line = line
+        self.col = col
+
+    def __str__(self) -> str:
+        return f'(SourceLocation {self.line} {self.col})'
+
+class Token:
+
+    def __init__(self, sl: SourceLocation, val: str):
+        self.sl = sl
+        self.val = val
+
+    def __str__(self) -> str:
+        return f'(Token {self.sl} {self.val})'
+
+def lex(source: str, debug: bool) -> deque[Token]:
     chars = deque(source)
+    line = 1
+    col = 1
 
-    def next_token() -> str:
+    def next_token() -> Union[None, Token]:
+        nonlocal line, col
         while chars and chars[0].isspace():
-            chars.popleft()
+            space = chars.popleft()
+            col += 1
+            if space == '\n':
+                line += 1
+                col = 1
         if chars:
+            sl = SourceLocation(line, col)
             if chars[0].isdigit():
-                token = ''
+                val = ''
                 while chars and chars[0].isdigit():
-                    token += chars.popleft()
+                    val += chars.popleft()
             elif chars[0] in ('-', '+') and (len(chars) > 1 and chars[1].isdigit()):
-                token = chars.popleft()
+                val = chars.popleft()
                 while chars and chars[0].isdigit():
-                    token += chars.popleft()
+                    val += chars.popleft()
             elif chars[0].isalpha():
-                token = ''
+                val = ''
                 while chars and chars[0].isalpha():
-                    token += chars.popleft()
+                    val += chars.popleft()
             elif chars[0] in ('(', ')', '{', '}', '[', ']', '='):
-                token = chars.popleft()
+                val = chars.popleft()
             else:
-                sys.exit(f'[Expr Lexer Error] unrecognized character "{chars[0]}"')
+                sys.exit(f'[Expr Lexer Error] unsupported or incomplete character sequence starting with {chars[0]} at {sl}')
+            token = Token(sl, val)
+            col += len(val)
             return token
         else:
-            return ''
+            return None
 
     tokens = deque()
     while True:
         token = next_token()
-        if debug:
-            sys.stderr.write(f'[Expr Debug] read token {token}\n')
         if token:
+            if debug:
+                sys.stderr.write(f'[Expr Debug] read token {token}\n')
             tokens.append(token)
         else:
             break
     return tokens
 
-# AST and parser
+### parser
 
 class Expr:
 
@@ -100,125 +128,143 @@ class Expr:
 
 class Int(Expr):
 
-    def __init__(self, parent: Union[None, Expr], value: int):
+    def __init__(self, sl: SourceLocation, parent: Union[None, Expr], value: int):
+        self.sl = sl
         self.parent = parent
         self.value = value
 
     def __str__(self) -> str:
-        return f'(Int {self.value})'
+        return f'(Int {self.sl} {self.value})'
 
 class Var(Expr):
 
-    def __init__(self, parent: Union[None, Expr], name: str):
+    def __init__(self, sl: SourceLocation, parent: Union[None, Expr], name: str):
+        self.sl = sl
         self.parent = parent
         self.name = name
 
     def __str__(self) -> str:
-        return f'(Var {self.name})'
+        return f'(Var {self.sl} {self.name})'
 
 class Lambda(Expr):
 
-    def __init__(self, parent: Union[None, Expr], var_list: list[Var], expr: Expr):
+    def __init__(self, sl: SourceLocation, parent: Union[None, Expr], var_list: list[Var], expr: Expr):
+        self.sl = sl
         self.parent = parent
         self.var_list = var_list
         self.expr = expr
 
     def __str__(self) -> str:
-        return f'(Lambda {unfold(self.var_list)} {self.expr})'
+        return f'(Lambda {self.sl} {unfold(self.var_list)} {self.expr})'
 
 class Letrec(Expr):
 
-    def __init__(self, parent: Union[None, Expr], var_expr_list: list[tuple[Var, Expr]], expr: Expr):
+    def __init__(self, sl: SourceLocation, parent: Union[None, Expr], var_expr_list: list[tuple[Var, Expr]], expr: Expr):
+        self.sl = sl
         self.parent = parent
         self.var_expr_list = var_expr_list
         self.expr = expr
 
     def __str__(self) -> str:
-        return f'(Letrec {unfold(self.var_expr_list)} {self.expr})'
+        return f'(Letrec {self.sl} {unfold(self.var_expr_list)} {self.expr})'
 
 class If(Expr):
 
-    def __init__(self, parent: Union[None, Expr], cond: Expr, branch1: Expr, branch2: Expr):
+    def __init__(self, sl: SourceLocation, parent: Union[None, Expr], cond: Expr, branch1: Expr, branch2: Expr):
+        self.sl = sl
         self.parent = parent
         self.cond = cond
         self.branch1 = branch1
         self.branch2 = branch2
 
     def __str__(self) -> str:
-        return f'(If {self.cond} {self.branch1} {self.branch2})'
+        return f'(If {self.sl} {self.cond} {self.branch1} {self.branch2})'
 
 class Call(Expr):
 
-    def __init__(self, parent: Union[None, Expr], callee: Expr, arg_list: list[Expr]):
+    def __init__(self, sl: SourceLocation, parent: Union[None, Expr], callee: Expr, arg_list: list[Expr]):
+        self.sl = sl
         self.parent = parent
         self.callee = callee
         self.arg_list = arg_list
 
     def __str__(self) -> str:
-        return f'(Call {self.callee} {unfold(self.arg_list)})'
+        return f'(Call {self.sl} {self.callee} {unfold(self.arg_list)})'
 
 class Seq(Expr):
 
-    def __init__(self, parent: Union[None, Expr], expr_list: list[Expr]):
+    def __init__(self, sl: SourceLocation, parent: Union[None, Expr], expr_list: list[Expr]):
+        self.sl = sl
         self.parent = parent
         self.expr_list = expr_list
 
     def __str__(self) -> str:
-        return f'(Seq {unfold(self.expr_list)})'
+        return f'(Seq {self.sl} {unfold(self.expr_list)})'
 
-def parse(tokens: deque[str], debug: bool) -> Expr:
+def parse(tokens: deque[Token], debug: bool) -> Expr:
     
-    def is_int(token: str) -> bool:
+    def is_int(token: Token) -> bool:
         try:
-            int(token)
+            int(token.val)
             return True
         except ValueError:
             return False
 
-    def is_var(token: str) -> bool:
-        return token.isalpha()
+    def is_var(token: Token) -> bool:
+        return token.val.isalpha()
+
+    def consume(expected: str) -> Token:
+        if not tokens:
+            sys.exit(f'[Expr Parser Error] incomplete token stream')
+        token = tokens.popleft()
+        if token.val == expected:
+            return token
+        else:
+            sys.exit(f'[Expr Parser Error] expected {expected}, got {token}')
 
     def parse_int() -> Int:
-        if debug:
-            sys.stderr.write('[Expr Debug] entered Int\n')
-        value = int(tokens.popleft())
-        node = Int(None, value)
+        if not tokens:
+            sys.exit(f'[Expr Parser Error] incomplete token stream')
+        token = tokens.popleft()
+        if not is_int(token):
+            sys.exit(f'[Expr Parser Error] expected an integer, got {token}')
+        node = Int(token.sl, None, int(token.val))
         return node
 
     def parse_lambda() -> Lambda:
-        if debug:
-            sys.stderr.write('[Expr Debug] entered Lambda\n')
-        tokens.popleft() # lambda
-        tokens.popleft() # (
+        start = consume('lambda')
+        consume('(')
+        if not tokens:
+            sys.exit(f'[Expr Parser Error] incomplete token stream')
         var_list = []
-        while tokens[0].isalpha():
+        while tokens and is_var(tokens[0]):
             var_list.append(parse_var())
-        tokens.popleft() # )
-        tokens.popleft() # {
+        consume(')')
+        consume('{')
         expr = parse_expr()
-        tokens.popleft() # }
-        node = Lambda(None, var_list, expr)
+        consume('}')
+        node = Lambda(start.sl, None, var_list, expr)
         for v in node.var_list:
             v.parent = node
         node.expr.parent = node
         return node
 
     def parse_letrec() -> Letrec:
-        if debug:
-            sys.stderr.write('[Expr Debug] entered Letrec\n')
-        tokens.popleft() # letrec
-        tokens.popleft() # (
+        start = consume('letrec')
+        consume('(')
+        if not tokens:
+            sys.exit(f'[Expr Parser Error] incomplete token stream')
         var_expr_list = []
-        while tokens[0].isalpha():
+        while tokens and is_var(tokens[0]):
             v = parse_var()
-            tokens.popleft() # =
+            consume('=')
             e = parse_expr()
             var_expr_list.append((v, e))
-        tokens.popleft() # )
-        tokens.popleft() # {
+        consume(')')
+        consume('{')
         expr = parse_expr()
-        tokens.popleft() # }
-        node = Letrec(None, var_expr_list, expr)
+        consume('}')
+        node = Letrec(start.sl, None, var_expr_list, expr)
         for v, e in node.var_expr_list:
             v.parent = node
             e.parent = node
@@ -226,81 +272,82 @@ def parse(tokens: deque[str], debug: bool) -> Expr:
         return node
 
     def parse_if() -> If:
-        if debug:
-            sys.stderr.write('[Expr Debug] entered If\n')
-        tokens.popleft() # if
+        start = consume('if')
         cond = parse_expr()
-        tokens.popleft() # then
+        consume('then')
         branch1 = parse_expr()
-        tokens.popleft() # else
+        consume('else')
         branch2 = parse_expr()
-        node = If(None, cond, branch1, branch2)
+        node = If(start.sl, None, cond, branch1, branch2)
         node.cond.parent = node
         node.branch1.parent = node
         node.branch2.parent = node
         return node
 
     def parse_var() -> Var:
-        if debug:
-            sys.stderr.write('[Expr Debug] entered Var\n')
-        name = tokens.popleft()
-        node = Var(None, name)
+        if not tokens:
+            sys.exit(f'[Expr Parser Error] incomplete token stream')
+        token = tokens.popleft()
+        if not is_var(token):
+            sys.exit(f'[Expr Parser Error] expected a variable, got {token}')
+        node = Var(token.sl, None, token.val)
         return node
 
     def parse_call() -> Call:
-        if debug:
-            sys.stderr.write('[Expr Debug] entered Call\n')
-        tokens.popleft() # (
+        start = consume('(')
         callee = parse_expr()
+        if not tokens:
+            sys.exit(f'[Expr Parser Error] incomplete token stream')
         arg_list = []
-        while tokens[0] != ')':
+        while tokens and tokens[0].val != ')':
             arg_list.append(parse_expr())
-        tokens.popleft() # )
-        node = Call(None, callee, arg_list)
+        consume(')')
+        node = Call(start.sl, None, callee, arg_list)
         node.callee.parent = node
         for a in node.arg_list:
             a.parent = node
         return node
 
     def parse_seq() -> Seq:
-        if debug:
-            sys.stderr.write('[Expr Debug] entered Seq\n')
-        tokens.popleft() # [
+        start = consume('[')
+        if not tokens:
+            sys.exit(f'[Expr Parser Error] incomplete token stream')
         expr_list = []
-        while tokens[0] != ']':
+        while tokens and tokens[0].val != ']':
             expr_list.append(parse_expr())
-        tokens.popleft() # ]
         if len(expr_list) == 0:
-            sys.exit('[Expr Parser Error] zero-length sequence')
-        node = Seq(None, expr_list)
+            sys.exit('[Expr Parser Error] zero-length sequence at {start}')
+        consume(']')
+        node = Seq(start.sl, None, expr_list)
         for e in node.expr_list:
             e.parent = node
         return node
 
     def parse_expr() -> Expr:
+        if not tokens:
+            sys.exit(f'[Expr Parser Error] incomplete token stream')
+        if debug:
+            sys.stderr.write(f'[Expr Debug] parsing expression starting with {tokens[0]}')
         if is_int(tokens[0]):
             return parse_int()
-        elif tokens[0] == 'lambda':
+        elif tokens[0].val == 'lambda':
             return parse_lambda()
-        elif tokens[0] == 'letrec':
+        elif tokens[0].val == 'letrec':
             return parse_letrec()
-        elif tokens[0] == 'if':
+        elif tokens[0].val == 'if':
             return parse_if()
         elif is_var(tokens[0]):
             return parse_var()
-        elif tokens[0] == '(':
+        elif tokens[0].val == '(':
             return parse_call()
-        elif tokens[0] == '[':
+        elif tokens[0].val == '[':
             return parse_seq()
         else:
-            sys.exit(f'[Expr Parser Error] unrecognized expression starting with "{tokens[0]}"')
+            sys.exit(f'[Expr Parser Error] unrecognized expression starting with {tokens[0]}')
     
-    try:
-        return parse_expr()
-    except IndexError:
-        sys.exit('[Expr Parser Error] incomplete expression')
+    return parse_expr()
 
-# runtime classes
+### runtime
 
 class Value:
     
@@ -400,8 +447,6 @@ class State:
                 mark(l)
         return sweep()
 
-# runtime pure helper functions
-
 def lexical_lookup(var: str, env: list[tuple[str, int]]) -> int:
     for i in range(len(env) - 1, -1, -1):
         if env[i][0] == var:
@@ -411,7 +456,7 @@ def lexical_lookup(var: str, env: list[tuple[str, int]]) -> int:
 def dynamic_lookup(var: str, stack: list[Layer]) -> int: # TODO
     pass
 
-# interpreter
+### interpreter
 
 def interpret(tree: Expr, debug: bool) -> Value:
     intrinsics = ['void', 'add', 'sub', 'mul', 'div', 'mod', 'lt', 'get', 'put', 'callcc', 'type', 'exit']
@@ -566,7 +611,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
         else:
             sys.exit(f'[Expr Runtime Error] unrecognized AST node "{node}"')
 
-# main entry
+### main
 
 def main(option: str, source: str) -> None:
     if option == 'run':
