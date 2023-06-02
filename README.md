@@ -36,7 +36,7 @@ Python >= 3.9
 | dynamic scope variables | complete |
 | letrec and (mutual) recursion | complete |
 | first-class continuations | complete |
-| strict dynamic type check | in progress |
+| dynamic type check | complete |
 | mark-and-sweep garbage collection | in progress |
 
 The full semantic reference is the interpreter itself.
