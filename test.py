@@ -45,7 +45,9 @@ def main():
 
         ('test/continuation.expr', [], ['3', '2', '1', '1', '2', '3', '3', '2', '1', '300']),
 
-        ('test/type.expr', [], ['0', '1', '2', '3', 'void'])
+        ('test/type.expr', [], ['0', '1', '2', '3', 'void']),
+
+        ('test/oop.expr', [], ['1', '2', '100', '2', 'void'])
     ]
     for test in tests:
         if not check_io(*test):
