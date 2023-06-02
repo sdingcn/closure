@@ -32,8 +32,8 @@ Python >= 3.9
 | feature | status |
 | --- | --- |
 | first-class functions | complete |
-| lexical scope and closures | complete |
-| dynamic scope | complete |
+| lexical scope variables and closures | complete |
+| dynamic scope variables | complete |
 | letrec and (mutual) recursion | complete |
 | first-class continuations | complete |
 | strict dynamic type check | in progress |

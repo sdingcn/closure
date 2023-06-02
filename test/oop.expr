@@ -1,12 +1,7 @@
 letrec (
   makeBase = lambda () {
     lambda (call) {
-      letrec (
-        F = lambda () { 1 }
-        G = lambda () { 2 }
-      ) {
-        (call)
-      }
+      letrec (F = lambda () { 1 } G = lambda () { 2 }) { (call) }
     }
   }
   makeDerived = lambda () {
