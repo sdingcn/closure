@@ -2,6 +2,14 @@ letrec (
   f = letrec (a = 1) {
     lambda () { a }
   }
+  g = lambda (x) {
+    lambda (y) {
+      x
+    }
+  }
 ) {
-  letrec (a = 2) { (f) }
+  [
+    letrec (a = 2) { (put (f)) }
+    (put ((g 100) 200))
+  ]
 }

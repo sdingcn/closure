@@ -387,7 +387,7 @@ class Layer:
     '''The layer class in the evaluation stack, where each layer is the expression currently under evaluation'''
 
     def __init__(self,
-            env: list[tuple[str, int]],
+            env: list[tuple[str, int]], # env will be shared among layers under the same closure call
             expr: Expr,
             pc: int,
             local: dict[str, Any]
@@ -395,7 +395,7 @@ class Layer:
         self.env = env # environment for the evaluation of the current expression
         self.expr = expr # the current expression under evaluation
         self.pc = pc # program counter (the pc-th step of evaluating this expression)
-        self.local = local # local variables
+        self.local = local # variables local to this evaluation layer
 
     def __str__(self) -> str:
         return f'(layer {unfold(self.env)} {self.expr} {self.pc} {unfold(self.local)})'
@@ -479,33 +479,34 @@ def interpret(tree: Expr, debug: bool) -> Value:
             state.stack.pop()
         elif type(layer.expr) == Letrec:
             if layer.pc == 0: # create locations and bind variables to them
-                layer.local['new_env'] = layer.env[:]
                 for v, e in layer.expr.var_expr_list:
-                    layer.local['new_env'].append((v.name, state.new(Void())))
+                    layer.env.append((v.name, state.new(Void())))
                 layer.pc += 1
             elif layer.pc <= len(layer.expr.var_expr_list): # evaluate binding expressions
                 if layer.pc > 1: # update location content
-                    last_location = lexical_lookup(layer.expr.var_expr_list[layer.pc - 2][0], layer.local['new_env'])
+                    last_location = lexical_lookup(layer.expr.var_expr_list[layer.pc - 2][0], layer.env)
                     state.store[last_location] = value
-                state.stack.append(Layer(layer.local['new_env'][:], layer.expr.var_expr_list[layer.pc - 1][1], 0, {}))
+                state.stack.append(Layer(layer.env, layer.expr.var_expr_list[layer.pc - 1][1], 0, {}))
                 layer.pc += 1
             elif layer.pc == len(layer.expr.var_expr_list) + 1: # evaluate body expression
                 if layer.pc > 1: # update location content
-                    last_location = lexical_lookup(layer.expr.var_expr_list[layer.pc - 2][0], layer.local['new_env'])
+                    last_location = lexical_lookup(layer.expr.var_expr_list[layer.pc - 2][0], layer.env)
                     state.store[last_location] = value
-                state.stack.append(Layer(layer.local['new_env'][:], layer.expr.expr, 0, {}))
+                state.stack.append(Layer(layer.env, layer.expr.expr, 0, {}))
                 layer.pc += 1
             else: # finish letrec
+                for i in range(len(layer.expr.var_expr_list)):
+                    layer.env.pop()
                 state.stack.pop()
         elif type(layer.expr) == If:
             if layer.pc == 0: # evaluate the condition
-                state.stack.append(Layer(layer.env[:], layer.expr.cond, 0, {}))
+                state.stack.append(Layer(layer.env, layer.expr.cond, 0, {}))
                 layer.pc += 1
             elif layer.pc == 1: # choose the branch to evaluate
                 if value.value != 0:
-                    state.stack.append(Layer(layer.env[:], layer.expr.branch1, 0, {}))
+                    state.stack.append(Layer(layer.env, layer.expr.branch1, 0, {}))
                 else:
-                    state.stack.append(Layer(layer.env[:], layer.expr.branch2, 0, {}))
+                    state.stack.append(Layer(layer.env, layer.expr.branch2, 0, {}))
                 layer.pc += 1
             else: # finish if
                 state.stack.pop()
@@ -520,7 +521,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                 elif layer.pc <= len(layer.expr.arg_list): # evaluate arguments
                     if layer.pc > 1:
                         layer.local['arg_vals'].append(value)
-                    state.stack.append(Layer(layer.env[:], layer.expr.arg_list[layer.pc - 1], 0, {}))
+                    state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 1], 0, {}))
                     layer.pc += 1
                 else: # intrinsic call doesn't need to grow the stack, so this is the final step for this call
                     if layer.pc > 1:
@@ -577,7 +578,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                     state.stack.pop()
             else: # closure or continuation call
                 if layer.pc == 0: # evaluate the callee
-                    state.stack.append(Layer(layer.env[:], layer.expr.callee, 0, {}))
+                    state.stack.append(Layer(layer.env, layer.expr.callee, 0, {}))
                     layer.pc += 1
                 elif layer.pc == 1: # initialize arg_vals
                     layer.local['callee'] = value
@@ -586,7 +587,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                 elif layer.pc - 1 <= len(layer.expr.arg_list): # evaluate arguments
                     if layer.pc - 1 > 1:
                         layer.local['arg_vals'].append(value)
-                    state.stack.append(Layer(layer.env[:], layer.expr.arg_list[layer.pc - 2], 0, {}))
+                    state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 2], 0, {}))
                     layer.pc += 1
                 elif layer.pc - 1 == len(layer.expr.arg_list) + 1: # evaluate the call
                     if layer.pc - 1 > 1:
@@ -608,7 +609,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                     state.stack.pop()
         elif type(layer.expr) == Seq:
             if layer.pc < len(layer.expr.expr_list): # evaluate the expressions, without the need of storing the results to local
-                state.stack.append(Layer(layer.env[:], layer.expr.expr_list[layer.pc], 0, {}))
+                state.stack.append(Layer(layer.env, layer.expr.expr_list[layer.pc], 0, {}))
                 layer.pc += 1
             else: # finish the sequence
                 state.stack.pop()

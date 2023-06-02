@@ -39,7 +39,7 @@ def main():
         ('test/quicksort.expr', ['5', '5', '4', '3', '2', '1'], ['1', '2', '3', '4', '5', 'void']),
         ('test/quicksort.expr', ['6', '8', '-1', '3', '0', '6', '-5'], ['-5', '-1', '0', '3', '6', '8', 'void']),
 
-        ('test/lexical-scope.expr', [], ['1']),
+        ('test/lexical-scope.expr', [], ['1', '100', 'void']),
 
         ('test/continuation.expr', [], ['3', '2', '1', '1', '2', '3', '3', '2', '1', '300']),
 
