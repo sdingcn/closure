@@ -10,7 +10,9 @@ Python >= 3.9
 
 ```
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
-<var> := [a-zA-Z]+ ; except for keywords and intrinsic function names
+<lex-var> := [a-z][a-zA-Z]*
+<dyn-var> := [A-Z][a-zA-Z]*
+<var> := <lex-var> | <dyn-var> ; except for keywords and intrinsic function names
 ```
 
 ```
@@ -31,7 +33,7 @@ Python >= 3.9
 | --- | --- |
 | first-class functions | complete |
 | lexical scope and closures | complete |
-| dynamic scope | in progress |
+| dynamic scope | complete |
 | letrec and (mutual) recursion | complete |
 | first-class continuations | complete |
 | mark-and-sweep garbage collection | in progress |

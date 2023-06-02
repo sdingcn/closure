@@ -1,0 +1,7 @@
+letrec (
+  f = letrec (lex = 1 Dyn = 101) {
+    lambda () { [(put lex) (put Dyn)] }
+  }
+) {
+  letrec (lex = 3 Dyn = 303) { (f) }
+}

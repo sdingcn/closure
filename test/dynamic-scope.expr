@@ -1,0 +1,10 @@
+letrec (
+  putName = letrec (Name = 0) {
+    lambda () { (put Name) }
+  }
+) {
+  [
+    letrec (Name = 100) { (putName) }
+    (lambda (Name) { (putName) } 200)
+  ]
+}
