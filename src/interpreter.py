@@ -523,6 +523,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                 state.stack.append(Layer(layer.env, layer.expr.cond, 0, {}, False))
                 layer.pc += 1
             elif layer.pc == 1: # choose the branch to evaluate
+                # TODO: may want to add checks for condition value's type
                 if value.value != 0:
                     state.stack.append(Layer(layer.env, layer.expr.branch1, 0, {}, False))
                 else:
@@ -615,6 +616,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                 elif layer.pc - 1 == len(layer.expr.arg_list) + 1: # evaluate the call
                     if layer.pc - 1 > 1:
                         layer.local['arg_vals'].append(value)
+                    # TODO: may want to add checks for numbers of arguments (types will be checked in later stages)
                     if type(layer.local['callee']) == Closure:
                         closure = layer.local['callee']
                         new_env = closure.env[:]
@@ -628,6 +630,8 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         if debug:
                             sys.stderr.write(f'[Expr Debug] applied continuation {cont}, stack switched\n')
                         continue # the stack has been replaced, so we don't need to pop the previous stack's call layer
+                    else:
+                        sys.exit(f'[Expr Runtime Error] {layer.expr.callee} (whose evaluation result is {layer.local["callee"]}) is not callable')
                 else: # finish the call
                     state.stack.pop()
         elif type(layer.expr) == Seq:
