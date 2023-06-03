@@ -594,7 +594,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                     elif intrinsic == 'div':
                         if not check_args(layer.local['arg_vals'], [Integer, Integer]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
-                        value = Integer(layer.local['arg_vals'][0].value / layer.local['arg_vals'][1].value)
+                        value = Integer(layer.local['arg_vals'][0].value // layer.local['arg_vals'][1].value)
                     elif intrinsic == 'mod':
                         if not check_args(layer.local['arg_vals'], [Integer, Integer]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
