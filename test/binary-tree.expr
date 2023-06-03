@@ -1,0 +1,37 @@
+letrec (
+  eq = lambda (a b) {
+    if (lt (add (lt a b) (lt b a)) 1) then 1 else 0
+  }
+  leaf = lambda () {
+    lambda (x) {
+      if (eq x 0) then 0
+      else exit
+    }
+  }
+  node = lambda (val left right) {
+    lambda (x) {
+      if (eq x 0) then 1
+      else if (eq x 1) then val
+      else if (eq x 2) then left
+      else right
+    }
+  }
+  dfs = lambda (tree) {
+    if (eq (tree 0) 0) then (void)
+    else [
+      (dfs (tree 2))
+      (put (tree 1))
+      (dfs (tree 3))
+    ]
+  }
+) {
+  (dfs
+    (node 4
+      (node 2
+        (node 1 (leaf) (leaf))
+        (node 3 (leaf) (leaf))
+      )
+      (node 5 (leaf) (leaf))
+    )
+  )
+}

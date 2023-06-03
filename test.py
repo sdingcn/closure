@@ -49,7 +49,9 @@ def main():
 
         ('test/type.expr', [], ['0', '1', '2', '3', 'void']),
 
-        ('test/oop.expr', [], ['1', '2', '100', '2', 'void'])
+        ('test/oop.expr', [], ['1', '2', '100', '2', 'void']),
+
+        ('test/binary-tree.expr', [], ['1', '2', '3', '4', '5', 'void'])
     ]
     for test in tests:
         if not check_io(*test):

@@ -14,16 +14,11 @@ letrec (
     }
   }
   cons = lambda (head tail) {
-    letrec (
-      h = head
-      t = tail
-    ) {
-      lambda (x) {
-        if (eq x 0) then 0
-        else if (eq x 1) then h
-        else if (eq x 2) then t
-        else (exit)
-      }
+    lambda (x) {
+      if (eq x 0) then 0
+      else if (eq x 1) then head
+      else if (eq x 2) then tail
+      else (exit)
     }
   }
   isnull = lambda (list) {
