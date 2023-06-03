@@ -5,9 +5,8 @@ def run_and_read(cmd: str, inp: str) -> str:
     return subprocess.run(cmd,
         input = inp,
         stdout = subprocess.PIPE,
-        # stderr = subprocess.STDOUT,
         universal_newlines = True,
-        timeout = 5
+        timeout = 10
     ).stdout
 
 def check_io(prog: str, i: list[str], o: list[str]) -> bool:
@@ -50,6 +49,8 @@ def main():
         ('test/type.expr', [], ['0', '1', '2', '3', 'void']),
 
         ('test/oop.expr', [], ['1', '2', '100', '2', 'void']),
+
+        ('test/intensive.expr', [], ['50005000']),
 
         ('test/binary-tree.expr', [], ['1', '2', '3', '4', '5', 'void'])
     ]

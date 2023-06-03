@@ -37,7 +37,7 @@ For more examples, see `test/`.
 | letrec and (mutual) recursion | complete |
 | first-class continuations | complete |
 | dynamic type check | complete |
-| mark-and-sweep garbage collection | in progress |
+| mark-and-sweep garbage collection | complete |
 
 ## syntax and semantics
 

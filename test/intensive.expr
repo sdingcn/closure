@@ -1,0 +1,8 @@
+letrec (
+  sum = lambda (n) {
+    if (lt n 1) then 0
+    else (add n (sum (sub n 1)))
+  }
+) {
+  (sum 10000)
+}

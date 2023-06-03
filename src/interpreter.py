@@ -426,7 +426,7 @@ class State:
         self.location += 1
         return self.location - 1
 
-    def gc(self) -> int: # TODO: this is still incomplete
+    def gc(self) -> int:
         visited = set()
 
         def mark(loc: int) -> None:
@@ -435,6 +435,12 @@ class State:
                 for v, l in self.store[loc].env:
                     if l not in visited:
                         mark(l)
+            elif type(self.store[loc]) == Continuation:
+                for layer in self.store[loc].stack:
+                    if layer.frame:
+                        for v, l in layer.env:
+                            if l not in visited:
+                                mark(l)
 
         def sweep() -> int:
             to_remove = set()
@@ -446,8 +452,9 @@ class State:
             return len(to_remove)
 
         for layer in self.stack:
-            for v, l in layer.env:
-                mark(l)
+            if layer.frame:
+                for v, l in layer.env:
+                    mark(l)
         return sweep()
 
 def check_args(vals: list[Value], ts: list[type]) -> bool:
@@ -491,11 +498,17 @@ def interpret(tree: Expr, debug: bool) -> Value:
     intrinsics = ['void', 'add', 'sub', 'mul', 'div', 'mod', 'lt', 'get', 'put', 'callcc', 'type', 'exit']
     state = State(tree)
     value = None
+    ops = 0 # number of operations
 
     while True:
-        # TODO: call state.gc() according to some heuristics
         if len(state.stack) == 0:
             return value
+        if ops == 1000:
+            cnt = state.gc()
+            if debug:
+                sys.stderr.write(f'[Expr Debug] GC collected {cnt} store cells\n')
+            ops = 0
+        ops += 1
         layer = state.stack[-1]
         if debug:
             sys.stderr.write(f'[Expr Debug] evaluating AST node of type {type(layer.expr)} at {layer.expr.sl}\n')
