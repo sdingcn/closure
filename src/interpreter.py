@@ -452,7 +452,7 @@ class Layer:
         self.expr = expr # the current expression under evaluation
         self.pc = pc # program counter (the pc-th step of evaluating this expression)
         self.local = local # variables local to this evaluation layer
-        self.frame = frame # whether this layer starts a frame (a closure call or the initial layer for the entire program)
+        self.frame = frame # whether this layer starts a frame (a closure call or the initial layer)
 
     def __str__(self) -> str:
         return f'(layer {unfold(self.env)} {self.expr} {self.pc} {unfold(self.local)})'
@@ -482,36 +482,42 @@ class State:
         return self.location - 1
 
     def gc(self, value) -> int:
-        visited = set()
+        visited_closures = set()
+        visited_stacks = set()
+        visited_locations = set()
 
         def mark_closure(closure: Closure) -> None:
-            for v, l in closure.env:
-                mark_loc(l)
+            if id(closure) not in visited_closures:
+                visited_closures.add(id(closure))
+                for v, l in closure.env:
+                    mark_location(l)
         
         def mark_stack(stack: list[Layer]) -> None:
-            for layer in stack:
-                if layer.frame:
-                    for v, l in layer.env:
-                        mark_loc(l)
-                if layer.local:
-                    if 'callee' in layer.local:
-                        val = layer.local['callee']
-                        if type(val) == Closure:
-                            mark_closure(val)
-                        elif type(val) == Continuation:
-                            mark_stack(val.stack)
-                    if 'arg_vals' in layer.local:
-                        for val in layer.local['arg_vals']:
+            if id(stack) not in visited_stacks:
+                visited_stacks.add(id(stack))
+                for layer in stack:
+                    if layer.frame:
+                        for v, l in layer.env:
+                            mark_location(l)
+                    if layer.local: # TODO: keys in layer.local are currently hardcoded; it's better to avoid this
+                        if 'callee' in layer.local:
+                            val = layer.local['callee']
                             if type(val) == Closure:
                                 mark_closure(val)
                             elif type(val) == Continuation:
                                 mark_stack(val.stack)
+                        if 'args' in layer.local:
+                            for val in layer.local['args']:
+                                if type(val) == Closure:
+                                    mark_closure(val)
+                                elif type(val) == Continuation:
+                                    mark_stack(val.stack)
                             
 
-        def mark_loc(loc: int) -> None:
-            if loc not in visited:
-                visited.add(loc)
-                val = self.store[loc]
+        def mark_location(location: int) -> None:
+            if location not in visited_locations:
+                visited_locations.add(location)
+                val = self.store[location]
                 if type(val) == Closure:
                     mark_closure(val)
                 elif type(val) == Continuation:
@@ -520,7 +526,7 @@ class State:
         def sweep() -> int:
             to_remove = set()
             for k, v in self.store.items():
-                if k not in visited:
+                if k not in visited_locations:
                     to_remove.add(k)
             for k in to_remove:
                 del self.store[k]
@@ -584,14 +590,20 @@ def interpret(tree: Expr, debug: bool) -> Value:
     ops = 0 # number of operations
 
     while True:
+        
+        # end of evaluation
         if len(state.stack) == 0:
             return value
-        if ops == 1000: # TODO: may need a better heuristic
+
+        # GC control
+        if ops == 1000: # TODO: may need a better heuristic for triggering GC
             cnt = state.gc(value)
             if debug:
                 sys.stderr.write(f'[Expr Debug] GC collected {cnt} store cells\n')
             ops = 0
         ops += 1
+
+        # evaluating the current layer
         layer = state.stack[-1]
         if debug:
             sys.stderr.write(f'[Expr Debug] evaluating AST node of type {type(layer.expr)} at {layer.expr.sl}\n')
@@ -651,19 +663,19 @@ def interpret(tree: Expr, debug: bool) -> Value:
             state.stack.pop()
         elif type(layer.expr) == Call:
             if type(layer.expr.callee) == Var and layer.expr.callee.name in intrinsics: # intrinsic call
-                if layer.pc == 0: # initialize arg_vals
-                    layer.local['arg_vals'] = []
+                if layer.pc == 0: # initialize args
+                    layer.local['args'] = []
                     layer.pc += 1
                 elif layer.pc <= len(layer.expr.arg_list): # evaluate arguments
                     if layer.pc > 1:
-                        layer.local['arg_vals'].append(value)
+                        layer.local['args'].append(value)
                     state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 1], 0, {}, False))
                     layer.pc += 1
                 else: # intrinsic call doesn't need to grow the stack, so this is the final step for this call
                     if layer.pc > 1:
-                        layer.local['arg_vals'].append(value)
+                        layer.local['args'].append(value)
                     intrinsic = layer.expr.callee.name
-                    args = layer.local['arg_vals']
+                    args = layer.local['args']
                     if intrinsic == 'void':
                         if len(args) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
@@ -733,34 +745,34 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         print(output, end = '', flush = True)
                         value = Void()
                     elif intrinsic == 'callcc':
-                        if not check_args(layer.local['arg_vals'], [Closure]):
+                        if not check_args(args, [Closure]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         state.stack.pop()
                         cont = Continuation(deepcopy(state.stack)) # obtain the continuation (this deepcopy will not copy the store)
                         if debug:
                             sys.stderr.write(f'[Expr Debug] captured continuation {cont}\n')
-                        closure = layer.local['arg_vals'][0]
+                        closure = args[0]
                         # make a closure call layer and pass in the continuation
                         state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, state.new(cont))], closure.fun.expr, 0, {}, True))
                         continue # we already popped the stack in the callcc case
                     elif intrinsic == 'type':
-                        if len(layer.local['arg_vals']) != 1:
+                        if len(args) != 1:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
-                        arg_val = layer.local['arg_vals'][0]
-                        if type(arg_val) == Void:
+                        arg = args[0]
+                        if type(arg) == Void:
                             value = Integer(0)
-                        elif type(arg_val) == Integer:
+                        elif type(arg) == Integer:
                             value = Integer(1)
-                        elif type(arg_val) == String:
+                        elif type(arg) == String:
                             value = Integer(2)
-                        elif type(arg_val) == Closure:
+                        elif type(arg) == Closure:
                             value = Integer(3)
-                        elif type(arg_val) == Continuation:
+                        elif type(arg) == Continuation:
                             value = Integer(4)
                         else:
-                            sys.exit(f'[Expr Runtime Error] the intrinsic call {layer.expr} got a value ({arg_val}) of unknown type')
+                            sys.exit(f'[Expr Runtime Error] the intrinsic call {layer.expr} got a value ({arg}) of unknown type')
                     elif intrinsic == 'exit':
-                        if len(layer.local['arg_vals']) != 0:
+                        if len(args) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         if debug:
                             sys.exit(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr}')
@@ -771,20 +783,20 @@ def interpret(tree: Expr, debug: bool) -> Value:
                 if layer.pc == 0: # evaluate the callee
                     state.stack.append(Layer(layer.env, layer.expr.callee, 0, {}, False))
                     layer.pc += 1
-                elif layer.pc == 1: # initialize arg_vals
+                elif layer.pc == 1: # initialize args
                     layer.local['callee'] = value
-                    layer.local['arg_vals'] = []
+                    layer.local['args'] = []
                     layer.pc += 1
                 elif layer.pc - 1 <= len(layer.expr.arg_list): # evaluate arguments
                     if layer.pc - 1 > 1:
-                        layer.local['arg_vals'].append(value)
+                        layer.local['args'].append(value)
                     state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 2], 0, {}, False))
                     layer.pc += 1
                 elif layer.pc - 1 == len(layer.expr.arg_list) + 1: # evaluate the call
                     if layer.pc - 1 > 1:
-                        layer.local['arg_vals'].append(value)
+                        layer.local['args'].append(value)
                     callee = layer.local['callee']
-                    args = layer.local['arg_vals']
+                    args = layer.local['args']
                     if type(callee) == Closure:
                         closure = callee
                         if len(args) != len(closure.fun.var_list): # types will be checked inside the closure call
@@ -803,7 +815,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             sys.stderr.write(f'[Expr Debug] applied continuation {cont}, stack switched\n')
                         continue # the stack has been replaced, so we don't need to pop the previous stack's call layer
                     else:
-                        sys.exit(f'[Expr Runtime Error] {layer.expr.callee} (whose evaluation result is {layer.local["callee"]}) is not callable')
+                        sys.exit(f'[Expr Runtime Error] {layer.expr.callee} (whose evaluation result is {callee}) is not callable')
                 else: # finish the call
                     state.stack.pop()
         elif type(layer.expr) == Seq:
