@@ -43,13 +43,21 @@ For more examples, see `test/`.
 
 ```
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
+<str> := Python double-quote str literal
 <lex-var> := [a-z][a-zA-Z]*
 <dyn-var> := [A-Z][a-zA-Z]*
 <var> := <lex-var> | <dyn-var> ; except for keywords and intrinsic function names
 ```
 
 ```
-<intrinsic> := void | add | sub | mul | div | mod | lt | getint | put | callcc | type | exit
+<intrinsic> := void
+             | add | sub | mul | div | mod | lt
+             | strlen | strslice | strcat | strlt | strint
+             | getline
+             | put
+             | callcc
+             | type
+             | exit
 <var-list> := epsilon | <var> <var-list>
 <binding-list> := epsilon | <var> = <expr> <binding-list>
 <expr-list> := epsilon | <expr> <expr-list>

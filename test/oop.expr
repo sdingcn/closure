@@ -17,10 +17,10 @@ letrec (
     derived = (makeDerived)
   ) {
     [
-      (put (base lambda () { (F) }))
-      (put (base lambda () { (G) }))
-      (put (derived lambda () { (F) }))
-      (put (derived lambda () { (G) }))
+      (put (base lambda () { (F) }) "\n")
+      (put (base lambda () { (G) }) "\n")
+      (put (derived lambda () { (F) }) "\n")
+      (put (derived lambda () { (G) }) "\n")
     ]
   }
 }

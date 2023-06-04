@@ -1,0 +1,5 @@
+[
+  (put "aaa\"" "\n")
+  (put "bbbb\\\"" "\n")
+  (put "ccccc\\" "\n")
+]

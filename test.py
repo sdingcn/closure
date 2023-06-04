@@ -11,7 +11,7 @@ def run_and_read(cmd: str, inp: str) -> str:
 
 def check_io(prog: str, i: list[str], o: list[str]) -> bool:
     raw_o1 = run_and_read(['python3', 'src/interpreter.py', 'run', prog], '\n'.join(i))
-    o1 = list(map(lambda s: s.strip(), raw_o1.split()))
+    o1 = raw_o1.splitlines()
     if o1 == o:
         return True
     else:
@@ -46,13 +46,19 @@ def main():
 
         ('test/continuation.expr', [], ['3', '2', '1', '1', '2', '3', '3', '2', '1', '300']),
 
-        ('test/type.expr', [], ['0', '1', '2', '3', 'void']),
+        ('test/type.expr', [], ['0', '1', '2', '3', '4', 'void']),
 
         ('test/oop.expr', [], ['1', '2', '100', '2', 'void']),
 
         ('test/intensive.expr', [], ['50005000']),
 
-        ('test/binary-tree.expr', [], ['1', '2', '3', '4', '5', 'void'])
+        ('test/binary-tree.expr', [], ['1', '2', '3', '4', '5', 'void']),
+
+        ('test/string-reverse.expr', ["abcde"], ["edcba", "void"]),
+        ('test/string-reverse.expr', ["12 ccc"], ["ccc 21", "void"]),
+        ('test/string-reverse.expr', ["\t <>///"], ["///>< \t", "void"]),
+
+        ('test/string-literals.expr', [], ["aaa\"", "bbbb\\\"", "ccccc\\", "void"])
     ]
     for test in tests:
         if not check_io(*test):

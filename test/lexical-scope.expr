@@ -9,7 +9,7 @@ letrec (
   }
 ) {
   [
-    letrec (a = 2) { (put (f)) }
-    (put ((g 100) 200))
+    letrec (a = 2) { (put (f) "\n") }
+    (put ((g 100) 200) "\n")
   ]
 }

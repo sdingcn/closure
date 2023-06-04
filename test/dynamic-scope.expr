@@ -1,6 +1,6 @@
 letrec (
   putName = letrec (Name = 0) {
-    lambda () { (put Name) }
+    lambda () { (put Name "\n") }
   }
 ) {
   [

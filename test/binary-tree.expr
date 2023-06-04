@@ -20,7 +20,7 @@ letrec (
     if (eq (tree 0) 0) then (void)
     else [
       (dfs (tree 2))
-      (put (tree 1))
+      (put (tree 1) "\n")
       (dfs (tree 3))
     ]
   }

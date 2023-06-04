@@ -1,7 +1,7 @@
 letrec (
   recur = lambda (n k) {
     if (lt n 1) then (k 200)
-    else [(put n) (recur (sub n 1) k) (put n)]
+    else [(put n "\n") (recur (sub n 1) k) (put n "\n")]
   }
 ) {
   [

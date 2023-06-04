@@ -1,13 +1,15 @@
 letrec (
   a = (void)
   b = 0
-  c = lambda () { (void) }
-  d = (callcc lambda (k) { (k k) })
+  c = ""
+  d = lambda () { (void) }
+  e = (callcc lambda (k) { (k k) })
 ) {
   [
-    (put (type a))
-    (put (type b))
-    (put (type c))
-    (put (type d))
+    (put (type a) "\n")
+    (put (type b) "\n")
+    (put (type c) "\n")
+    (put (type d) "\n")
+    (put (type e) "\n")
   ]
 }

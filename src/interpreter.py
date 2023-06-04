@@ -71,6 +71,18 @@ def lex(source: str, debug: bool) -> deque[Token]:
     line = 1
     col = 1
 
+    def count_trailing_escape(s: str) -> int:
+        l = len(s)
+        cnt = 0
+        pos = l - 1
+        while pos >= 0:
+            if s[pos] == '\\':
+                cnt += 1
+                pos -= 1
+            else:
+                break
+        return cnt
+
     def next_token() -> Union[None, Token]:
         nonlocal line, col
         while chars and chars[0].isspace():
@@ -85,18 +97,29 @@ def lex(source: str, debug: bool) -> deque[Token]:
                 val = ''
                 while chars and chars[0].isdigit():
                     val += chars.popleft()
-            elif chars[0] in ('-', '+') and (len(chars) > 1 and chars[1].isdigit()):
-                val = chars.popleft()
-                while chars and chars[0].isdigit():
-                    val += chars.popleft()
+            elif chars[0] in ('-', '+'):
+                if len(chars) > 1 and chars[1].isdigit():
+                    val = chars.popleft()
+                    while chars and chars[0].isdigit():
+                        val += chars.popleft()
+                else:
+                    sys.exit(f'[Expr Lexer Error] incomplete integer literal at {sl}')
             elif chars[0].isalpha():
                 val = ''
                 while chars and chars[0].isalpha():
                     val += chars.popleft()
             elif chars[0] in ('(', ')', '{', '}', '[', ']', '='):
                 val = chars.popleft()
+            elif chars[0] == '"':
+                val = chars.popleft()
+                while chars and (chars[0] != '"' or (chars[0] == '"' and count_trailing_escape(val) % 2 != 0)):
+                    val += chars.popleft()
+                if chars and chars[0] == '"':
+                    val += chars.popleft()
+                else:
+                    sys.exit(f'[Expr Lexer Error] incomplete string literal at {sl}')
             else:
-                sys.exit(f'[Expr Lexer Error] unsupported or incomplete character sequence starting with {chars[0]} at {sl}')
+                sys.exit(f'[Expr Lexer Error] unsupported character {chars[0]} at {sl}')
             token = Token(sl, val)
             col += len(val)
             return token
@@ -127,6 +150,16 @@ class Expr:
 class Int(Expr):
 
     def __init__(self, sl: SourceLocation, parent: Union[None, Expr], value: int):
+        self.sl = sl
+        self.parent = parent
+        self.value = value
+
+    def __str__(self) -> str:
+        return f'(Int {self.sl} {self.value})'
+
+class Str(Expr):
+
+    def __init__(self, sl: SourceLocation, parent: Union[None, Expr], value: str):
         self.sl = sl
         self.parent = parent
         self.value = value
@@ -208,6 +241,9 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
         except ValueError:
             return False
 
+    def is_str(token: Token) -> bool:
+        return len(token.val) and token.val[0] == '"'
+
     def is_var(token: Token) -> bool:
         return token.val.isalpha()
 
@@ -227,6 +263,15 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
         if not is_int(token):
             sys.exit(f'[Expr Parser Error] expected an integer, got {token}')
         node = Int(token.sl, None, int(token.val))
+        return node
+
+    def parse_str() -> Str:
+        if not tokens:
+            sys.exit(f'[Expr Parser Error] incomplete token stream')
+        token = tokens.popleft()
+        if not is_str(token):
+            sys.exit(f'[Expr Parser Error] expected a string, got {token}')
+        node = Str(token.sl, None, eval(token.val))
         return node
 
     def parse_lambda() -> Lambda:
@@ -328,6 +373,8 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
             sys.stderr.write(f'[Expr Debug] parsing expression starting with {tokens[0]}\n')
         if is_int(tokens[0]):
             return parse_int()
+        elif is_str(tokens[0]):
+            return parse_str()
         elif tokens[0].val == 'lambda':
             return parse_lambda()
         elif tokens[0].val == 'letrec':
@@ -373,6 +420,14 @@ class Integer(Value):
 
     def __str__(self) -> str:
         return str(self.value)
+
+class String(Value):
+
+    def __init__(self, value: str):
+        self.value = value
+
+    def __str__(self) -> str:
+        return self.value
 
 class Closure(Value):
 
@@ -426,21 +481,41 @@ class State:
         self.location += 1
         return self.location - 1
 
-    def gc(self) -> int:
+    def gc(self, value) -> int:
         visited = set()
 
-        def mark(loc: int) -> None:
-            visited.add(loc)
-            if type(self.store[loc]) == Closure:
-                for v, l in self.store[loc].env:
-                    if l not in visited:
-                        mark(l)
-            elif type(self.store[loc]) == Continuation:
-                for layer in self.store[loc].stack:
-                    if layer.frame:
-                        for v, l in layer.env:
-                            if l not in visited:
-                                mark(l)
+        def mark_closure(closure: Closure) -> None:
+            for v, l in closure.env:
+                mark_loc(l)
+        
+        def mark_stack(stack: list[Layer]) -> None:
+            for layer in stack:
+                if layer.frame:
+                    for v, l in layer.env:
+                        mark_loc(l)
+                if layer.local:
+                    if 'callee' in layer.local:
+                        val = layer.local['callee']
+                        if type(val) == Closure:
+                            mark_closure(val)
+                        elif type(val) == Continuation:
+                            mark_stack(val.stack)
+                    if 'arg_vals' in layer.local:
+                        for val in layer.local['arg_vals']:
+                            if type(val) == Closure:
+                                mark_closure(val)
+                            elif type(val) == Continuation:
+                                mark_stack(val.stack)
+                            
+
+        def mark_loc(loc: int) -> None:
+            if loc not in visited:
+                visited.add(loc)
+                val = self.store[loc]
+                if type(val) == Closure:
+                    mark_closure(val)
+                elif type(val) == Continuation:
+                    mark_stack(val.stack)
 
         def sweep() -> int:
             to_remove = set()
@@ -451,10 +526,11 @@ class State:
                 del self.store[k]
             return len(to_remove)
 
-        for layer in self.stack:
-            if layer.frame:
-                for v, l in layer.env:
-                    mark(l)
+        if type(value) == Closure:
+            mark_closure(value)
+        elif type(value) == Continuation:
+            mark_stack(value.stack)
+        mark_stack(self.stack)
         return sweep()
 
 def check_args(vals: list[Value], ts: list[type]) -> bool:
@@ -495,7 +571,14 @@ def lookup_stack(sl: SourceLocation, name: str, stack: list[Layer]) -> int:
 ### interpreter
 
 def interpret(tree: Expr, debug: bool) -> Value:
-    intrinsics = ['void', 'add', 'sub', 'mul', 'div', 'mod', 'lt', 'getint', 'put', 'callcc', 'type', 'exit']
+    intrinsics = ['void',
+                  'add', 'sub', 'mul', 'div', 'mod', 'lt',
+                  'strlen', 'strslice', 'strcat', 'strlt', 'strint',
+                  'getline',
+                  'put',
+                  'callcc',
+                  'type',
+                  'exit']
     state = State(tree)
     value = None
     ops = 0 # number of operations
@@ -503,8 +586,8 @@ def interpret(tree: Expr, debug: bool) -> Value:
     while True:
         if len(state.stack) == 0:
             return value
-        if ops == 1000:
-            cnt = state.gc()
+        if ops == 1000: # TODO: may need a better heuristic
+            cnt = state.gc(value)
             if debug:
                 sys.stderr.write(f'[Expr Debug] GC collected {cnt} store cells\n')
             ops = 0
@@ -514,6 +597,9 @@ def interpret(tree: Expr, debug: bool) -> Value:
             sys.stderr.write(f'[Expr Debug] evaluating AST node of type {type(layer.expr)} at {layer.expr.sl}\n')
         if type(layer.expr) == Int:
             value = Integer(layer.expr.value)
+            state.stack.pop()
+        elif type(layer.expr) == Str:
+            value = String(layer.expr.value)
             state.stack.pop()
         elif type(layer.expr) == Lambda:
             value = Closure(filter_lexical(layer.env), layer.expr)
@@ -556,6 +642,8 @@ def interpret(tree: Expr, debug: bool) -> Value:
             else: # finish if
                 state.stack.pop()
         elif type(layer.expr) == Var:
+            if debug:
+                sys.stderr.write(f'[Expr Debug] looking up the variable {layer.expr}\n')
             if is_lexical_name(layer.expr.name):
                 value = state.store[lookup_env(layer.expr.sl, layer.expr.name, layer.env)]
             else:
@@ -575,46 +663,74 @@ def interpret(tree: Expr, debug: bool) -> Value:
                     if layer.pc > 1:
                         layer.local['arg_vals'].append(value)
                     intrinsic = layer.expr.callee.name
+                    args = layer.local['arg_vals']
                     if intrinsic == 'void':
-                        if len(layer.local['arg_vals']) != 0:
+                        if len(args) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         value = Void()
                     elif intrinsic == 'add':
-                        if not check_args(layer.local['arg_vals'], [Integer, Integer]):
+                        if not check_args(args, [Integer, Integer]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
-                        value = Integer(layer.local['arg_vals'][0].value + layer.local['arg_vals'][1].value)
+                        value = Integer(args[0].value + args[1].value)
                     elif intrinsic == 'sub':
-                        if not check_args(layer.local['arg_vals'], [Integer, Integer]):
+                        if not check_args(args, [Integer, Integer]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
-                        value = Integer(layer.local['arg_vals'][0].value - layer.local['arg_vals'][1].value)
+                        value = Integer(args[0].value - args[1].value)
                     elif intrinsic == 'mul':
-                        if not check_args(layer.local['arg_vals'], [Integer, Integer]):
+                        if not check_args(args, [Integer, Integer]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
-                        value = Integer(layer.local['arg_vals'][0].value * layer.local['arg_vals'][1].value)
+                        value = Integer(args[0].value * args[1].value)
                     elif intrinsic == 'div':
-                        if not check_args(layer.local['arg_vals'], [Integer, Integer]):
+                        if not check_args(args, [Integer, Integer]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
-                        value = Integer(layer.local['arg_vals'][0].value // layer.local['arg_vals'][1].value)
+                        value = Integer(args[0].value // args[1].value)
                     elif intrinsic == 'mod':
-                        if not check_args(layer.local['arg_vals'], [Integer, Integer]):
+                        if not check_args(args, [Integer, Integer]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
-                        value = Integer(layer.local['arg_vals'][0].value % layer.local['arg_vals'][1].value)
+                        value = Integer(args[0].value % args[1].value)
                     elif intrinsic == 'lt':
-                        if not check_args(layer.local['arg_vals'], [Integer, Integer]):
+                        if not check_args(args, [Integer, Integer]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
-                        value = Integer(1) if layer.local['arg_vals'][0].value < layer.local['arg_vals'][1].value else Integer(0)
-                    elif intrinsic == 'getint':
-                        if len(layer.local['arg_vals']) != 0:
+                        value = Integer(1) if args[0].value < args[1].value else Integer(0)
+                    elif intrinsic == 'strlen':
+                        if not check_args(args, [String]):
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                        value = Integer(len(args[0].value))
+                    elif intrinsic == 'strslice':
+                        if not check_args(args, [String, Integer, Integer]):
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                        start = args[1].value
+                        end = args[2].value
+                        value = String(args[0].value[start:end])
+                    elif intrinsic == 'strcat':
+                        if not check_args(args, [String, String]):
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                        value = String(args[0].value + args[1].value)
+                    elif intrinsic == 'strlt':
+                        if not check_args(args, [String, String]):
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                        value = Integer(1) if args[0].value < args[1].value else Integer(0)
+                    elif intrinsic == 'strint':
+                        if not check_args(args, [String]):
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                        value = Integer(int(args[0].value))
+                    elif intrinsic == 'getline':
+                        if len(args) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         try:
-                            s = input()
-                            value = Integer(int(s.strip()))
-                        except ValueError:
-                            sys.exit(f'[Expr Runtime Error] unsupported input {s}')
+                            value = String(input())
+                        except EOFError:
+                            value = ''
                     elif intrinsic == 'put':
-                        if not check_args(layer.local['arg_vals'], [Integer]):
+                        if not (len(args) >= 1 and all(map(lambda v : type(v) == Integer or type(v) == String, args))):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
-                        print(layer.local['arg_vals'][0].value)
+                        output = ''
+                        for v in args:
+                            if type(v) == Integer:
+                                output += str(v.value)
+                            else:
+                                output += v.value
+                        print(output, end = '', flush = True)
                         value = Void()
                     elif intrinsic == 'callcc':
                         if not check_args(layer.local['arg_vals'], [Closure]):
@@ -635,17 +751,21 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             value = Integer(0)
                         elif type(arg_val) == Integer:
                             value = Integer(1)
-                        elif type(arg_val) == Closure:
+                        elif type(arg_val) == String:
                             value = Integer(2)
-                        elif type(arg_val) == Continuation:
+                        elif type(arg_val) == Closure:
                             value = Integer(3)
+                        elif type(arg_val) == Continuation:
+                            value = Integer(4)
                         else:
                             sys.exit(f'[Expr Runtime Error] the intrinsic call {layer.expr} got a value ({arg_val}) of unknown type')
                     elif intrinsic == 'exit':
                         if len(layer.local['arg_vals']) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         if debug:
-                            sys.stderr.write('[Expr Debug] execution stopped by the intrinsic call {layer.expr}\n')
+                            sys.exit(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr}')
+                        else:
+                            sys.exit()
                     state.stack.pop()
             else: # closure or continuation call
                 if layer.pc == 0: # evaluate the callee
@@ -663,18 +783,20 @@ def interpret(tree: Expr, debug: bool) -> Value:
                 elif layer.pc - 1 == len(layer.expr.arg_list) + 1: # evaluate the call
                     if layer.pc - 1 > 1:
                         layer.local['arg_vals'].append(value)
-                    if type(layer.local['callee']) == Closure:
-                        closure = layer.local['callee']
-                        if len(layer.local['arg_vals']) != len(closure.fun.var_list): # types will be checked inside the closure call
+                    callee = layer.local['callee']
+                    args = layer.local['arg_vals']
+                    if type(callee) == Closure:
+                        closure = callee
+                        if len(args) != len(closure.fun.var_list): # types will be checked inside the closure call
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         new_env = closure.env[:]
                         for i, v in enumerate(closure.fun.var_list):
-                            new_env.append((v.name, state.new(layer.local['arg_vals'][i])))
+                            new_env.append((v.name, state.new(args[i])))
                         state.stack.append(Layer(new_env, closure.fun.expr, 0, {}, True))
                         layer.pc += 1
-                    elif type(layer.local['callee']) == Continuation:
-                        cont = layer.local['callee']
-                        if len(layer.local['arg_vals']) != 1: # the "value" variable already contains the last evaluation result of all args
+                    elif type(callee) == Continuation:
+                        cont = callee
+                        if len(args) != 1: # the "value" variable already contains the last evaluation result of the arg
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         state.stack = deepcopy(cont.stack)
                         if debug:
@@ -700,7 +822,7 @@ def main(option: str, source: str) -> None:
         tokens = lex(source, False)
         tree = parse(tokens, False)
         result = interpret(tree, False)
-        print(result)
+        print(result, flush = True)
     elif option == 'debug':
         sys.stderr.write('[Expr Debug] *** starting lexer ***\n')
         tokens = lex(source, True)
@@ -708,11 +830,11 @@ def main(option: str, source: str) -> None:
         tree = parse(tokens, True)
         sys.stderr.write('[Expr Debug] *** starting interpreter ***\n')
         result = interpret(tree, True)
-        print(result)
+        print(result, flush = True)
     elif option == 'dump-ast':
         tokens = lex(source, False)
         tree = parse(tokens, False)
-        print(tree)
+        print(tree, flush = True)
 
 if __name__ == '__main__':
     if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'debug', 'dump-ast']:
