@@ -6,5 +6,5 @@ letrec (
     if (eq b 0) then a else (gcd b (mod a b))
   }
 ) {
-  (put (gcd (get) (get)))
+  (put (gcd (getint) (getint)))
 }

@@ -495,7 +495,7 @@ def lookup_stack(sl: SourceLocation, name: str, stack: list[Layer]) -> int:
 ### interpreter
 
 def interpret(tree: Expr, debug: bool) -> Value:
-    intrinsics = ['void', 'add', 'sub', 'mul', 'div', 'mod', 'lt', 'get', 'put', 'callcc', 'type', 'exit']
+    intrinsics = ['void', 'add', 'sub', 'mul', 'div', 'mod', 'lt', 'getint', 'put', 'callcc', 'type', 'exit']
     state = State(tree)
     value = None
     ops = 0 # number of operations
@@ -603,7 +603,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         if not check_args(layer.local['arg_vals'], [Integer, Integer]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         value = Integer(1) if layer.local['arg_vals'][0].value < layer.local['arg_vals'][1].value else Integer(0)
-                    elif intrinsic == 'get':
+                    elif intrinsic == 'getint':
                         if len(layer.local['arg_vals']) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         try:

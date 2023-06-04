@@ -49,7 +49,7 @@ For more examples, see `test/`.
 ```
 
 ```
-<intrinsic> := void | add | sub | mul | div | mod | lt | get | put | callcc | type | exit
+<intrinsic> := void | add | sub | mul | div | mod | lt | getint | put | callcc | type | exit
 <var-list> := epsilon | <var> <var-list>
 <binding-list> := epsilon | <var> = <expr> <binding-list>
 <expr-list> := epsilon | <expr> <expr-list>

@@ -36,7 +36,7 @@ letrec (
   }
   getlist = lambda (n) {
     if (eq n 0) then (null)
-    else (cons (get) (getlist (sub n 1)))
+    else (cons (getint) (getlist (sub n 1)))
   }
   putlist = lambda (list) {
     if (isnull list) then (void)
@@ -84,7 +84,7 @@ letrec (
   }
 ) {
   letrec (
-    n = (get)
+    n = (getint)
   ) {
     (putlist (quicksort (getlist n)))
   }
