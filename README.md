@@ -78,9 +78,9 @@ The full semantic reference is the interpreter itself.
 
 ## usage
 
-+ `python3 src/interpreter.py run <file>` runs code in `<file>`.
++ `python3 src/interpreter.py run <file>` runs code in `<file>` and prints (to `stderr`) the interpreter's time usage.
 
-+ `python3 src/interpreter.py debug <file>` runs code in `<file>` and prints (to `stderr`) intermediate steps.
++ `python3 src/interpreter.py debug <file>` runs code in `<file>` and prints (to `stderr`) the interpreter's intermediate steps and space usage.
 
 + `python3 src/interpreter.py dump-ast <file>` dumps AST of code in `<file>`.
 

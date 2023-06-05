@@ -1,4 +1,6 @@
 import sys
+import time
+import tracemalloc
 from collections import deque
 from typing import Union, Any
 from copy import deepcopy
@@ -831,11 +833,18 @@ def interpret(tree: Expr, debug: bool) -> Value:
 
 def main(option: str, source: str) -> None:
     if option == 'run':
+        start_time = time.time()
         tokens = lex(source, False)
         tree = parse(tokens, False)
         result = interpret(tree, False)
         print(result, flush = True)
+        end_time = time.time()
+        sys.stderr.write(f'Total Time (seconds): {end_time - start_time}\n')
     elif option == 'debug':
+        # in debug mode the interpreter is much slower but the memory overhead shouldn't change a lot
+        # and tracemalloc can slow-down the interpreter
+        # so we measure space here and measure time in normal execution
+        tracemalloc.start() 
         sys.stderr.write('[Expr Debug] *** starting lexer ***\n')
         tokens = lex(source, True)
         sys.stderr.write('[Expr Debug] *** starting parser ***\n')
@@ -843,6 +852,9 @@ def main(option: str, source: str) -> None:
         sys.stderr.write('[Expr Debug] *** starting interpreter ***\n')
         result = interpret(tree, True)
         print(result, flush = True)
+        current_memory, peak_memory = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        sys.stderr.write(f'Peak Memory (KiB): {peak_memory / 1024}\n')
     elif option == 'dump-ast':
         tokens = lex(source, False)
         tree = parse(tokens, False)
