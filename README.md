@@ -14,11 +14,11 @@ Python >= 3.9
 letrec (
   f = lambda (x) {
     if (lt x 0) then (void)
-    else [(put x) (g (sub x 1))]
+    else [(put x "\n") (g (sub x 1))]
   }
   g = lambda (x) {
     if (lt x 0) then (void)
-    else [(put x) (f (sub x 1))]
+    else [(put x "\n") (f (sub x 1))]
   }
 ) {
   (f 10)
@@ -84,4 +84,4 @@ The full semantic reference is the interpreter itself.
 
 + `python3 src/interpreter.py dump-ast <file>` dumps AST of code in `<file>`.
 
-+ `python3 test.py` runs all tests.
++ `python3 test.py` runs all tests (see `test.py` for inputs/outputs of each test program).
