@@ -921,6 +921,8 @@ if __name__ == '__main__':
         sys.exit(
             'Usage:\n'
             f'\tpython3 {sys.argv[0]} run <source-file>\n'
+            f'\tpython3 {sys.argv[0]} time <source-file>\n'
+            f'\tpython3 {sys.argv[0]} space <source-file>\n'
             f'\tpython3 {sys.argv[0]} debug <source-file>\n'
             f'\tpython3 {sys.argv[0]} dump-ast <source-file>'
         )
