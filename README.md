@@ -1,7 +1,7 @@
 # expr
 
-Expr is a simple, dynamically-typed, functional programming language.
-The main purpose of this repository is to demonstrate the implementation of interpreters.
+Expr is a simple, dynamically-typed, functional programming language with first-class continuations and mark-and-sweep garbage collection.
+The main purpose of this project is to demonstrate the implementation of interpreters.
 
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
@@ -48,14 +48,14 @@ For more examples, see `test/`.
 <lex-var>   := [a-z][a-zA-Z]*
 <dyn-var>   := [A-Z][a-zA-Z]*
 <var>       := <lex-var> | <dyn-var>
-<intrinsic> := void
-             | add | sub | mul | div | mod | lt
-             | strlen | strslice | strcat | strlt | strint
-             | getline
-             | put
-             | callcc
-             | type
-             | exit
+<intrinsic> := void                                        ; zero-argument function returning a void value
+             | add | sub | mul | div | mod | lt            ; integer arithmetic and comparison
+             | strlen | strslice | strcat | strlt | strint ; string length / slicing / concatenation / comparison / conversion to integer
+             | getline                                     ; reading a line from stdin and discarding the trailing newline character(s)
+             | put                                         ; writing arbitrarily many values to stdout (not separated by anything, no automatic newline)
+             | callcc                                      ; calling with current continuation
+             | type                                        ; type tester (Void: 0, Int: 1, String: 2, Closure: 3, Continuation: 4)
+             | exit                                        ; immediately stopping the interpreter (the interpreter's return value is still 0)
 <binding>   := <var> = <expr>
 <callee>    := <intrinsic> | <expr>
 <expr>      := <int>                             ; integer literal
@@ -74,6 +74,8 @@ All objects are immutable.
 All variables are references to objects and are immutable once bound.
 Variables starting with lower-case letters are lexically scoped;
 variables starting with upper-case letters are dynamically scoped.
+Garbage collection (GC) automatically runs when 80% of the reserved heap space is occupied,
+and if GC cannot reduce the occupancy to be smaller than 80% then the reserved space will grow.
 Other features and intrinsic functions should be intuitive.
 The full semantic reference is the interpreter itself.
 
