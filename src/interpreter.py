@@ -410,7 +410,7 @@ class Value:
 class Void(Value):
 
     def __init__(self):
-        pass
+        self.location = None # location in the store (if allocated)
 
     def __str__(self) -> str:
         return 'void'
@@ -418,6 +418,7 @@ class Void(Value):
 class Integer(Value):
 
     def __init__(self, value: int):
+        self.location = None
         self.value = value
 
     def __str__(self) -> str:
@@ -426,6 +427,7 @@ class Integer(Value):
 class String(Value):
 
     def __init__(self, value: str):
+        self.location = None
         self.value = value
 
     def __str__(self) -> str:
@@ -434,6 +436,7 @@ class String(Value):
 class Closure(Value):
 
     def __init__(self, env: list[tuple[str, int]], fun: Lambda):
+        self.location = None
         self.env = env
         self.fun = fun
 
@@ -462,6 +465,7 @@ class Layer:
 class Continuation(Value):
 
     def __init__(self, stack: list[Layer]):
+        self.location = None
         self.stack = stack
 
     def __str__(self) -> str:
@@ -486,8 +490,10 @@ class State:
     def new(self, value: Value) -> int:
         if self.location < len(self.store):
             self.store[self.location] = value
+            value.location = self.location
         else:
             self.store.append(value)
+            value.location = self.location
         self.location += 1
         return self.location - 1
 
@@ -550,6 +556,7 @@ class State:
         while j < n:
             if j in visited_locations:
                 self.store[i] = self.store[j]
+                self.store[i].location = i
                 relocation[j] = i
                 i += 1
             else:
@@ -624,7 +631,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
     
     # state
     state = State(tree)
-    value = None
+    value = None # the evaluation result of the last stack layer
 
     # for GC
     insufficient_capacity = -1
@@ -799,7 +806,8 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             sys.stderr.write(f'[Expr Debug] captured continuation {cont}\n')
                         closure = args[0]
                         # make a closure call layer and pass in the continuation
-                        state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, state.new(cont))], closure.fun.expr, 0, {}, True))
+                        addr = cont.location if cont.location != None else state.new(cont)
+                        state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, 0, {}, True))
                         continue # we already popped the stack in the callcc case
                     elif intrinsic == 'type':
                         if len(args) != 1:
@@ -849,7 +857,8 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         new_env = closure.env[:]
                         for i, v in enumerate(closure.fun.var_list):
-                            new_env.append((v.name, state.new(args[i])))
+                            addr = args[i].location if args[i].location != None else state.new(args[i])
+                            new_env.append((v.name, addr))
                         state.stack.append(Layer(new_env, closure.fun.expr, 0, {}, True))
                         layer.pc += 1
                     elif type(callee) == Continuation:
@@ -875,37 +884,41 @@ def interpret(tree: Expr, debug: bool) -> Value:
 
 ### main
 
+def normal_run(source: str) -> None:
+    tokens = lex(source, False)
+    tree = parse(tokens, False)
+    result = interpret(tree, False)
+    print(result)
+
 def main(option: str, source: str) -> None:
     if option == 'run':
+        normal_run(source)
+    elif option == 'time':
         start_time = time.time()
-        tokens = lex(source, False)
-        tree = parse(tokens, False)
-        result = interpret(tree, False)
-        print(result, flush = True)
+        normal_run(source)
         end_time = time.time()
-        sys.stderr.write(f'Total Time (seconds): {end_time - start_time}\n')
-    elif option == 'debug':
-        # in debug mode the interpreter is much slower but the memory overhead shouldn't change a lot
-        # and tracemalloc can slow-down the interpreter
-        # so we measure space here and measure time in normal execution
+        sys.stderr.write(f'Total time (seconds): {end_time - start_time}\n')
+    elif option == 'space':
         tracemalloc.start() 
+        normal_run(source)
+        current_memory, peak_memory = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        sys.stderr.write(f'Peak memory (KiB): {peak_memory / 1024}\n')
+    elif option == 'debug':
         sys.stderr.write('[Expr Debug] *** starting lexer ***\n')
         tokens = lex(source, True)
         sys.stderr.write('[Expr Debug] *** starting parser ***\n')
         tree = parse(tokens, True)
         sys.stderr.write('[Expr Debug] *** starting interpreter ***\n')
         result = interpret(tree, True)
-        print(result, flush = True)
-        current_memory, peak_memory = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-        sys.stderr.write(f'Peak Memory (KiB): {peak_memory / 1024}\n')
+        print(result)
     elif option == 'dump-ast':
         tokens = lex(source, False)
         tree = parse(tokens, False)
-        print(tree, flush = True)
+        print(tree)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'debug', 'dump-ast']:
+    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'time', 'space', 'debug', 'dump-ast']:
         sys.exit(
             'Usage:\n'
             f'\tpython3 {sys.argv[0]} run <source-file>\n'

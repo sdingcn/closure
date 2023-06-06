@@ -6,17 +6,30 @@ def run_and_read(cmd: str, inp: str) -> str:
         input = inp,
         stdout = subprocess.PIPE,
         universal_newlines = True,
-        timeout = 10
+        timeout = 60
     ).stdout
 
 def check_io(prog: str, i: list[str], o: list[str]) -> bool:
-    raw_o1 = run_and_read(['python3', 'src/interpreter.py', 'run', prog], '\n'.join(i))
-    o1 = raw_o1.splitlines()
-    if o1 == o:
-        return True
-    else:
-        print(f'Expected:\n{o}\nGot:\n{raw_o1}\n')
+    try:
+        raw_o1 = run_and_read(['python3', 'src/interpreter.py', 'time', prog], '\n'.join(i))
+    except TimeoutExpired:
+        print('Timeout expired')
         return False
+    try:
+        raw_o2 = run_and_read(['python3', 'src/interpreter.py', 'space', prog], '\n'.join(i))
+    except TimeoutExpired:
+        print('Timeout expired')
+        return False
+    if raw_o1 != raw_o2:
+        print('Time mode and space mode give different outputs.')
+        return False
+    else:
+        o1 = raw_o1.splitlines()
+        if o1 != o:
+            print(f'Expected: {o}, Got: {o1}')
+            return False
+        else:
+            return True
 
 def main():
     tests = [
