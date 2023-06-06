@@ -447,7 +447,7 @@ class Layer:
             env: list[tuple[str, int]], # env will be shared among layers in each frame
             expr: Expr,
             pc: int,
-            local: dict[str, Any],
+            local: dict[str, Union[Value, list[Value]]],
             frame: bool
         ):
         self.env = env # environment for the evaluation of the current expression
@@ -483,7 +483,7 @@ class State:
         self.location += 1
         return self.location - 1
 
-    def gc(self, value) -> int:
+    def gc(self, value) -> int: # TODO: may want to change the heap (store) to a list and do memory compaction (and relocation) after each GC
         visited_closures = set()
         visited_stacks = set()
         visited_locations = set()
@@ -501,19 +501,18 @@ class State:
                     if layer.frame:
                         for v, l in layer.env:
                             mark_location(l)
-                    if layer.local: # TODO: keys in layer.local are currently hardcoded; it's better to avoid this
-                        if 'callee' in layer.local:
-                            val = layer.local['callee']
-                            if type(val) == Closure:
-                                mark_closure(val)
-                            elif type(val) == Continuation:
-                                mark_stack(val.stack)
-                        if 'args' in layer.local:
-                            for val in layer.local['args']:
-                                if type(val) == Closure:
-                                    mark_closure(val)
-                                elif type(val) == Continuation:
-                                    mark_stack(val.stack)
+                    if layer.local:
+                        for name, value in layer.local.items():
+                            if type(value) == Closure:
+                                mark_closure(value)
+                            elif type(value) == Continuation:
+                                mark_stack(value.stack)
+                            elif type(value) == list:
+                                for elem in value:
+                                    if type(elem) == Closure:
+                                        mark_closure(elem)
+                                    elif type(elem) == Continuation:
+                                        mark_stack(elem.stack)
                             
 
         def mark_location(location: int) -> None:
@@ -598,7 +597,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
             return value
 
         # GC control
-        if ops == 1000: # TODO: may need a better heuristic for triggering GC
+        if ops == 1000: # TODO: may need a better heuristic for triggering GC (e.g. generation-based GC)
             cnt = state.gc(value)
             if debug:
                 sys.stderr.write(f'[Expr Debug] GC collected {cnt} store cells\n')
