@@ -472,31 +472,42 @@ class State:
 
     def __init__(self, expr: Expr):
         self.stack = [Layer([], expr, 0, {}, True)]
-        self.store = {}
+        self.store = []
         self.location = 0 # the next available addess in the store
+        self._ref_size = 8
+        self._empty_store_size = sys.getsizeof(self.store)
 
     def __str__(self) -> str:
         return f'(state {unfold(self.stack)} {unfold(self.store)} {self.location})'
 
+    def get_store_capacity(self) -> int:
+        return (sys.getsizeof(self.store) - self._empty_store_size) // self._ref_size
+
     def new(self, value: Value) -> int:
-        self.store[self.location] = value
+        if self.location < len(self.store):
+            self.store[self.location] = value
+        else:
+            self.store.append(value)
         self.location += 1
         return self.location - 1
 
-    def gc(self, value) -> int: # TODO: may want to change the heap (store) to a list and do memory compaction (and relocation) after each GC
+    def mark(self, value: Value) -> tuple[set[int], list[Value]]:
         visited_closures = set()
         visited_stacks = set()
         visited_locations = set()
+        visited_values = []
 
         def mark_closure(closure: Closure) -> None:
             if id(closure) not in visited_closures:
                 visited_closures.add(id(closure))
+                visited_values.append(closure)
                 for v, l in closure.env:
                     mark_location(l)
         
         def mark_stack(stack: list[Layer]) -> None:
             if id(stack) not in visited_stacks:
                 visited_stacks.add(id(stack))
+                visited_values.append(stack)
                 for layer in stack:
                     if layer.frame:
                         for v, l in layer.env:
@@ -513,7 +524,6 @@ class State:
                                         mark_closure(elem)
                                     elif type(elem) == Continuation:
                                         mark_stack(elem.stack)
-                            
 
         def mark_location(location: int) -> None:
             if location not in visited_locations:
@@ -523,22 +533,47 @@ class State:
                     mark_closure(val)
                 elif type(val) == Continuation:
                     mark_stack(val.stack)
-
-        def sweep() -> int:
-            to_remove = set()
-            for k, v in self.store.items():
-                if k not in visited_locations:
-                    to_remove.add(k)
-            for k in to_remove:
-                del self.store[k]
-            return len(to_remove)
-
+        
         if type(value) == Closure:
             mark_closure(value)
         elif type(value) == Continuation:
             mark_stack(value.stack)
         mark_stack(self.stack)
-        return sweep()
+        return (visited_locations, visited_values)
+
+    def sweep_and_compact(self, visited_locations: set[int]) -> tuple[int, dict[int, int]]:
+        removed = 0
+        relocation = {}
+        n = len(self.store)
+        i = 0
+        j = 0
+        while j < n:
+            if j in visited_locations:
+                self.store[i] = self.store[j]
+                relocation[j] = i
+                i += 1
+            else:
+                removed += 1
+            j += 1
+        self.location = i
+        return (removed, relocation)
+    
+    def relocate(self, visited_values: list[Value], relocation: dict[int, int]) -> None:
+        for value in visited_values: # don't need to recursively update because all descendant objects are in visited_values
+            if type(value) == Closure:
+                for i in range(len(value.env)):
+                    value.env[i] = (value.env[i][0], relocation[value.env[i][1]])
+            elif type(value) == list:
+                for layer in value:
+                    if layer.frame:
+                        for i in range(len(layer.env)):
+                            layer.env[i] = (layer.env[i][0], relocation[layer.env[i][1]])
+
+    def gc(self, value) -> int:
+        visited_locations, visited_values = self.mark(value)
+        removed, relocation = self.sweep_and_compact(visited_locations)
+        self.relocate(visited_values, relocation)
+        return removed
 
 def check_args(vals: list[Value], ts: list[type]) -> bool:
     if len(vals) != len(ts):
@@ -586,9 +621,13 @@ def interpret(tree: Expr, debug: bool) -> Value:
                   'callcc',
                   'type',
                   'exit']
+    
+    # state
     state = State(tree)
     value = None
-    ops = 0 # number of operations
+
+    # for GC
+    insufficient_capacity = -1
 
     while True:
         
@@ -597,12 +636,18 @@ def interpret(tree: Expr, debug: bool) -> Value:
             return value
 
         # GC control
-        if ops == 1000: # TODO: may need a better heuristic for triggering GC (e.g. generation-based GC)
-            cnt = state.gc(value)
-            if debug:
-                sys.stderr.write(f'[Expr Debug] GC collected {cnt} store cells\n')
-            ops = 0
-        ops += 1
+        capacity = state.get_store_capacity()
+        if capacity > insufficient_capacity: # after GC the capacity will likely be sufficient
+            if state.location >= 0.8 * capacity:
+                cnt = state.gc(value)
+                if debug:
+                    sys.stderr.write(f'[Expr Debug] GC collected {cnt} store cells\n')
+                if state.location >= 0.8 * capacity: # GC failed to release enough memory, meaning the capacity really needs to grow
+                    insufficient_capacity = capacity
+                else: # after GC the current capacity is still enough so we keep the previous insufficient_capacity
+                    pass
+        else: # just grow without GC
+            pass
 
         # evaluating the current layer
         layer = state.stack[-1]
@@ -679,64 +724,64 @@ def interpret(tree: Expr, debug: bool) -> Value:
                     args = layer.local['args']
                     if intrinsic == 'void':
                         if len(args) != 0:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Void()
                     elif intrinsic == 'add':
                         if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Integer(args[0].value + args[1].value)
                     elif intrinsic == 'sub':
                         if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Integer(args[0].value - args[1].value)
                     elif intrinsic == 'mul':
                         if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Integer(args[0].value * args[1].value)
                     elif intrinsic == 'div':
                         if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Integer(args[0].value // args[1].value)
                     elif intrinsic == 'mod':
                         if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Integer(args[0].value % args[1].value)
                     elif intrinsic == 'lt':
                         if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
                     elif intrinsic == 'strlen':
                         if not check_args(args, [String]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Integer(len(args[0].value))
                     elif intrinsic == 'strslice':
                         if not check_args(args, [String, Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         start = args[1].value
                         end = args[2].value
                         value = String(args[0].value[start:end])
                     elif intrinsic == 'strcat':
                         if not check_args(args, [String, String]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = String(args[0].value + args[1].value)
                     elif intrinsic == 'strlt':
                         if not check_args(args, [String, String]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
                     elif intrinsic == 'strint':
                         if not check_args(args, [String]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         value = Integer(int(args[0].value))
                     elif intrinsic == 'getline':
                         if len(args) != 0:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         try:
                             value = String(input())
                         except EOFError:
                             value = ''
                     elif intrinsic == 'put':
                         if not (len(args) >= 1 and all(map(lambda v : type(v) == Integer or type(v) == String, args))):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         output = ''
                         for v in args:
                             if type(v) == Integer:
@@ -747,7 +792,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         value = Void()
                     elif intrinsic == 'callcc':
                         if not check_args(args, [Closure]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         state.stack.pop()
                         cont = Continuation(deepcopy(state.stack)) # obtain the continuation (this deepcopy will not copy the store)
                         if debug:
@@ -758,7 +803,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         continue # we already popped the stack in the callcc case
                     elif intrinsic == 'type':
                         if len(args) != 1:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         arg = args[0]
                         if type(arg) == Void:
                             value = Integer(0)
@@ -774,9 +819,9 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             sys.exit(f'[Expr Runtime Error] the intrinsic call {layer.expr} got a value ({arg}) of unknown type')
                     elif intrinsic == 'exit':
                         if len(args) != 0:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         if debug:
-                            sys.exit(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr}')
+                            sys.exit(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr.expr}')
                         else:
                             sys.exit()
                     state.stack.pop()
