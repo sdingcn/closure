@@ -1,6 +1,7 @@
 # expr
 
 Expr is a simple, dynamically-typed, functional programming language.
+The main purpose of this repository is to demonstrate the implementation of interpreters.
 
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 

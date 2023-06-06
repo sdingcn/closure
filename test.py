@@ -13,20 +13,20 @@ def check_io(prog: str, i: list[str], o: list[str]) -> bool:
     try:
         raw_o1 = run_and_read(['python3', 'src/interpreter.py', 'time', prog], '\n'.join(i))
     except TimeoutExpired:
-        print('Timeout expired')
+        sys.stderr.write('Timeout expired on time mode\n')
         return False
     try:
         raw_o2 = run_and_read(['python3', 'src/interpreter.py', 'space', prog], '\n'.join(i))
     except TimeoutExpired:
-        print('Timeout expired')
+        sys.stderr.write('Timeout expired on space mode\n')
         return False
     if raw_o1 != raw_o2:
-        print('Time mode and space mode give different outputs.')
+        sys.stderr.write('Time mode and space mode give different outputs.\n')
         return False
     else:
         o1 = raw_o1.splitlines()
         if o1 != o:
-            print(f'Expected: {o}, Got: {o1}')
+            sys.stderr.write(f'Expected: {o}, Got: {o1}\n')
             return False
         else:
             return True
@@ -74,10 +74,10 @@ def main():
         ('test/string-literals.expr', [], ["aaa\"", "bbbb\\\"", "ccccc\\", "void"])
     ]
     for test in tests:
+        sys.stderr.write(f'Running on test {test[0]} with input {test[1]}\n')
         if not check_io(*test):
             sys.exit(f'Failed on test "{test}"')
-        print('.')
-    print('All tests passed')
+    sys.stderr.write('Passed all tests\n')
 
 if __name__ == '__main__':
     main()
