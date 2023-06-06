@@ -829,9 +829,8 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         if len(args) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         if debug:
-                            sys.exit(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr.expr}')
-                        else:
-                            sys.exit()
+                            sys.stderr.write(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr.expr}\n')
+                        sys.exit()
                     state.stack.pop()
             else: # closure or continuation call
                 if layer.pc == 0: # evaluate the callee
