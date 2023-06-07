@@ -1,7 +1,13 @@
 # expr
 
 Expr is a simple, dynamically typed, functional programming language with first class continuations.
-It also features lexically scoped variables and dynamically scoped variables, dynamic type checking, as well as automatic mark-and-sweep garbage collection.
+It also features lexically scoped variables and dynamically scoped variables, dynamic type checking, and automatic mark-and-sweep garbage collection.
+
+Object-oriented programming can be mimicked using closures and dynamically scoped variables.
+Special control-flows (e.g. coroutines, exceptions) can be implemented using continuations.
+Data structures (e.g. lists, binary trees) can be implemented using closures.
+See `test/` for examples on these aspects.
+
 The main purpose of this project is to demonstrates the implementation of simple interpreters.
 
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
@@ -50,23 +56,22 @@ For more examples, see `test/`.
              | getline  // () -> String; read a line from stdin (discard '\n')
              | put      // ((Integer | String)+) -> Void; write to stdout, no separator, no auto '\n'
              | callcc   // (Closure) -> Any
-             | type     // (Any) -> Integer; Void -> 0 Integer -> 1 String -> 2 Closure -> 3 Continuation -> 4
+             | type     // (Any) -> Integer; Void -> 0, Integer -> 1, String -> 2, Closure -> 3, Continuation -> 4
              | exit     // () ->; stop the interpreter (the interpreter's return value is 0)
 <binding> := <var> = <expr>
 <callee> := <intrinsic> | <expr>
 <expr> := <int>
-       | <str>
-       | lambda ( <var>* ) { <expr> }
-       | letrec ( <binding>* ) { <expr> }  // left-to-right evaluation
-       | if <expr> then <expr> else <expr> // condition must be an integer; 0 is false, others are true
-       | <var>                             // cannot hold intrinsic functions
-       | ( <callee> <expr>* )              // intrinsic / closure / continuation call
-       | [ <expr>+ ]                       // left-to-right evaluation, return the last result
+        | <str>
+        | lambda ( <var>* ) { <expr> }
+        | letrec ( <binding>* ) { <expr> }  // left-to-right evaluation
+        | if <expr> then <expr> else <expr> // condition must be an integer; 0 is false, others are true
+        | <var>                             // cannot hold intrinsic functions
+        | ( <callee> <expr>* )              // intrinsic / closure / continuation call
+        | [ <expr>+ ]                       // left-to-right evaluation, return the last result
 ```
 
 Supported types: Void, Integer, String, Closure, Continuation.
 Lambdas are not curried.
-Data structures (e.g. lists) can be implemented using closures (see `test/`).
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
 Garbage collection (GC) runs when 80% of the reserved heap space is occupied,
