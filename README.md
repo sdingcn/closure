@@ -1,7 +1,7 @@
 # expr
 
 Expr is a simple, dynamically-typed, functional programming language with first-class continuations.
-The main purpose of this project is to demonstrate the implementation of interpreters.
+It demonstrates the implementation of simple interpreters.
 
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
@@ -45,47 +45,55 @@ For more examples, see `test/`.
 ```
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
 <str> := <Python-double-quote-str-literal>
-<lex-var> := [a-z][a-zA-Z]*                     ; lexically scoped variable
-<dyn-var> := [A-Z][a-zA-Z]*                     ; dynamically scoped variable
+<lex-var> := [a-z][a-zA-Z]* ; lexically scoped variable
+<dyn-var> := [A-Z][a-zA-Z]* ; dynamically scoped variable
 <var> := <lex-var> | <dyn-var>
-<intrinsic> := void                             ; zero-argument function returning void
-  | add | sub | mul | div | mod | lt            ; integer arithmetic and comparison
-  | strlen | strslice | strcat | strlt | strint ; string length, slice, concatenation, comparison, conversion to integer
-  | getline                                     ; read a line from stdin and discard newline character(s)
-  | put                                         ; write at least one value to stdout (no separator, no automatic newline)
-  | callcc                                      ; call with current continuation
-  | type                                        ; type tester (Void->0, Integer->1, String->2, Closure->3, Continuation->4)
-  | exit                                        ; stop the interpreter (the interpreter's return value is 0)
+<intrinsic>
+ := void     ; ()->Void                         ; returns the void value (the only value of type Void)
+  | add      ; (Integer,Integer)->Integer
+  | sub      ; (Integer,Integer)->Integer
+  | mul      ; (Integer,Integer)->Integer
+  | div      ; (Integer,Integer)->Integer
+  | mod      ; (Integer,Integer)->Integer
+  | lt       ; (Integer,Integer)->Integer       ; (a < b) ? 1 : 0
+  | strlen   ; (String)->Integer
+  | strslice ; (String,Integer,Integer)->String ; s[a ... b - 1]
+  | strcat   ; (String,String)->String          ; string concatenation
+  | strlt    ; (String,String)->Integer         ; lexicographical less-than ; (s1 < s2) ? 1 : 0
+  | strint   ; (String)->Integer                ; convert a string to an integer
+  | getline  ; ()->String                       ; read a line from stdin, discard trailing newline(s)
+  | put      ; ((Integer|String)+)->Void        ; write to stdout, no separator, no automatic newline
+  | callcc   ; (Closure)->Any
+  | type     ; (Any)->Integer                   ; Void->0, Integer->1, String->2, Closure->3, Continuation->4
+  | exit     ; ()->                             ; stop the interpreter (the interpreter's return value is 0)
 <binding> := <var> = <expr>
 <callee> := <intrinsic> | <expr>
-<expr> := <int>                                 ; integer literal
-  | <str>                                       ; string literal
-  | lambda ( <var>* ) { <expr> }                ; lambda function
-  | letrec ( <binding>* ) { <expr> }            ; letrec binding (left-to-right evaluation)
-  | if <expr> then <expr> else <expr>           ; if expression (condition must be an integer, 0 is false and others are true)
-  | <var>                                       ; variable dereference
-  | ( <callee> <expr>* )                        ; intrinsic / closure / continuation call
-  | [ <expr>+ ]                                 ; sequence (left-to-right evaluation, return the last evaluation result)
+<expr>
+ := <int>
+  | <str>
+  | lambda ( <var>* ) { <expr> }
+  | letrec ( <binding>* ) { <expr> }  ; left-to-right evaluation
+  | if <expr> then <expr> else <expr> ; condition must be an integer, 0 is false and others are true
+  | <var>
+  | ( <callee> <expr>* )              ; intrinsic / closure / continuation call
+  | [ <expr>+ ]                       ; left-to-right evaluation, return the last result
 ```
 
 Supported types: Void, Integer, String, Closure, Continuation.
-Data structures (e.g. lists, trees) can be implemented using closures (see `test/`).
+Lambdas are not curried.
+Data structures (e.g. lists) can be implemented using closures (see `test/`).
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
 Garbage collection (GC) runs when 80% of the reserved heap space is occupied,
-and if GC cannot reduce the occupancy to be smaller than 80%, the reserved heap space will grow.
+and if GC cannot reduce the occupancy to be smaller than 80%, the reservation will grow.
 The full semantic reference is the interpreter code.
 
 ## usage
 
-+ `python3 src/interpreter.py run <file>` runs code in `<file>`.
-
-+ `python3 src/interpreter.py time <file>` runs code in `<file>` and prints (to `stderr`) execution time.
-
-+ `python3 src/interpreter.py space <file>` runs code in `<file>` and prints (to `stderr`) peak memory usage (may slow down the interpreter).
-
-+ `python3 src/interpreter.py debug <file>` runs code in `<file>` and prints (to `stderr`) the interpreter's intermediate steps.
-
-+ `python3 src/interpreter.py dump-ast <file>` dumps AST of code in `<file>`.
-
++ `python3 src/interpreter.py <option> <file>`, where `<option>` can be one of the following choices.
+  - `run`: Run code in `<file>`.
+  - `time`: Run code in `<file>` and print (to `stderr`) execution time.
+  - `space`: Run code in `<file>` and print (to `stderr`) peak memory use (may slow down the interpreter).
+  - `debug`: Run code in `<file>` and print (to `stderr`) the interpreter's intermediate steps.
+  - `dump-ast`: Dump AST of code in `<file>`.
 + `python3 test.py` runs all tests (see `test.py` for inputs/outputs for each test program).
