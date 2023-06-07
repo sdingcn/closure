@@ -1,40 +1,22 @@
 # expr
 
-Expr is a simple, dynamically typed, functional programming language with first class continuations.
-It also features lexically scoped variables and dynamically scoped variables, dynamic type checking, and automatic mark-and-sweep garbage collection.
-
-Object-oriented programming [test/oop.expr](test/oop.expr)
-can be mimicked using closures and dynamically scoped variables.
-Special control-flows, such as coroutines [test/coroutines.expr](test/coroutines.expr) and exceptions [test/exception.expr](test/exception.expr),
-can be implemented using continuations.
-Data structures, such as lists [test/quicksort.expr](test/quicksort.expr) and binary trees [test/binary-tree.expr](test/binary-tree.expr),
-can be implemented using closures.
-
-The main purpose of this project is to demonstrates the implementation of simple interpreters.
-
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
+
+Expr is a simple, dynamically typed, functional programming language with first class continuations.
+It also features lexically scoped variables, dynamically scoped variables, and mark-and-sweep garbage collection.
+The main purposes of this project are to experiment with language features and to demonstrate the implementation of simple interpreters.
+
+Object-oriented programming ([test/oop.expr](test/oop.expr))
+can be mimicked using closures and dynamically scoped variables.
+Special control-flows such as coroutines ([test/coroutines.expr](test/coroutines.expr)) and exceptions ([test/exception.expr](test/exception.expr))
+can be implemented using continuations.
+Data structures such as lists ([test/quicksort.expr](test/quicksort.expr)) and binary trees ([test/binary-tree.expr](test/binary-tree.expr))
+can be implemented using closures.
+See `test/` for more examples.
 
 ## dependencies
 
 Python >= 3.9
-
-## example (GCD for nonnegative integers)
-
-```
-letrec (
-  gcd = lambda (a b) {
-    if (lt b 1) then a
-    else (gcd b (mod a b))
-  }
-) {
-  (put
-    (gcd (strint (getline)) (strint (getline)))
-    "\n"
-  )
-}
-```
-
-For more examples, see `test/`.
 
 ## syntax and semantics
 
