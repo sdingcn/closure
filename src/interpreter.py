@@ -175,7 +175,7 @@ class Str(Expr):
         self.value = value
 
     def __str__(self) -> str:
-        return f'(Int {self.sl} {self.value})'
+        return f'(Str {self.sl} {self.value})'
 
 class Var(Expr):
 
@@ -415,7 +415,7 @@ class Value:
         pass
 
     def __str__(self) -> str:
-        return 'value'
+        return 'Value'
 
 class Void(Value):
 
@@ -424,7 +424,7 @@ class Void(Value):
         self.location = None
 
     def __str__(self) -> str:
-        return 'void'
+        return 'Void'
 
 class Integer(Value):
 
@@ -433,7 +433,7 @@ class Integer(Value):
         self.value = value
 
     def __str__(self) -> str:
-        return str(self.value)
+        return f'(Integer {self.value})'
 
 class String(Value):
 
@@ -442,7 +442,7 @@ class String(Value):
         self.value = value
 
     def __str__(self) -> str:
-        return self.value
+        return f'(String {self.value})'
 
 class Closure(Value):
 
@@ -452,7 +452,7 @@ class Closure(Value):
         self.fun = fun
 
     def __str__(self) -> str:
-        return f'(closure {unfold(self.env)} {self.fun})'
+        return f'(Closure {unfold(self.env)} {self.fun})'
 
 class Layer:
     '''The layer class in the evaluation stack, where each layer is the expression currently under evaluation'''
@@ -477,7 +477,7 @@ class Layer:
         self.frame = frame
 
     def __str__(self) -> str:
-        return f'(layer {unfold(self.env)} {self.expr} {self.pc} {unfold(self.local)})'
+        return f'(Layer {unfold(self.env)} {self.expr} {self.pc} {unfold(self.local)} {self.frame})'
 
 class Continuation(Value):
 
@@ -487,7 +487,7 @@ class Continuation(Value):
         self.stack = stack
 
     def __str__(self) -> str:
-        return f'(continuation {unfold(self.stack)})'
+        return f'(Continuation {unfold(self.stack)})'
 
 class State:
     '''The state class for the interpretation, where each state object completely determines the current state (stack and store)'''
@@ -503,7 +503,7 @@ class State:
         self._empty_store_size = sys.getsizeof(self.store)
 
     def __str__(self) -> str:
-        return f'(state {unfold(self.stack)} {unfold(self.store)} {self.location})'
+        return f'(State {unfold(self.stack)} {unfold(self.store)} {self.location})'
 
     def get_store_capacity(self) -> int:
         # capacity >= length
@@ -892,7 +892,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         if len(args) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         if debug:
-                            sys.stderr.write(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr.expr}\n')
+                            sys.stderr.write(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr}\n')
                         # the interpreter returns 0
                         sys.exit()
                     state.stack.pop()
@@ -923,7 +923,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         closure = callee
                         # types will be checked inside the closure call
                         if len(args) != len(closure.fun.var_list):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         new_env = closure.env[:]
                         for i, v in enumerate(closure.fun.var_list):
                             addr = args[i].location if args[i].location != None else state.new(args[i])
@@ -935,7 +935,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         cont = callee
                         # the "value" variable already contains the last evaluation result of the args, so we just continue
                         if len(args) != 1:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         # replace the stack
                         state.stack = deepcopy(cont.stack)
                         if debug:

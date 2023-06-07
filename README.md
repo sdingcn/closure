@@ -54,19 +54,19 @@ Python >= 3.9
         | [ <expr>+ ]                       // left-to-right evaluation, return the last result
 ```
 
-Supported types: Void, Integer, String, Closure, Continuation.
+Supported object types: Void, Integer, String, Closure, Continuation.
 Lambdas are not curried.
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
 Garbage collection (GC) runs when 80% of the reserved heap space is occupied,
-and if GC cannot reduce the occupancy to be smaller than 80%, the reserved heap space will grow.
+and once GC cannot reduce the occupancy to be smaller than 80%, the reserved heap space will grow.
 
 ## usage
 
 + `python3 src/interpreter.py <option> <file>`, where `<option>` can be one of the following choices.
   - `run`: Run code in `<file>`.
   - `time`: Run code in `<file>` and print (to `stderr`) execution time.
-  - `space`: Run code in `<file>` and print (to `stderr`) peak memory use (may slow down the interpreter).
+  - `space`: Run code in `<file>` and print (to `stderr`) peak memory use (this option could slow down the interpreter).
   - `debug`: Run code in `<file>` and print (to `stderr`) the interpreter's intermediate steps.
   - `dump-ast`: Dump AST of code in `<file>`.
 + `python3 test.py` runs all tests (see `test.py` for inputs/outputs for each test program).
