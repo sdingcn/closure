@@ -1,10 +1,11 @@
 letrec (
-  eq = lambda (a b) {
-    if (lt (add (lt a b) (lt b a)) 1) then 1 else 0
-  }
   gcd = lambda (a b) {
-    if (eq b 0) then a else (gcd b (mod a b))
+    if (lt b 1) then a
+    else (gcd b (mod a b))
   }
 ) {
-  (put (gcd (strint (getline)) (strint (getline))) "\n")
+  (put
+    (gcd (strint (getline)) (strint (getline)))
+    "\n"
+  )
 }
