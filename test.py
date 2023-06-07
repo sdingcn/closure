@@ -57,7 +57,29 @@ def main():
 
         ('test/mixed-scope.expr', [], ['1', '303', 'void']),
 
-        ('test/continuation.expr', [], ['3', '2', '1', '1', '2', '3', '3', '2', '1', '300']),
+        ('test/exception.expr', [], [
+            'call n = 2',
+            'call n = 1',
+            'call n = 0',
+            'return n = 0',
+            'return n = 1',
+            'return n = 2',
+            'call n = 2',
+            'call n = 1',
+            'call n = 0',
+            'exception',
+            'void'
+        ]),
+
+        ('test/coroutines.expr', [], [
+            'main',
+            'task 1',
+            'main',
+            'task 2',
+            'main',
+            'task 3',
+            'void'
+        ]),
 
         ('test/type.expr', [], ['0', '1', '2', '3', '4', 'void']),
 

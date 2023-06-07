@@ -923,7 +923,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         closure = callee
                         # types will be checked inside the closure call
                         if len(args) != len(closure.fun.var_list):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {callee}')
                         new_env = closure.env[:]
                         for i, v in enumerate(closure.fun.var_list):
                             addr = args[i].location if args[i].location != None else state.new(args[i])
@@ -935,7 +935,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         cont = callee
                         # the "value" variable already contains the last evaluation result of the args, so we just continue
                         if len(args) != 1:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {callee}')
                         # replace the stack
                         state.stack = deepcopy(cont.stack)
                         if debug:

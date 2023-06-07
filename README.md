@@ -3,10 +3,12 @@
 Expr is a simple, dynamically typed, functional programming language with first class continuations.
 It also features lexically scoped variables and dynamically scoped variables, dynamic type checking, and automatic mark-and-sweep garbage collection.
 
-Object-oriented programming can be mimicked using closures and dynamically scoped variables.
-Special control-flows (e.g. coroutines, exceptions) can be implemented using continuations.
-Data structures (e.g. lists, binary trees) can be implemented using closures.
-See `test/` for examples on these aspects.
+Object-oriented programming [test/oop.expr](test/oop.expr)
+can be mimicked using closures and dynamically scoped variables.
+Special control-flows, such as coroutines [test/coroutines.expr](test/coroutines.expr) and exceptions [test/exception.expr](test/exception.expr),
+can be implemented using continuations.
+Data structures, such as lists [test/quicksort.expr](test/quicksort.expr) and binary trees [test/binary-tree.expr](test/binary-tree.expr),
+can be implemented using closures.
 
 The main purpose of this project is to demonstrates the implementation of simple interpreters.
 

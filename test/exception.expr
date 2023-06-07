@@ -1,0 +1,24 @@
+letrec (
+  body = lambda (n except throw) {
+    if (lt n 0) then
+      if except then (throw "exception") else (void)
+    else [
+      (put "call n = " n "\n")
+      (body (sub n 1) except throw)
+      (put "return n = " n "\n")
+    ]
+  }
+  try = lambda (f) {
+    letrec (
+      cc = (callcc lambda (k) { (k k) })
+    ) {
+      if (lt 3 (type cc)) then (f cc)
+      else (put cc "\n")
+    }
+  }
+) {
+  [
+    (try lambda (throw) { (body 2 0 throw) })
+    (try lambda (throw) { (body 2 1 throw) })
+  ]
+}
