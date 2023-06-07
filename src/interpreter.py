@@ -87,18 +87,22 @@ def lex(source: str, debug: bool) -> deque[Token]:
 
     def next_token() -> Union[None, Token]:
         nonlocal line, col
+        # skip whitespaces
         while chars and chars[0].isspace():
             space = chars.popleft()
             col += 1
             if space == '\n':
                 line += 1
                 col = 1
+        # read the next token
         if chars:
             sl = SourceLocation(line, col)
+            # integer without +/-
             if chars[0].isdigit():
                 val = ''
                 while chars and chars[0].isdigit():
                     val += chars.popleft()
+            # integer with +/-
             elif chars[0] in ('-', '+'):
                 if len(chars) > 1 and chars[1].isdigit():
                     val = chars.popleft()
@@ -106,12 +110,15 @@ def lex(source: str, debug: bool) -> deque[Token]:
                         val += chars.popleft()
                 else:
                     sys.exit(f'[Expr Lexer Error] incomplete integer literal at {sl}')
+            # variable / intrinsic / keyword
             elif chars[0].isalpha():
                 val = ''
                 while chars and chars[0].isalpha():
                     val += chars.popleft()
+            # special symbol
             elif chars[0] in ('(', ')', '{', '}', '[', ']', '='):
                 val = chars.popleft()
+            # string
             elif chars[0] == '"':
                 val = chars.popleft()
                 while chars and (chars[0] != '"' or (chars[0] == '"' and count_trailing_escape(val) % 2 != 0)):
@@ -142,6 +149,7 @@ def lex(source: str, debug: bool) -> deque[Token]:
 ### parser
 
 class Expr:
+    ''' Normally we don't create instances of this base class. '''
 
     def __init__(self):
         pass
@@ -383,6 +391,7 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
             return parse_letrec()
         elif tokens[0].val == 'if':
             return parse_if()
+        # check keywords before var to avoid recognizing keywords as vars
         elif is_var(tokens[0]):
             return parse_var()
         elif tokens[0].val == '(':
@@ -400,6 +409,7 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
 ### runtime
 
 class Value:
+    ''' Normally we don't create instances of this base class. '''
     
     def __init__(self):
         pass
@@ -410,7 +420,8 @@ class Value:
 class Void(Value):
 
     def __init__(self):
-        self.location = None # location in the store (if allocated)
+        # the location of this value (object) in the store (if allocated)
+        self.location = None
 
     def __str__(self) -> str:
         return 'void'
@@ -447,17 +458,23 @@ class Layer:
     '''The layer class in the evaluation stack, where each layer is the expression currently under evaluation'''
 
     def __init__(self,
-            env: list[tuple[str, int]], # env will be shared among layers in each frame
+            # env will be shared among layers in each frame
+            env: list[tuple[str, int]], 
             expr: Expr,
             pc: int,
             local: dict[str, Union[Value, list[Value]]],
             frame: bool
         ):
-        self.env = env # environment for the evaluation of the current expression
-        self.expr = expr # the current expression under evaluation
-        self.pc = pc # program counter (the pc-th step of evaluating this expression)
-        self.local = local # variables local to this evaluation layer
-        self.frame = frame # whether this layer starts a frame (a closure call or the initial layer)
+        # environment for the evaluation of the current expression
+        self.env = env 
+        # the current expression under evaluation
+        self.expr = expr
+        # program counter (the pc-th step of evaluating this expression)
+        self.pc = pc
+        # variables local to this evaluation layer
+        self.local = local
+        # whether this layer starts a frame (a closure call or the initial layer)
+        self.frame = frame
 
     def __str__(self) -> str:
         return f'(layer {unfold(self.env)} {self.expr} {self.pc} {unfold(self.local)})'
@@ -466,6 +483,7 @@ class Continuation(Value):
 
     def __init__(self, stack: list[Layer]):
         self.location = None
+        # we only need to store the stack, because objects in the heap are immutable
         self.stack = stack
 
     def __str__(self) -> str:
@@ -476,8 +494,11 @@ class State:
 
     def __init__(self, expr: Expr):
         self.stack = [Layer([], expr, 0, {}, True)]
+        # the heap
         self.store = []
-        self.location = 0 # the next available addess in the store
+        # the next available addess in the store
+        self.location = 0
+        # private values
         self._ref_size = 8
         self._empty_store_size = sys.getsizeof(self.store)
 
@@ -485,22 +506,29 @@ class State:
         return f'(state {unfold(self.stack)} {unfold(self.store)} {self.location})'
 
     def get_store_capacity(self) -> int:
+        # capacity >= length
         return (sys.getsizeof(self.store) - self._empty_store_size) // self._ref_size
 
     def new(self, value: Value) -> int:
+        ''' heap space allocation '''
         if self.location < len(self.store):
             self.store[self.location] = value
             value.location = self.location
         else:
+            # the self.store array is managed by Python and will automatically grow
             self.store.append(value)
             value.location = self.location
         self.location += 1
         return self.location - 1
 
     def mark(self, value: Value) -> tuple[set[int], list[Value]]:
+        # ids
         visited_closures = set()
+        # ids
         visited_stacks = set()
+        # integer locations
         visited_locations = set()
+        # Python references
         visited_values = []
 
         def mark_closure(closure: Closure) -> None:
@@ -540,15 +568,18 @@ class State:
                 elif type(val) == Continuation:
                     mark_stack(val.stack)
         
+        # mark both the value and the stack
         if type(value) == Closure:
             mark_closure(value)
         elif type(value) == Continuation:
             mark_stack(value.stack)
         mark_stack(self.stack)
+        # returning visited_values is for relocating their internal location values
         return (visited_locations, visited_values)
 
     def sweep_and_compact(self, visited_locations: set[int]) -> tuple[int, dict[int, int]]:
         removed = 0
+        # old location -> new location
         relocation = {}
         n = len(self.store)
         i = 0
@@ -562,11 +593,13 @@ class State:
             else:
                 removed += 1
             j += 1
+        # adjust the next available location
         self.location = i
         return (removed, relocation)
     
     def relocate(self, visited_values: list[Value], relocation: dict[int, int]) -> None:
-        for value in visited_values: # don't need to recursively update because all descendant objects are in visited_values
+        # don't need to recursively update because all descendant objects are in visited_values
+        for value in visited_values: 
             if type(value) == Closure:
                 for i in range(len(value.env)):
                     value.env[i] = (value.env[i][0], relocation[value.env[i][1]])
@@ -577,12 +610,14 @@ class State:
                             layer.env[i] = (layer.env[i][0], relocation[layer.env[i][1]])
 
     def gc(self, value) -> int:
+        ''' mark-and-sweep garbage collection '''
         visited_locations, visited_values = self.mark(value)
         removed, relocation = self.sweep_and_compact(visited_locations)
         self.relocate(visited_values, relocation)
         return removed
 
 def check_args(vals: list[Value], ts: list[type]) -> bool:
+    ''' check whether arguments conform to types, mainly used in intrinsic function calls '''
     if len(vals) != len(ts):
         return False
     for i in range(len(vals)):
@@ -597,6 +632,7 @@ def is_dynamic_name(name: str) -> bool:
     return name[0].isupper()
 
 def filter_lexical(env: list[tuple[str, int]]) -> list[tuple[str, int]]:
+    ''' find out lexical variable-location pairs in an environment '''
     lex_env = []
     for v, l in env:
         if is_lexical_name(v):
@@ -604,12 +640,14 @@ def filter_lexical(env: list[tuple[str, int]]) -> list[tuple[str, int]]:
     return lex_env
 
 def lookup_env(sl: SourceLocation, name: str, env: list[tuple[str, int]]) -> int:
+    ''' lexically scoped variable lookup '''
     for i in range(len(env) - 1, -1, -1):
         if env[i][0] == name:
             return env[i][1]
     sys.exit(f'[Expr Runtime Error] undefined variable {name} at {sl} (intrinsic functions cannot be treated as variables)')
 
 def lookup_stack(sl: SourceLocation, name: str, stack: list[Layer]) -> int:
+    ''' dynamically scoped variable lookup '''
     for i in range(len(stack) - 1, -1, -1):
         if stack[i].frame:
             for j in range(len(stack[i].env) - 1, -1, -1):
@@ -631,11 +669,14 @@ def interpret(tree: Expr, debug: bool) -> Value:
     
     # state
     state = State(tree)
-    value = None # the evaluation result of the last stack layer
+    # the evaluation result of the last stack layer
+    value = None
 
-    # for GC
+    # used for GC control
     insufficient_capacity = -1
 
+    # we just adjust "state.stack" and "value"
+    # the evaluation will automatically continue along the while loop
     while True:
         
         # end of evaluation
@@ -644,16 +685,20 @@ def interpret(tree: Expr, debug: bool) -> Value:
 
         # GC control
         capacity = state.get_store_capacity()
-        if capacity > insufficient_capacity: # after GC the capacity will likely be sufficient
+        # insufficient_capacity is the last capacity where GC failed
+        if capacity > insufficient_capacity:
             if state.location >= 0.8 * capacity:
                 cnt = state.gc(value)
                 if debug:
                     sys.stderr.write(f'[Expr Debug] GC collected {cnt} store cells\n')
-                if state.location >= 0.8 * capacity: # GC failed to release enough memory, meaning the capacity really needs to grow
+                # GC failed to release enough memory, meaning that the capacity needs to grow
+                if state.location >= 0.8 * capacity:
                     insufficient_capacity = capacity
-                else: # after GC the current capacity is still enough so we keep the previous insufficient_capacity
+                # after GC the current capacity is enough so we keep the previous insufficient_capacity
+                else:
                     pass
-        else: # just grow without GC
+        # the capacity is insufficient, so we allow it to naturally grow and don't run GC before the growing
+        else:
             pass
 
         # evaluating the current layer
@@ -670,33 +715,41 @@ def interpret(tree: Expr, debug: bool) -> Value:
             value = Closure(filter_lexical(layer.env), layer.expr)
             state.stack.pop()
         elif type(layer.expr) == Letrec:
-            if layer.pc == 0: # create locations and bind variables to them
+            # create locations and bind variables to them
+            if layer.pc == 0:
                 for v, e in layer.expr.var_expr_list:
                     layer.env.append((v.name, state.new(Void())))
                 layer.pc += 1
-            elif layer.pc <= len(layer.expr.var_expr_list): # evaluate binding expressions
-                if layer.pc > 1: # update location content
+            # evaluate binding expressions
+            elif layer.pc <= len(layer.expr.var_expr_list):
+                # update location content
+                if layer.pc > 1:
                     var = layer.expr.var_expr_list[layer.pc - 2][0]
                     last_location = lookup_env(var.sl, var.name, layer.env)
                     state.store[last_location] = value
                 state.stack.append(Layer(layer.env, layer.expr.var_expr_list[layer.pc - 1][1], 0, {}, False))
                 layer.pc += 1
-            elif layer.pc == len(layer.expr.var_expr_list) + 1: # evaluate body expression
-                if layer.pc > 1: # update location content
+            # evaluate body expression
+            elif layer.pc == len(layer.expr.var_expr_list) + 1:
+                # update location content
+                if layer.pc > 1:
                     var = layer.expr.var_expr_list[layer.pc - 2][0]
                     last_location = lookup_env(var.sl, var.name, layer.env)
                     state.store[last_location] = value
                 state.stack.append(Layer(layer.env, layer.expr.expr, 0, {}, False))
                 layer.pc += 1
-            else: # finish letrec
+            # finish letrec
+            else:
                 for i in range(len(layer.expr.var_expr_list)):
                     layer.env.pop()
                 state.stack.pop()
         elif type(layer.expr) == If:
-            if layer.pc == 0: # evaluate the condition
+            # evaluate the condition
+            if layer.pc == 0:
                 state.stack.append(Layer(layer.env, layer.expr.cond, 0, {}, False))
                 layer.pc += 1
-            elif layer.pc == 1: # choose the branch to evaluate
+            # choose the branch to evaluate
+            elif layer.pc == 1:
                 if type(value) != Integer:
                     sys.exit(f'[Expr Runtime Error] the condition of {layer.expr} evaluated to a value ({value}) of wrong type')
                 if value.value != 0:
@@ -704,31 +757,38 @@ def interpret(tree: Expr, debug: bool) -> Value:
                 else:
                     state.stack.append(Layer(layer.env, layer.expr.branch2, 0, {}, False))
                 layer.pc += 1
-            else: # finish if
+            # finish if
+            else:
                 state.stack.pop()
         elif type(layer.expr) == Var:
             if debug:
                 sys.stderr.write(f'[Expr Debug] looking up the variable {layer.expr}\n')
+            # two types of variables
             if is_lexical_name(layer.expr.name):
                 value = state.store[lookup_env(layer.expr.sl, layer.expr.name, layer.env)]
             else:
                 value = state.store[lookup_stack(layer.expr.sl, layer.expr.name, state.stack)]
             state.stack.pop()
         elif type(layer.expr) == Call:
-            if type(layer.expr.callee) == Var and layer.expr.callee.name in intrinsics: # intrinsic call
-                if layer.pc == 0: # initialize args
+            # intrinsic call
+            if type(layer.expr.callee) == Var and layer.expr.callee.name in intrinsics:
+                # initialize args
+                if layer.pc == 0:
                     layer.local['args'] = []
                     layer.pc += 1
-                elif layer.pc <= len(layer.expr.arg_list): # evaluate arguments
+                # evaluate arguments
+                elif layer.pc <= len(layer.expr.arg_list):
                     if layer.pc > 1:
                         layer.local['args'].append(value)
                     state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 1], 0, {}, False))
                     layer.pc += 1
-                else: # intrinsic call doesn't need to grow the stack, so this is the final step for this call
+                # intrinsic call doesn't need to grow the stack, so this is the final step for this call
+                else:
                     if layer.pc > 1:
                         layer.local['args'].append(value)
                     intrinsic = layer.expr.callee.name
                     args = layer.local['args']
+                    # a gigantic series of if conditions, one for each intrinsic function
                     if intrinsic == 'void':
                         if len(args) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
@@ -796,19 +856,22 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             else:
                                 output += v.value
                         print(output, end = '', flush = True)
+                        # the return value of put is void
                         value = Void()
                     elif intrinsic == 'callcc':
                         if not check_args(args, [Closure]):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         state.stack.pop()
-                        cont = Continuation(deepcopy(state.stack)) # obtain the continuation (this deepcopy will not copy the store)
+                        # obtain the continuation (this deepcopy will not copy the store)
+                        cont = Continuation(deepcopy(state.stack))
                         if debug:
                             sys.stderr.write(f'[Expr Debug] captured continuation {cont}\n')
                         closure = args[0]
                         # make a closure call layer and pass in the continuation
                         addr = cont.location if cont.location != None else state.new(cont)
                         state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, 0, {}, True))
-                        continue # we already popped the stack in the callcc case
+                        # we already popped the stack in this case, so just continue the evaluation
+                        continue
                     elif intrinsic == 'type':
                         if len(args) != 1:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
@@ -830,53 +893,68 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         if debug:
                             sys.stderr.write(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr.expr}\n')
+                        # the interpreter returns 0
                         sys.exit()
                     state.stack.pop()
-            else: # closure or continuation call
-                if layer.pc == 0: # evaluate the callee
+            # closure or continuation call
+            else:
+                # evaluate the callee
+                if layer.pc == 0:
                     state.stack.append(Layer(layer.env, layer.expr.callee, 0, {}, False))
                     layer.pc += 1
-                elif layer.pc == 1: # initialize args
+                # initialize callee and args
+                elif layer.pc == 1:
                     layer.local['callee'] = value
                     layer.local['args'] = []
                     layer.pc += 1
-                elif layer.pc - 1 <= len(layer.expr.arg_list): # evaluate arguments
+                # evaluate arguments
+                elif layer.pc - 1 <= len(layer.expr.arg_list):
                     if layer.pc - 1 > 1:
                         layer.local['args'].append(value)
                     state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 2], 0, {}, False))
                     layer.pc += 1
-                elif layer.pc - 1 == len(layer.expr.arg_list) + 1: # evaluate the call
+                # evaluate the call
+                elif layer.pc - 1 == len(layer.expr.arg_list) + 1:
                     if layer.pc - 1 > 1:
                         layer.local['args'].append(value)
                     callee = layer.local['callee']
                     args = layer.local['args']
                     if type(callee) == Closure:
                         closure = callee
-                        if len(args) != len(closure.fun.var_list): # types will be checked inside the closure call
+                        # types will be checked inside the closure call
+                        if len(args) != len(closure.fun.var_list):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
                         new_env = closure.env[:]
                         for i, v in enumerate(closure.fun.var_list):
                             addr = args[i].location if args[i].location != None else state.new(args[i])
                             new_env.append((v.name, addr))
+                        # evaluate the closure call
                         state.stack.append(Layer(new_env, closure.fun.expr, 0, {}, True))
                         layer.pc += 1
                     elif type(callee) == Continuation:
                         cont = callee
-                        if len(args) != 1: # the "value" variable already contains the last evaluation result of the arg
+                        # the "value" variable already contains the last evaluation result of the args, so we just continue
+                        if len(args) != 1:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.callee}')
+                        # replace the stack
                         state.stack = deepcopy(cont.stack)
                         if debug:
                             sys.stderr.write(f'[Expr Debug] applied continuation {cont}, stack switched\n')
-                        continue # the stack has been replaced, so we don't need to pop the previous stack's call layer
+                        # the stack has been replaced, so we don't need to pop the previous stack's call layer
+                        # the previous stack is simply discarded
+                        continue
                     else:
                         sys.exit(f'[Expr Runtime Error] {layer.expr.callee} (whose evaluation result is {callee}) is not callable')
-                else: # finish the call
+                # finish the call
+                else:
                     state.stack.pop()
         elif type(layer.expr) == Seq:
-            if layer.pc < len(layer.expr.expr_list): # evaluate the expressions, without the need of storing the results to local
+            # evaluate the expressions, without the need of storing the results to local
+            if layer.pc < len(layer.expr.expr_list):
                 state.stack.append(Layer(layer.env, layer.expr.expr_list[layer.pc], 0, {}, False))
                 layer.pc += 1
-            else: # finish the sequence
+            # finish the sequence
+            else:
                 state.stack.pop()
         else:
             sys.exit(f'[Expr Runtime Error] unrecognized AST node {layer.expr}')
