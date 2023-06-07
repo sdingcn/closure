@@ -49,7 +49,7 @@ For more examples, see `test/`.
 <dyn-var> := [A-Z][a-zA-Z]* ; dynamically scoped variable
 <var> := <lex-var> | <dyn-var>
 <intrinsic>
- := void     ; ()->Void                         ; returns the void value (the only value of type Void)
+ := void     ; ()->Void                    ; returns void (the only value of type Void)
   | add      ; (Integer,Integer)->Integer
   | sub      ; (Integer,Integer)->Integer
   | mul      ; (Integer,Integer)->Integer
@@ -58,14 +58,14 @@ For more examples, see `test/`.
   | lt       ; (Integer,Integer)->Integer       ; (a < b) ? 1 : 0
   | strlen   ; (String)->Integer
   | strslice ; (String,Integer,Integer)->String ; s[a ... b - 1]
-  | strcat   ; (String,String)->String          ; string concatenation
-  | strlt    ; (String,String)->Integer         ; lexicographical less-than ; (s1 < s2) ? 1 : 0
-  | strint   ; (String)->Integer                ; convert a string to an integer
-  | getline  ; ()->String                       ; read a line from stdin, discard trailing newline(s)
-  | put      ; ((Integer|String)+)->Void        ; write to stdout, no separator, no automatic newline
+  | strcat   ; (String,String)->String    ; string concatenation
+  | strlt    ; (String,String)->Integer   ; lexicographical < ; (s1 < s2) ? 1 : 0
+  | strint   ; (String)->Integer          ; convert a string to an integer
+  | getline  ; ()->String                 ; read a line from stdin, discard newline(s)
+  | put      ; ((Integer|String)+)->Void  ; write to stdout, no separator, no auto newline
   | callcc   ; (Closure)->Any
-  | type     ; (Any)->Integer                   ; Void->0, Integer->1, String->2, Closure->3, Continuation->4
-  | exit     ; ()->                             ; stop the interpreter (the interpreter's return value is 0)
+  | type     ; (Any)->Integer  ; Void->0, Integer->1, String->2, Closure->3, Continuation->4
+  | exit     ; ()->            ; stop the interpreter (the interpreter's return value is 0)
 <binding> := <var> = <expr>
 <callee> := <intrinsic> | <expr>
 <expr>
@@ -73,7 +73,7 @@ For more examples, see `test/`.
   | <str>
   | lambda ( <var>* ) { <expr> }
   | letrec ( <binding>* ) { <expr> }  ; left-to-right evaluation
-  | if <expr> then <expr> else <expr> ; condition must be an integer, 0 is false and others are true
+  | if <expr> then <expr> else <expr> ; condition must be an integer ; 0=false, others=true
   | <var>
   | ( <callee> <expr>* )              ; intrinsic / closure / continuation call
   | [ <expr>+ ]                       ; left-to-right evaluation, return the last result
@@ -86,7 +86,6 @@ Objects are immutable.
 Variables are references to objects and are immutable once bound.
 Garbage collection (GC) runs when 80% of the reserved heap space is occupied,
 and if GC cannot reduce the occupancy to be smaller than 80%, the reservation will grow.
-The full semantic reference is the interpreter code.
 
 ## usage
 
