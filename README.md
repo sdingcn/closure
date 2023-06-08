@@ -3,7 +3,7 @@
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
 Expr is a simple, dynamically typed, functional programming language with first class continuations.
-It also features lexically scoped variables, dynamically scoped variables, and mark-and-sweep garbage collection.
+It also features lexically scoped variables, dynamically scoped variables, mark-and-sweep garbage collection, and built-in code evaluator `eval`.
 The main purposes of this project are to experiment with language features and to demonstrate the implementation of simple interpreters.
 
 Object-oriented programming ([test/oop.expr](test/oop.expr))
@@ -41,6 +41,7 @@ Python >= 3.9
              | put      // ((Integer | String)+) -> Void; write to stdout, no separator, no auto '\n'
              | callcc   // (Closure) -> Any
              | type     // (Any) -> Integer; Void -> 0, Integer -> 1, String -> 2, Closure -> 3, Continuation -> 4
+             | eval     // (String) -> Any; evaluate a string as code in a new interpreter instance
              | exit     // () ->; stop the interpreter (the interpreter's return value is 0)
 <binding> := <var> = <expr>
 <callee> := <intrinsic> | <expr>
@@ -70,6 +71,6 @@ the evaluation result of the entire program will be printed to `stdout`
   - `run`: Run code in `<file>`.
   - `time`: Run code in `<file>` and print (to `stderr`) execution time.
   - `space`: Run code in `<file>` and print (to `stderr`) peak memory use (this option could slow down the interpreter).
-  - `debug`: Run code in `<file>` and print (to `stderr`) the interpreter's intermediate steps.
+  - `debug`: Run code in `<file>` and print (to `stderr`) intermediate steps of all interpreter instances (including ones started by `eval`).
   - `dump-ast`: Dump AST of code in `<file>`.
 + `python3 test.py` runs all tests (see `test.py` for inputs/outputs for each test program).

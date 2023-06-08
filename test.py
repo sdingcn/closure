@@ -77,6 +77,8 @@ def main():
 
         ('test/mixed-scope.expr', [], ['1', '303', 'Void']),
 
+        ('test/multi-stage.expr', [], ['EVAL', 'Void']),
+
         ('test/mutual-recursion.expr', [], ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1', '0', 'Void']),
 
         ('test/oop.expr', [], ['1', '2', '100', '2', 'Void']),

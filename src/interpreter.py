@@ -69,6 +69,9 @@ class Token:
         return f'(Token {self.sl} {self.val})'
 
 def lex(source: str, debug: bool) -> deque[Token]:
+    if debug:
+        sys.stderr.write('[Expr Debug] *** starting lexer ***\n')
+
     chars = deque(source)
     line = 1
     col = 1
@@ -243,6 +246,8 @@ class Seq(Expr):
         return f'(Seq {self.sl} {unfold(self.expr_list)})'
 
 def parse(tokens: deque[Token], debug: bool) -> Expr:
+    if debug:
+        sys.stderr.write('[Expr Debug] *** starting parser ***\n')
     
     def is_int(token: Token) -> bool:
         try:
@@ -658,6 +663,9 @@ def lookup_stack(sl: SourceLocation, name: str, stack: list[Layer]) -> int:
 ### interpreter
 
 def interpret(tree: Expr, debug: bool) -> Value:
+    if debug:
+        sys.stderr.write('[Expr Debug] *** starting interpreter ***\n')
+
     intrinsics = ['void',
                   'add', 'sub', 'mul', 'div', 'mod', 'lt',
                   'strlen', 'strslice', 'strcat', 'strlt', 'strint',
@@ -665,6 +673,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                   'put',
                   'callcc',
                   'type',
+                  'eval',
                   'exit']
     
     # state
@@ -888,6 +897,16 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             value = Integer(4)
                         else:
                             sys.exit(f'[Expr Runtime Error] the intrinsic call {layer.expr} got a value ({arg}) of unknown type')
+                    elif intrinsic == 'eval':
+                        if not check_args(args, [String]):
+                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        arg = args[0]
+                        if debug:
+                            sys.stderr.write(f'[Expr Debug] eval started a new interpreter instance at {layer.expr}\n')
+                            value = debug_run(arg.value)
+                            sys.stderr.write(f'[Expr Debug] eval stopped the new interpreter instance at {layer.expr}\n')
+                        else:
+                            value = normal_run(arg.value)
                     elif intrinsic == 'exit':
                         if len(args) != 0:
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
@@ -961,34 +980,34 @@ def interpret(tree: Expr, debug: bool) -> Value:
 
 ### main
 
-def normal_run(source: str) -> None:
+def normal_run(source: str) -> Value:
     tokens = lex(source, False)
     tree = parse(tokens, False)
     result = interpret(tree, False)
-    print(result)
+    return result
+
+def debug_run(source: str) -> Value:
+    tokens = lex(source, True)
+    tree = parse(tokens, True)
+    result = interpret(tree, True)
+    return result
 
 def main(option: str, source: str) -> None:
     if option == 'run':
-        normal_run(source)
+        print(normal_run(source))
     elif option == 'time':
         start_time = time.time()
-        normal_run(source)
+        print(normal_run(source))
         end_time = time.time()
         sys.stderr.write(f'Total time (seconds): {end_time - start_time}\n')
     elif option == 'space':
         tracemalloc.start() 
-        normal_run(source)
+        print(normal_run(source))
         current_memory, peak_memory = tracemalloc.get_traced_memory()
         tracemalloc.stop()
         sys.stderr.write(f'Peak memory (KiB): {peak_memory / 1024}\n')
     elif option == 'debug':
-        sys.stderr.write('[Expr Debug] *** starting lexer ***\n')
-        tokens = lex(source, True)
-        sys.stderr.write('[Expr Debug] *** starting parser ***\n')
-        tree = parse(tokens, True)
-        sys.stderr.write('[Expr Debug] *** starting interpreter ***\n')
-        result = interpret(tree, True)
-        print(result)
+        print(debug_run(source))
     elif option == 'dump-ast':
         tokens = lex(source, False)
         tree = parse(tokens, False)
