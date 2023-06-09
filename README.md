@@ -3,11 +3,11 @@
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
 Expr is a simple, dynamically typed, functional programming language with first class continuations.
-It also features lexically scoped variables, dynamically scoped variables, mark-and-sweep garbage collection, and built-in code evaluator `eval`.
-The main purposes of this project are to experiment with language features and to demonstrate the implementation of simple interpreters.
+It also features lexically scoped variables, dynamically scoped variables, mark-and-sweep garbage collection, and a built-in code evaluator `eval`.
+The goals of this project are to experiment with language features and to demonstrate the implementation of simple interpreters.
 
 Object-oriented programming ([test/oop.expr](test/oop.expr))
-can be mimicked using closures and dynamically scoped variables.
+can be implemented using closures and dynamically scoped variables.
 Special control-flows such as coroutines ([test/coroutines.expr](test/coroutines.expr)) and exceptions ([test/exception.expr](test/exception.expr))
 can be implemented using continuations.
 Data structures such as lists ([test/quicksort.expr](test/quicksort.expr)) and binary trees ([test/binary-tree.expr](test/binary-tree.expr))
@@ -34,7 +34,7 @@ Python >= 3.9
              | lt       // (Integer, Integer) -> Integer; (a < b) ? 1 : 0
              | strlen   // (String) -> Integer
              | strslice // (String, Integer, Integer) -> String; s[a ... b - 1]
-             | strcat   // (String, String) -> String; string concatenation
+             | strcat   // (String, String) -> String; concatenation
              | strlt    // (String, String) -> Integer; (s1 lexicograhically < s2) ? 1 : 0
              | strint   // (String) -> Integer; string to integer
              | getline  // () -> String; read a line from stdin (discard '\n')
@@ -48,9 +48,9 @@ Python >= 3.9
 <expr> := <int>
         | <str>
         | lambda ( <var>* ) { <expr> }
-        | letrec ( <binding>* ) { <expr> }  // left-to-right evaluation
+        | letrec ( <binding>* ) { <expr> }  // mutually recursive variable bindings (left-to-right evaluation)
         | if <expr> then <expr> else <expr> // condition must be an integer; 0 is false, others are true
-        | <var>                             // cannot hold intrinsic functions
+        | <var>
         | ( <callee> <expr>* )              // intrinsic / closure / continuation call
         | [ <expr>+ ]                       // left-to-right evaluation, return the last result
 ```
