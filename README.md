@@ -14,7 +14,7 @@ letrec (
 ```
 
 Expr is a simple, dynamically typed, functional programming language with first class continuations.
-It also features lexically & dynamically scoped variables, mark-and-sweep garbage collection, and a built-in code evaluator `eval`.
+It also features lexically / dynamically scoped variables, mark-and-sweep garbage collection, and a built-in code evaluator `eval`.
 The goals of this project are to experiment with language features and to demonstrate the implementation of interpreters.
 
 Object-oriented programming ([test/oop.expr](test/oop.expr))
@@ -23,7 +23,7 @@ Coroutines ([test/coroutines.expr](test/coroutines.expr)) and exceptions ([test/
 can be implemented using continuations.
 Data structures such as lists ([test/quicksort.expr](test/quicksort.expr)) and binary trees ([test/binary-tree.expr](test/binary-tree.expr))
 can be implemented using closures.
-See `test/` for more examples.
+See [test/](test/) for more examples.
 
 ## dependencies
 
@@ -66,15 +66,14 @@ Objects are immutable.
 Variables are references to objects and are immutable once bound.
 Garbage collection (GC) runs when 80% of the reserved heap space is occupied,
 and if GC cannot reduce the occupancy to be < 80%, the reserved heap space will grow.
-At the end of execution,
-the evaluation result of the entire program will be printed to `stdout`.
+The evaluation result of the entire program is printed to `stdout`.
 
 ## usage
 
 + `python3 src/interpreter.py <option> <file>`, where `<option>` can be
-  - `run` Run code in `<file>`;
-  - `time` Run code in `<file>` and print (to `stderr`) execution time;
-  - `space` Run code in `<file>` and print (to `stderr`) peak memory use (this could slow down the interpreter);
-  - `debug` Run code in `<file>` and print (to `stderr`) intermediate evaluation steps;
-  - `dump-ast` Dump AST of code in `<file>`.
+  - `run` run code in `<file>`;
+  - `time` run code in `<file>` and print (to `stderr`) execution time;
+  - `space` run code in `<file>` and print (to `stderr`) peak memory use (this could slow down the interpreter);
+  - `debug` run code in `<file>` and print (to `stderr`) intermediate evaluation steps;
+  - `dump-ast` print (to `stdout`) the AST of code in `<file>`.
 + `python3 test.py` runs all tests (see `test.py` for inputs/outputs for each test program).
