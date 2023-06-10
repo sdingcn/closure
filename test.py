@@ -38,6 +38,13 @@ def main():
         ('test/abs.expr', ['-501'], ['(Integer 501)']),
 
         ('test/binary-tree.expr', [], ['1', '2', '3', '4', '5', 'Void']),
+        
+        ('test/comments.expr', [], [
+            '123',
+            '456 # message 2',
+            '789',
+            'Void'
+        ]),
 
         ('test/coroutines.expr', [], [
             'main',

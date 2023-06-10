@@ -1,4 +1,5 @@
 letrec (
+  # greatest common divisor of nonnegative integers
   gcd = lambda (a b) {
     if (lt b 1) then a
     else (gcd b (mod a b))

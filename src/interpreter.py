@@ -143,6 +143,14 @@ def lex(source: str, debug: bool) -> deque[Token]:
                     col += 1
                 else:
                     sys.exit(f'[Expr Lexer Error] incomplete string literal at {sl}')
+            # comment
+            elif chars[0] == '#':
+                chars.popleft()
+                col += 1
+                while chars and chars[0] != '\n':
+                    chars.popleft()
+                    col += 1
+                return next_token()
             else:
                 sys.exit(f'[Expr Lexer Error] unsupported character {chars[0]} at {sl}')
             token = Token(sl, val)

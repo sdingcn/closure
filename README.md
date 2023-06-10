@@ -4,6 +4,7 @@
 
 ```
 letrec (
+  # greatest common divisor of nonnegative integers
   gcd = lambda (a b) {
     if (lt b 1) then a
     else (gcd b (mod a b))
@@ -32,6 +33,7 @@ Python >= 3.9
 ## syntax and semantics
 
 ```
+<one-line-comment> := #.*?\n
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
 <str> := <Python-double-quote-str-literal>
 <var> := [a-z][a-zA-Z]* // lexically scoped variable
