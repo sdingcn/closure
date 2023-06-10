@@ -1,5 +1,8 @@
 [
   (put "aaa\"" "\n")
-  (put "bbbb\\\"" "\n")
-  (put "ccccc\\" "\n")
+  (put "bbb\\\"" "\n")
+  (put "ccc\\" "\n")
+  (put "ddd\
+eee" "\n")
+  (put "fff\nggg" "\n")
 ]

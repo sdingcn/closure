@@ -93,10 +93,11 @@ def lex(source: str, debug: bool) -> deque[Token]:
         # skip whitespaces
         while chars and chars[0].isspace():
             space = chars.popleft()
-            col += 1
             if space == '\n':
                 line += 1
                 col = 1
+            else:
+                col += 1
         # read the next token
         if chars:
             sl = SourceLocation(line, col)
@@ -105,12 +106,15 @@ def lex(source: str, debug: bool) -> deque[Token]:
                 val = ''
                 while chars and chars[0].isdigit():
                     val += chars.popleft()
+                    col += 1
             # integer with +/-
             elif chars[0] in ('-', '+'):
                 if len(chars) > 1 and chars[1].isdigit():
                     val = chars.popleft()
+                    col += 1
                     while chars and chars[0].isdigit():
                         val += chars.popleft()
+                        col += 1
                 else:
                     sys.exit(f'[Expr Lexer Error] incomplete integer literal at {sl}')
             # variable / intrinsic / keyword
@@ -118,22 +122,30 @@ def lex(source: str, debug: bool) -> deque[Token]:
                 val = ''
                 while chars and chars[0].isalpha():
                     val += chars.popleft()
+                    col += 1
             # special symbol
             elif chars[0] in ('(', ')', '{', '}', '[', ']', '='):
                 val = chars.popleft()
+                col += 1
             # string
             elif chars[0] == '"':
                 val = chars.popleft()
+                col += 1
                 while chars and (chars[0] != '"' or (chars[0] == '"' and count_trailing_escape(val) % 2 != 0)):
                     val += chars.popleft()
+                    if val[-1] == '\n':
+                        line += 1
+                        col = 1
+                    else:
+                        col += 1
                 if chars and chars[0] == '"':
                     val += chars.popleft()
+                    col += 1
                 else:
                     sys.exit(f'[Expr Lexer Error] incomplete string literal at {sl}')
             else:
                 sys.exit(f'[Expr Lexer Error] unsupported character {chars[0]} at {sl}')
             token = Token(sl, val)
-            col += len(val)
             return token
         else:
             return None

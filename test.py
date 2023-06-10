@@ -89,7 +89,15 @@ def main():
         ('test/quicksort.expr', ['5', '5', '4', '3', '2', '1'], ['1', '2', '3', '4', '5', 'Void']),
         ('test/quicksort.expr', ['6', '8', '-1', '3', '0', '6', '-5'], ['-5', '-1', '0', '3', '6', '8', 'Void']),
 
-        ('test/string-literals.expr', [], ["aaa\"", "bbbb\\\"", "ccccc\\", "Void"]),
+        ('test/string-literals.expr', [], [
+            "aaa\"",
+            "bbb\\\"",
+            "ccc\\",
+            "dddeee",
+            "fff",
+            "ggg",
+            "Void"
+        ]),
 
         ('test/string-reverse.expr', ["abcde"], ["edcba", "Void"]),
         ('test/string-reverse.expr', ["12 ccc"], ["ccc 21", "Void"]),

@@ -4,8 +4,5 @@ letrec (
     else (gcd b (mod a b))
   }
 ) {
-  (put
-    (gcd (strint (getline)) (strint (getline)))
-    "\n"
-  )
+  (put (gcd (strint (getline)) (strint (getline))) "\n")
 }
