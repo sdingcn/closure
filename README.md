@@ -1,5 +1,7 @@
 # expr
 
+[中文 README](README-CN.md)
+
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
 ```
