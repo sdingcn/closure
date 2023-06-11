@@ -5,7 +5,7 @@ letrec (
     }
   }
   makeDerived = lambda () {
-    letrec (base = (makeBase)) {
+    letrec (base = (makeBase)) { # reuse the base class (inheritance)
       lambda (call) {
         (base lambda () { letrec (F = lambda () { 100 }) { (call) } })
       }
@@ -17,6 +17,8 @@ letrec (
     derived = (makeDerived)
   ) {
     [
+      # To call a member function on an "object",
+      # just wrap the call in a lambda and then "pass" that lambda into the "object".
       (put (base lambda () { (F) }) "\n")
       (put (base lambda () { (G) }) "\n")
       (put (derived lambda () { (F) }) "\n")
