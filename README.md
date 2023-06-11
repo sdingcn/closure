@@ -14,7 +14,7 @@ letrec (
 }
 ```
 
-Expr is a simple, dynamically typed, functional programming language with first class continuations.
+Expr is a dynamically typed functional programming language with first class continuations.
 It also features lexically / dynamically scoped variables, mark-and-sweep garbage collection, and a built-in code evaluator `eval`.
 The goals of this project are to experiment with language features and to demonstrate the implementation of interpreters.
 
@@ -33,49 +33,42 @@ Python >= 3.9
 ## syntax and semantics
 
 ```
-<one-line-comment> := #.*?\n
+<comment> := #.*?\n
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
 <str> := <Python-double-quote-str-literal>
-<var> := [a-z][a-zA-Z]* // lexically scoped variable
-       | [A-Z][a-zA-Z]* // dynamically scoped variable
-<intrinsic> := void     // () -> Void; returns void (the only value of type Void)
-             | add | sub | mul | div | mod  // (Integer, Integer) -> Integer; arithmetic
-             | lt       // (Integer, Integer) -> Integer; (a < b) ? 1 : 0
-             | strlen   // (String) -> Integer
-             | strslice // (String, Integer, Integer) -> String; s[a ... b - 1]
-             | strcat   // (String, String) -> String; concatenation
-             | strlt    // (String, String) -> Integer; (s1 lexicograhically < s2) ? 1 : 0
-             | strint   // (String) -> Integer; conversion
-             | getline  // () -> String; read a line from stdin (discard '\n')
-             | put      // ((Integer | String)+) -> Void; write to stdout, no separator, no '\n' end
-             | callcc   // (Closure) -> Any
-             | type     // (Any) -> Integer; Void:0 Integer:1 String:2 Closure:3 Continuation:4
-             | eval     // (String) -> Any; evaluate code in a new interpreter instance
-             | exit     // () ->; stop the interpreter (the interpreter's return value is 0)
+<lex-var> := [a-z][a-zA-Z]*
+<dyn-var> := [A-Z][a-zA-Z]*
+<var> := <lex-var> | <dyn-var>
+<intrinsic> := void
+             | add | sub | mul | div | mod | lt
+             | strlen | strslice | strcat | strlt | strint
+             | getline | put
+             | callcc | type | eval | exit
 <binding> := <var> = <expr>
 <callee> := <intrinsic> | <expr>
 <expr> := <int> | <str> | <var>
         | lambda ( <var>* ) { <expr> }
-        | letrec ( <binding>* ) { <expr> }  // mutually recursive variable bindings (left-to-right evaluation)
-        | if <expr> then <expr> else <expr> // condition must be an integer; 0 is false, others are true
-        | ( <callee> <expr>* )              // intrinsic / closure / continuation call
-        | [ <expr>+ ]                       // left-to-right evaluation, return the last result
+        | letrec ( <binding>* ) { <expr> }
+        | if <expr> then <expr> else <expr>
+        | ( <callee> <expr>* )
+        | [ <expr>+ ]
 ```
 
 Supported object types: Void, Integer, String, Closure, Continuation.
-Lambdas are not curried.
+Lambdas are not curried by default.
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
 Garbage collection (GC) runs when 80% of the reserved heap space is occupied,
 and if GC cannot reduce the occupancy to be < 80%, the reserved heap space will grow.
 The evaluation result of the entire program is printed to `stdout`.
+The full semantic reference is the interpreter ([src/interpreter.py](src/interpreter.py)).
 
 ## usage
 
 + `python3 src/interpreter.py <option> <file>`, where `<option>` can be
   - `run` run code in `<file>`;
-  - `time` run code in `<file>` and print (to `stderr`) execution time;
-  - `space` run code in `<file>` and print (to `stderr`) peak memory use (this could slow down the interpreter);
-  - `debug` run code in `<file>` and print (to `stderr`) intermediate evaluation steps;
+  - `time` run code in `<file>` and print (to `stderr`) the execution time;
+  - `space` run code in `<file>` and print (to `stderr`) the peak memory use (this option could slow down the interpreter);
+  - `debug` run code in `<file>` and print (to `stderr`) the intermediate execution steps;
   - `dump-ast` print (to `stdout`) the AST of code in `<file>`.
 + `python3 test.py` runs all tests (see `test.py` for inputs/outputs for each test program).
