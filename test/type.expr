@@ -1,4 +1,10 @@
 letrec (
+  # type id map
+  # Void -> 0
+  # Integer -> 1
+  # String -> 2
+  # Closure -> 3
+  # Continuation -> 4
   a = (void)
   b = 0
   c = ""
