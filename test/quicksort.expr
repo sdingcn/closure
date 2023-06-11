@@ -1,4 +1,6 @@
 letrec (
+  # This quicksort implementation is pretty long,
+  # because comparison operators (=, <, >) and lists (null, cons, car, cdr) are defined from scratch.
   eq = lambda (a b) {
     if (lt (add (lt a b) (lt b a)) 1) then 1 else 0
   }
