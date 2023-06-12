@@ -13,19 +13,19 @@ def check_io(prog: str, i: str, o: str) -> bool:
     try:
         raw_o1 = run_and_read(['python3', 'src/interpreter.py', 'time', prog], i)
     except subprocess.TimeoutExpired:
-        sys.stderr.write('Timeout expired on time mode\n')
+        sys.stderr.write('*** Timeout expired on time mode\n')
         return False
     try:
         raw_o2 = run_and_read(['python3', 'src/interpreter.py', 'space', prog], i)
     except subprocess.TimeoutExpired:
-        sys.stderr.write('Timeout expired on space mode\n')
+        sys.stderr.write('*** Timeout expired on space mode\n')
         return False
     if raw_o1 != raw_o2:
-        sys.stderr.write('Time mode and space mode give different outputs.\n')
+        sys.stderr.write('*** Time mode and space mode give different outputs.\n')
         return False
     else:
         if raw_o1 != o:
-            sys.stderr.write(f'Expected: {o}, Got: {raw_o1}\n')
+            sys.stderr.write(f'*** Expected: {o}, Got: {raw_o1}\n')
             return False
         else:
             return True
@@ -116,11 +116,13 @@ def main():
 
         ('test/type.expr', '', '0\n1\n2\n3\n4\nVoid\n')
     ]
+    cnt = 0
     for test in tests:
-        sys.stderr.write(f'Running on test\n{test[0]}\nwith input\n{test[1]}\n')
+        cnt += 1
+        sys.stderr.write(f'Running on test {cnt}, program\n{test[0]}\nwith input\n{test[1]}\n')
         if not check_io(*test):
-            sys.exit(f'Failed on test "{test}"')
-    sys.stderr.write('Passed all tests\n')
+            sys.exit(f'*** Failed on test {cnt}, program\n{test[0]}\nwith input\n{test[1]}')
+    sys.stderr.write(f'Passed all {cnt} tests\n')
 
 if __name__ == '__main__':
     main()
