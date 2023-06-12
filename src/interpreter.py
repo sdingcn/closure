@@ -641,14 +641,13 @@ class State:
         self.relocate(visited_values, relocation)
         return removed
 
-def check_args(vals: list[Value], ts: list[type]) -> bool:
-    ''' check whether arguments conform to types, mainly used in intrinsic function calls '''
-    if len(vals) != len(ts):
-        return False
-    for i in range(len(vals)):
-        if type(vals[i]) != ts[i]:
-            return False
-    return True
+def check_args_error_exit(callee: Expr, args: list[Value], ts: list[type]) -> bool:
+    ''' check whether arguments conform to types '''
+    if len(args) != len(ts):
+        sys.exit(f'[Expr Runtime Error] wrong number of arguments given to {callee}')
+    for i in range(len(args)):
+        if not isinstance(args[i], ts[i]):
+            sys.exit(f'[Expr Runtime Error] wrong type of arguments given to {callee}')
 
 def is_lexical_name(name: str) -> bool:
     return name[0].islower()
@@ -819,77 +818,69 @@ def interpret(tree: Expr, debug: bool) -> Value:
                     args = layer.local['args']
                     # a gigantic series of if conditions, one for each intrinsic function
                     if intrinsic == 'void':
-                        if len(args) != 0:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [])
                         value = Void()
                     elif intrinsic == 'add':
-                        if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value + args[1].value)
                     elif intrinsic == 'sub':
-                        if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value - args[1].value)
                     elif intrinsic == 'mul':
-                        if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value * args[1].value)
                     elif intrinsic == 'div':
-                        if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value // args[1].value)
                     elif intrinsic == 'mod':
-                        if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value % args[1].value)
                     elif intrinsic == 'lt':
-                        if not check_args(args, [Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
                     elif intrinsic == 'strlen':
-                        if not check_args(args, [String]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [String])
                         value = Integer(len(args[0].value))
                     elif intrinsic == 'strslice':
-                        if not check_args(args, [String, Integer, Integer]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [String, Integer, Integer])
                         start = args[1].value
                         end = args[2].value
                         value = String(args[0].value[start:end])
                     elif intrinsic == 'strcat':
-                        if not check_args(args, [String, String]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [String, String])
                         value = String(args[0].value + args[1].value)
                     elif intrinsic == 'strlt':
-                        if not check_args(args, [String, String]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [String, String])
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
                     elif intrinsic == 'strint':
-                        if not check_args(args, [String]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [String])
                         value = Integer(int(args[0].value))
                     elif intrinsic == 'getline':
-                        if len(args) != 0:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [])
                         try:
                             value = String(input())
                         except EOFError:
                             value = ''
                     elif intrinsic == 'put':
-                        if not (len(args) >= 1 and all(map(lambda v : type(v) == Integer or type(v) == String, args))):
+                        if not (len(args) >= 1 and all(map(lambda v : isinstance(v, Value), args))):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         output = ''
                         for v in args:
-                            if type(v) == Integer:
+                            if type(v) == Void:
+                                output += '<void>'
+                            elif type(v) == Integer:
                                 output += str(v.value)
-                            else:
+                            elif type(v) == String:
                                 output += v.value
+                            elif type(v) == Closure:
+                                output += '<closure>'
+                            elif type(v) == Continuation:
+                                output += '<continuation>'
                         print(output, end = '', flush = True)
                         # the return value of put is void
                         value = Void()
                     elif intrinsic == 'callcc':
-                        if not check_args(args, [Closure]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [Closure])
                         state.stack.pop()
                         # obtain the continuation (this deepcopy will not copy the store)
                         cont = Continuation(deepcopy(state.stack))
@@ -902,8 +893,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         # we already popped the stack in this case, so just continue the evaluation
                         continue
                     elif intrinsic == 'type':
-                        if len(args) != 1:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [Value])
                         arg = args[0]
                         if type(arg) == Void:
                             value = Integer(0)
@@ -915,11 +905,8 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             value = Integer(3)
                         elif type(arg) == Continuation:
                             value = Integer(4)
-                        else:
-                            sys.exit(f'[Expr Runtime Error] the intrinsic call {layer.expr} got a value ({arg}) of unknown type')
                     elif intrinsic == 'eval':
-                        if not check_args(args, [String]):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [String])
                         arg = args[0]
                         if debug:
                             sys.stderr.write(f'[Expr Debug] eval started a new interpreter instance at {layer.expr}\n')
@@ -928,8 +915,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         else:
                             value = normal_run(arg.value)
                     elif intrinsic == 'exit':
-                        if len(args) != 0:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                        check_args_error_exit(layer.expr.callee, args, [])
                         if debug:
                             sys.stderr.write(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr}\n')
                         # the interpreter returns 0
