@@ -10,5 +10,9 @@ letrec (
     }
   }
 ) {
-  (put (reverse (getline)) "\n")
+  letrec (
+    line = (getline)
+  ) {
+    (put (reverse line) "\n")
+  }
 }

@@ -1,0 +1,12 @@
+letrec (
+  loop = lambda (s) {
+    letrec (
+      line = (getline)
+    ) {
+      if (lt 0 (type line)) then (loop (strcat s (strcat line "\n")))
+      else (put s)
+    }
+  }
+) {
+  (loop "")
+}

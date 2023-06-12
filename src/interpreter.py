@@ -688,12 +688,8 @@ def interpret(tree: Expr, debug: bool) -> Value:
     intrinsics = ['void',
                   'add', 'sub', 'mul', 'div', 'mod', 'lt',
                   'strlen', 'strslice', 'strcat', 'strlt', 'strint',
-                  'getline',
-                  'put',
-                  'callcc',
-                  'type',
-                  'eval',
-                  'exit']
+                  'getline', 'put',
+                  'callcc', 'type', 'eval', 'exit']
     
     # state
     state = State(tree)
@@ -843,9 +839,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         value = Integer(len(args[0].value))
                     elif intrinsic == 'strslice':
                         check_args_error_exit(layer.expr.callee, args, [String, Integer, Integer])
-                        start = args[1].value
-                        end = args[2].value
-                        value = String(args[0].value[start:end])
+                        value = String(args[0].value[args[1].value : args[2].value])
                     elif intrinsic == 'strcat':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
                         value = String(args[0].value + args[1].value)
@@ -860,11 +854,12 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         try:
                             value = String(input())
                         except EOFError:
-                            value = ''
+                            value = Void()
                     elif intrinsic == 'put':
                         if not (len(args) >= 1 and all(map(lambda v : isinstance(v, Value), args))):
                             sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         output = ''
+                        # the printing format of "put" is simpler than that of the classes' "__str__" functions
                         for v in args:
                             if type(v) == Void:
                                 output += '<void>'

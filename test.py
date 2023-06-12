@@ -9,111 +9,115 @@ def run_and_read(cmd: str, inp: str) -> str:
         timeout = 60
     ).stdout
 
-def check_io(prog: str, i: list[str], o: list[str]) -> bool:
+def check_io(prog: str, i: str, o: str) -> bool:
     try:
-        raw_o1 = run_and_read(['python3', 'src/interpreter.py', 'time', prog], '\n'.join(i))
-    except TimeoutExpired:
+        raw_o1 = run_and_read(['python3', 'src/interpreter.py', 'time', prog], i)
+    except subprocess.TimeoutExpired:
         sys.stderr.write('Timeout expired on time mode\n')
         return False
     try:
-        raw_o2 = run_and_read(['python3', 'src/interpreter.py', 'space', prog], '\n'.join(i))
-    except TimeoutExpired:
+        raw_o2 = run_and_read(['python3', 'src/interpreter.py', 'space', prog], i)
+    except subprocess.TimeoutExpired:
         sys.stderr.write('Timeout expired on space mode\n')
         return False
     if raw_o1 != raw_o2:
         sys.stderr.write('Time mode and space mode give different outputs.\n')
         return False
     else:
-        o1 = raw_o1.splitlines()
-        if o1 != o:
-            sys.stderr.write(f'Expected: {o}, Got: {o1}\n')
+        if raw_o1 != o:
+            sys.stderr.write(f'Expected: {o}, Got: {raw_o1}\n')
             return False
         else:
             return True
 
 def main():
     tests = [
-        ('test/abs.expr', ['101'], ['(Integer 101)']),
-        ('test/abs.expr', ['0'], ['(Integer 0)']),
-        ('test/abs.expr', ['-501'], ['(Integer 501)']),
+        ('test/abs.expr', '101', '(Integer 101)\n'),
+        ('test/abs.expr', '0', '(Integer 0)\n'),
+        ('test/abs.expr', '-501', '(Integer 501)\n'),
 
-        ('test/binary-tree.expr', [], ['1', '2', '3', '4', '5', 'Void']),
+        ('test/binary-tree.expr', '', '1\n2\n3\n4\n5\nVoid\n'),
         
-        ('test/comments.expr', [], [
-            '123',
-            '456 # message 2',
-            '789',
-            'Void'
-        ]),
+        ('test/comments.expr', '', 
+            '123\n'
+            '456 # message 2\n'
+            '789\n'
+            'Void\n'
+        ),
 
-        ('test/coroutines.expr', [], [
-            'main',
-            'task 1',
-            'main',
-            'task 2',
-            'main',
-            'task 3',
-            'Void'
-        ]),
+        ('test/coroutines.expr', '',
+            'main\n'
+            'task 1\n'
+            'main\n'
+            'task 2\n'
+            'main\n'
+            'task 3\n'
+            'Void\n'
+        ),
 
-        ('test/dynamic-scope.expr', [], ['100', '200', 'Void']),
+        ('test/dynamic-scope.expr', '', '100\n200\nVoid\n'),
 
-        ('test/exception.expr', [], [
-            'call n = 2',
-            'call n = 1',
-            'call n = 0',
-            'return n = 0',
-            'return n = 1',
-            'return n = 2',
-            'call n = 2',
-            'call n = 1',
-            'call n = 0',
-            'exception',
-            'Void'
-        ]),
+        ('test/echo.expr', '', 'Void\n'),
+        ('test/echo.expr', '123 \n', '123 \nVoid\n'),
+        ('test/echo.expr', '100', '100\nVoid\n'),
+        ('test/echo.expr', ' \n  \n\n', ' \n  \n\nVoid\n'),
 
-        ('test/gcd.expr', ['100', '0'], ['100', 'Void']),
-        ('test/gcd.expr', ['0', '100'], ['100', 'Void']),
-        ('test/gcd.expr', ['30', '30'], ['30', 'Void']),
-        ('test/gcd.expr', ['25', '45'], ['5', 'Void']),
-        ('test/gcd.expr', ['7', '100'], ['1', 'Void']),
+        ('test/exception.expr', '',
+            'call n = 2\n'
+            'call n = 1\n'
+            'call n = 0\n'
+            'return n = 0\n'
+            'return n = 1\n'
+            'return n = 2\n'
+            'call n = 2\n'
+            'call n = 1\n'
+            'call n = 0\n'
+            'exception\n'
+            'Void\n'
+        ),
 
-        ('test/intensive.expr', [], ['(Integer 50005000)']),
+        ('test/gcd.expr', '100\n0\n', '100\nVoid\n'),
+        ('test/gcd.expr', '0\n100\n', '100\nVoid\n'),
+        ('test/gcd.expr', '30\n30\n', '30\nVoid\n'),
+        ('test/gcd.expr', '25\n45\n', '5\nVoid\n'),
+        ('test/gcd.expr', '7\n100\n', '1\nVoid\n'),
 
-        ('test/lexical-scope.expr', [], ['1', '100', 'Void']),
+        ('test/intensive.expr', '', '(Integer 50005000)\n'),
 
-        ('test/mixed-scope.expr', [], ['1', '303', 'Void']),
+        ('test/lexical-scope.expr', '', '1\n100\nVoid\n'),
 
-        ('test/multi-stage.expr', [], ['EVAL', 'Void']),
+        ('test/mixed-scope.expr', '', '1\n303\nVoid\n'),
 
-        ('test/mutual-recursion.expr', [], ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1', '0', 'Void']),
+        ('test/multi-stage.expr', '', 'EVAL\nVoid\n'),
 
-        ('test/oop.expr', [], ['1', '2', '100', '2', 'Void']),
+        ('test/mutual-recursion.expr', '', '10\n9\n8\n7\n6\n5\n4\n3\n2\n1\n0\nVoid\n'),
 
-        ('test/quicksort.expr', ['0'], ['Void']),
-        ('test/quicksort.expr', ['1', '303'], ['303', 'Void']),
-        ('test/quicksort.expr', ['3', '1', '3', '7'], ['1', '3', '7', 'Void']),
-        ('test/quicksort.expr', ['5', '5', '4', '3', '2', '1'], ['1', '2', '3', '4', '5', 'Void']),
-        ('test/quicksort.expr', ['6', '8', '-1', '3', '0', '6', '-5'], ['-5', '-1', '0', '3', '6', '8', 'Void']),
+        ('test/oop.expr', '', '1\n2\n100\n2\nVoid\n'),
 
-        ('test/string-literals.expr', [], [
-            "aaa\"",
-            "bbb\\\"",
-            "ccc\\",
-            "dddeee",
-            "fff",
-            "ggg",
-            "Void"
-        ]),
+        ('test/quicksort.expr', '0\n', 'Void\n'),
+        ('test/quicksort.expr', '1\n303\n', '303\nVoid\n'),
+        ('test/quicksort.expr', '3\n1\n3\n7\n', '1\n3\n7\nVoid\n'),
+        ('test/quicksort.expr', '5\n5\n4\n3\n2\n1\n', '1\n2\n3\n4\n5\nVoid\n'),
+        ('test/quicksort.expr', '6\n8\n-1\n3\n0\n6\n-5\n', '-5\n-1\n0\n3\n6\n8\nVoid\n'),
 
-        ('test/string-reverse.expr', ["abcde"], ["edcba", "Void"]),
-        ('test/string-reverse.expr', ["12 ccc"], ["ccc 21", "Void"]),
-        ('test/string-reverse.expr', ["\t <>///"], ["///>< \t", "Void"]),
+        ('test/string-literals.expr', '',
+            "aaa\"\n"
+            "bbb\\\"\n"
+            "ccc\\\n"
+            "dddeee\n"
+            "fff\n"
+            "ggg\n"
+            "Void\n"
+        ),
 
-        ('test/type.expr', [], ['0', '1', '2', '3', '4', 'Void'])
+        ('test/string-reverse.expr', "abcde\n", "edcba\nVoid\n"),
+        ('test/string-reverse.expr', "12 ccc\n", "ccc 21\nVoid\n"),
+        ('test/string-reverse.expr', "\t <>///\n", "///>< \t\nVoid\n"),
+
+        ('test/type.expr', '', '0\n1\n2\n3\n4\nVoid\n')
     ]
     for test in tests:
-        sys.stderr.write(f'Running on test {test[0]} with input {test[1]}\n')
+        sys.stderr.write(f'Running on test\n{test[0]}\nwith input\n{test[1]}\n')
         if not check_io(*test):
             sys.exit(f'Failed on test "{test}"')
     sys.stderr.write('Passed all tests\n')
