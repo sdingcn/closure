@@ -1,4 +1,4 @@
-# expr
+# exprscript
 
 [中文 README](README-CN.md)
 
@@ -16,7 +16,7 @@ letrec (
 }
 ```
 
-Expr is a dynamically typed functional programming language with first class continuations.
+ExprScript is a dynamically typed functional programming language with first class continuations.
 It also features lexically / dynamically scoped variables, mark-and-sweep garbage collection, and a built-in code evaluator `eval`.
 The goals of this project are to experiment with language features and to demonstrate the implementation of interpreters.
 

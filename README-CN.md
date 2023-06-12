@@ -1,4 +1,4 @@
-# expr
+# exprscript
 
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
@@ -14,7 +14,7 @@ letrec (
 }
 ```
 
-Expr 是一个动态类型函数式语言, 支持一等续延.
+ExprScript 是一个动态类型函数式语言, 支持一等续延.
 其它特性包括词法/动态作用域变量, 标记-扫描式垃圾回收, 和内置代码执行器 `eval`.
 本项目的目标是试验语言特性和示意解释器的实现.
 

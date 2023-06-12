@@ -16,7 +16,7 @@ def unfold(value: Union[list[Any], tuple[Any, ...], set[Any], dict[Any, Any]]) -
     elif type(value) in [set, dict]:
         s = '{'
     else:
-        sys.exit('[Expr Internal Error] unsupported argument given to unfold')
+        sys.exit('[Internal Error] unsupported argument given to unfold')
     if type(value) in [list, tuple, set]:
         for v in value:
             if type(v) in [list, tuple, set, dict]:
@@ -70,7 +70,7 @@ class Token:
 
 def lex(source: str, debug: bool) -> deque[Token]:
     if debug:
-        sys.stderr.write('[Expr Debug] *** starting lexer ***\n')
+        sys.stderr.write('[Debug] *** starting lexer ***\n')
 
     chars = deque(source)
     line = 1
@@ -116,7 +116,7 @@ def lex(source: str, debug: bool) -> deque[Token]:
                         val += chars.popleft()
                         col += 1
                 else:
-                    sys.exit(f'[Expr Lexer Error] incomplete integer literal at {sl}')
+                    sys.exit(f'[Lexer Error] incomplete integer literal at {sl}')
             # variable / intrinsic / keyword
             elif chars[0].isalpha():
                 val = ''
@@ -142,7 +142,7 @@ def lex(source: str, debug: bool) -> deque[Token]:
                     val += chars.popleft()
                     col += 1
                 else:
-                    sys.exit(f'[Expr Lexer Error] incomplete string literal at {sl}')
+                    sys.exit(f'[Lexer Error] incomplete string literal at {sl}')
             # comment
             elif chars[0] == '#':
                 chars.popleft()
@@ -152,7 +152,7 @@ def lex(source: str, debug: bool) -> deque[Token]:
                     col += 1
                 return next_token()
             else:
-                sys.exit(f'[Expr Lexer Error] unsupported character {chars[0]} at {sl}')
+                sys.exit(f'[Lexer Error] unsupported character {chars[0]} at {sl}')
             token = Token(sl, val)
             return token
         else:
@@ -163,7 +163,7 @@ def lex(source: str, debug: bool) -> deque[Token]:
         token = next_token()
         if token:
             if debug:
-                sys.stderr.write(f'[Expr Debug] read token {token}\n')
+                sys.stderr.write(f'[Debug] read token {token}\n')
             tokens.append(token)
         else:
             break
@@ -267,7 +267,7 @@ class Seq(Expr):
 
 def parse(tokens: deque[Token], debug: bool) -> Expr:
     if debug:
-        sys.stderr.write('[Expr Debug] *** starting parser ***\n')
+        sys.stderr.write('[Debug] *** starting parser ***\n')
     
     def is_int(token: Token) -> bool:
         try:
@@ -284,28 +284,28 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
 
     def consume(expected: str) -> Token:
         if not tokens:
-            sys.exit(f'[Expr Parser Error] incomplete token stream')
+            sys.exit(f'[Parser Error] incomplete token stream')
         token = tokens.popleft()
         if token.val == expected:
             return token
         else:
-            sys.exit(f'[Expr Parser Error] expected {expected}, got {token}')
+            sys.exit(f'[Parser Error] expected {expected}, got {token}')
 
     def parse_int() -> Int:
         if not tokens:
-            sys.exit(f'[Expr Parser Error] incomplete token stream')
+            sys.exit(f'[Parser Error] incomplete token stream')
         token = tokens.popleft()
         if not is_int(token):
-            sys.exit(f'[Expr Parser Error] expected an integer, got {token}')
+            sys.exit(f'[Parser Error] expected an integer, got {token}')
         node = Int(token.sl, None, int(token.val))
         return node
 
     def parse_str() -> Str:
         if not tokens:
-            sys.exit(f'[Expr Parser Error] incomplete token stream')
+            sys.exit(f'[Parser Error] incomplete token stream')
         token = tokens.popleft()
         if not is_str(token):
-            sys.exit(f'[Expr Parser Error] expected a string, got {token}')
+            sys.exit(f'[Parser Error] expected a string, got {token}')
         node = Str(token.sl, None, eval(token.val))
         return node
 
@@ -313,7 +313,7 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
         start = consume('lambda')
         consume('(')
         if not tokens:
-            sys.exit(f'[Expr Parser Error] incomplete token stream')
+            sys.exit(f'[Parser Error] incomplete token stream')
         var_list = []
         while tokens and is_var(tokens[0]):
             var_list.append(parse_var())
@@ -331,7 +331,7 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
         start = consume('letrec')
         consume('(')
         if not tokens:
-            sys.exit(f'[Expr Parser Error] incomplete token stream')
+            sys.exit(f'[Parser Error] incomplete token stream')
         var_expr_list = []
         while tokens and is_var(tokens[0]):
             v = parse_var()
@@ -364,10 +364,10 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
 
     def parse_var() -> Var:
         if not tokens:
-            sys.exit(f'[Expr Parser Error] incomplete token stream')
+            sys.exit(f'[Parser Error] incomplete token stream')
         token = tokens.popleft()
         if not is_var(token):
-            sys.exit(f'[Expr Parser Error] expected a variable, got {token}')
+            sys.exit(f'[Parser Error] expected a variable, got {token}')
         node = Var(token.sl, None, token.val)
         return node
 
@@ -375,7 +375,7 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
         start = consume('(')
         callee = parse_expr()
         if not tokens:
-            sys.exit(f'[Expr Parser Error] incomplete token stream')
+            sys.exit(f'[Parser Error] incomplete token stream')
         arg_list = []
         while tokens and tokens[0].val != ')':
             arg_list.append(parse_expr())
@@ -389,12 +389,12 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
     def parse_seq() -> Seq:
         start = consume('[')
         if not tokens:
-            sys.exit(f'[Expr Parser Error] incomplete token stream')
+            sys.exit(f'[Parser Error] incomplete token stream')
         expr_list = []
         while tokens and tokens[0].val != ']':
             expr_list.append(parse_expr())
         if len(expr_list) == 0:
-            sys.exit('[Expr Parser Error] zero-length sequence at {start}')
+            sys.exit('[Parser Error] zero-length sequence at {start}')
         consume(']')
         node = Seq(start.sl, None, expr_list)
         for e in node.expr_list:
@@ -403,9 +403,9 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
 
     def parse_expr() -> Expr:
         if not tokens:
-            sys.exit(f'[Expr Parser Error] incomplete token stream')
+            sys.exit(f'[Parser Error] incomplete token stream')
         if debug:
-            sys.stderr.write(f'[Expr Debug] parsing expression starting with {tokens[0]}\n')
+            sys.stderr.write(f'[Debug] parsing expression starting with {tokens[0]}\n')
         if is_int(tokens[0]):
             return parse_int()
         elif is_str(tokens[0]):
@@ -424,11 +424,11 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
         elif tokens[0].val == '[':
             return parse_seq()
         else:
-            sys.exit(f'[Expr Parser Error] unrecognized expression starting with {tokens[0]}')
+            sys.exit(f'[Parser Error] unrecognized expression starting with {tokens[0]}')
     
     expr = parse_expr()
     if tokens:
-        sys.exit(f'[Expr Parser Error] redundant token stream starting at {tokens[0]}')
+        sys.exit(f'[Parser Error] redundant token stream starting at {tokens[0]}')
     return expr
 
 ### runtime
@@ -644,10 +644,10 @@ class State:
 def check_args_error_exit(callee: Expr, args: list[Value], ts: list[type]) -> bool:
     ''' check whether arguments conform to types '''
     if len(args) != len(ts):
-        sys.exit(f'[Expr Runtime Error] wrong number of arguments given to {callee}')
+        sys.exit(f'[Runtime Error] wrong number of arguments given to {callee}')
     for i in range(len(args)):
         if not isinstance(args[i], ts[i]):
-            sys.exit(f'[Expr Runtime Error] wrong type of arguments given to {callee}')
+            sys.exit(f'[Runtime Error] wrong type of arguments given to {callee}')
 
 def is_lexical_name(name: str) -> bool:
     return name[0].islower()
@@ -668,7 +668,7 @@ def lookup_env(sl: SourceLocation, name: str, env: list[tuple[str, int]]) -> int
     for i in range(len(env) - 1, -1, -1):
         if env[i][0] == name:
             return env[i][1]
-    sys.exit(f'[Expr Runtime Error] undefined variable {name} at {sl} (intrinsic functions cannot be treated as variables)')
+    sys.exit(f'[Runtime Error] undefined variable {name} at {sl} (intrinsic functions cannot be treated as variables)')
 
 def lookup_stack(sl: SourceLocation, name: str, stack: list[Layer]) -> int:
     ''' dynamically scoped variable lookup '''
@@ -677,13 +677,13 @@ def lookup_stack(sl: SourceLocation, name: str, stack: list[Layer]) -> int:
             for j in range(len(stack[i].env) - 1, -1, -1):
                 if stack[i].env[j][0] == name:
                     return stack[i].env[j][1]
-    sys.exit(f'[Expr Runtime Error] undefined variable {name} at {sl} (intrinsic functions cannot be treated as variables)')
+    sys.exit(f'[Runtime Error] undefined variable {name} at {sl} (intrinsic functions cannot be treated as variables)')
 
 ### interpreter
 
 def interpret(tree: Expr, debug: bool) -> Value:
     if debug:
-        sys.stderr.write('[Expr Debug] *** starting interpreter ***\n')
+        sys.stderr.write('[Debug] *** starting interpreter ***\n')
 
     intrinsics = ['void',
                   'add', 'sub', 'mul', 'div', 'mod', 'lt',
@@ -714,7 +714,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
             if state.location >= 0.8 * capacity:
                 cnt = state.gc(value)
                 if debug:
-                    sys.stderr.write(f'[Expr Debug] GC collected {cnt} store cells\n')
+                    sys.stderr.write(f'[Debug] GC collected {cnt} store cells\n')
                 # GC failed to release enough memory, meaning that the capacity needs to grow
                 if state.location >= 0.8 * capacity:
                     insufficient_capacity = capacity
@@ -728,7 +728,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
         # evaluating the current layer
         layer = state.stack[-1]
         if debug:
-            sys.stderr.write(f'[Expr Debug] evaluating AST node of type {type(layer.expr)} at {layer.expr.sl}\n')
+            sys.stderr.write(f'[Debug] evaluating AST node of type {type(layer.expr)} at {layer.expr.sl}\n')
         if type(layer.expr) == Int:
             value = Integer(layer.expr.value)
             state.stack.pop()
@@ -775,7 +775,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
             # choose the branch to evaluate
             elif layer.pc == 1:
                 if type(value) != Integer:
-                    sys.exit(f'[Expr Runtime Error] the condition of {layer.expr} evaluated to a value ({value}) of wrong type')
+                    sys.exit(f'[Runtime Error] the condition of {layer.expr} evaluated to a value ({value}) of wrong type')
                 if value.value != 0:
                     state.stack.append(Layer(layer.env, layer.expr.branch1, 0, {}, False))
                 else:
@@ -786,7 +786,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                 state.stack.pop()
         elif type(layer.expr) == Var:
             if debug:
-                sys.stderr.write(f'[Expr Debug] looking up the variable {layer.expr}\n')
+                sys.stderr.write(f'[Debug] looking up the variable {layer.expr}\n')
             # two types of variables
             if is_lexical_name(layer.expr.name):
                 value = state.store[lookup_env(layer.expr.sl, layer.expr.name, layer.env)]
@@ -857,7 +857,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                             value = Void()
                     elif intrinsic == 'put':
                         if not (len(args) >= 1 and all(map(lambda v : isinstance(v, Value), args))):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                            sys.exit(f'[Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         output = ''
                         # the printing format of "put" is simpler than that of the classes' "__str__" functions
                         for v in args:
@@ -880,7 +880,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         # obtain the continuation (this deepcopy will not copy the store)
                         cont = Continuation(deepcopy(state.stack))
                         if debug:
-                            sys.stderr.write(f'[Expr Debug] captured continuation {cont}\n')
+                            sys.stderr.write(f'[Debug] captured continuation {cont}\n')
                         closure = args[0]
                         # make a closure call layer and pass in the continuation
                         addr = cont.location if cont.location != None else state.new(cont)
@@ -904,15 +904,15 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         check_args_error_exit(layer.expr.callee, args, [String])
                         arg = args[0]
                         if debug:
-                            sys.stderr.write(f'[Expr Debug] eval started a new interpreter instance at {layer.expr}\n')
+                            sys.stderr.write(f'[Debug] eval started a new interpreter instance at {layer.expr}\n')
                             value = debug_run(arg.value)
-                            sys.stderr.write(f'[Expr Debug] eval stopped the new interpreter instance at {layer.expr}\n')
+                            sys.stderr.write(f'[Debug] eval stopped the new interpreter instance at {layer.expr}\n')
                         else:
                             value = normal_run(arg.value)
                     elif intrinsic == 'exit':
                         check_args_error_exit(layer.expr.callee, args, [])
                         if debug:
-                            sys.stderr.write(f'[Expr Debug] execution stopped by the intrinsic call {layer.expr}\n')
+                            sys.stderr.write(f'[Debug] execution stopped by the intrinsic call {layer.expr}\n')
                         # the interpreter returns 0
                         sys.exit()
                     state.stack.pop()
@@ -943,7 +943,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         closure = callee
                         # types will be checked inside the closure call
                         if len(args) != len(closure.fun.var_list):
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                            sys.exit(f'[Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         new_env = closure.env[:]
                         for i, v in enumerate(closure.fun.var_list):
                             addr = args[i].location if args[i].location != None else state.new(args[i])
@@ -955,16 +955,16 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         cont = callee
                         # the "value" variable already contains the last evaluation result of the args, so we just continue
                         if len(args) != 1:
-                            sys.exit(f'[Expr Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
+                            sys.exit(f'[Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         # replace the stack
                         state.stack = deepcopy(cont.stack)
                         if debug:
-                            sys.stderr.write(f'[Expr Debug] applied continuation {cont}, stack switched\n')
+                            sys.stderr.write(f'[Debug] applied continuation {cont}, stack switched\n')
                         # the stack has been replaced, so we don't need to pop the previous stack's call layer
                         # the previous stack is simply discarded
                         continue
                     else:
-                        sys.exit(f'[Expr Runtime Error] {layer.expr.callee} (whose evaluation result is {callee}) is not callable')
+                        sys.exit(f'[Runtime Error] {layer.expr.callee} (whose evaluation result is {callee}) is not callable')
                 # finish the call
                 else:
                     state.stack.pop()
@@ -977,7 +977,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
             else:
                 state.stack.pop()
         else:
-            sys.exit(f'[Expr Runtime Error] unrecognized AST node {layer.expr}')
+            sys.exit(f'[Runtime Error] unrecognized AST node {layer.expr}')
 
 ### main
 
