@@ -15,15 +15,21 @@ letrec (
 ```
 
 ExprScript 是一个动态类型函数式语言, 支持一等续延.
-其它特性包括词法/动态作用域变量, 标记-扫描式垃圾回收, 和内置代码执行器 `eval`.
+其它特性包括词法/动态作用域变量, 标记-扫描式垃圾回收,
+和内置代码执行器 `eval`.
 本项目的目标是试验语言特性和示意解释器的实现.
 
 面向对象编程 ([test/oop.expr](test/oop.expr))
 可以用闭包和动态作用域变量模拟.
-协程 ([test/coroutines.expr](test/coroutines.expr)) 和异常 ([test/exception.expr](test/exception.expr))
+协程 ([test/coroutines.expr](test/coroutines.expr))
+和异常 ([test/exception.expr](test/exception.expr))
 可以用续延模拟.
-数据结构如链表 ([test/quicksort.expr](test/quicksort.expr)) 和二叉树 ([test/binary-tree.expr](test/binary-tree.expr))
+数据结构如链表 ([test/quicksort.expr](test/quicksort.expr))
+和二叉树 ([test/binary-tree.expr](test/binary-tree.expr))
 可以用闭包模拟.
+自定义求值顺序/惰性求值 ([test/lazy-evaluation](test/lazy-evaluation))
+和 Y 组合子 ([test/y-combinator](test/y-combinator.expr))
+可以用 lambda 函数模拟.
 [test/](test/) 包含更多例子.
 
 ## 依赖
@@ -55,7 +61,7 @@ Python >= 3.9
 ```
 
 支持的对象类型: Void, Integer, String, Closure, Continuation.
-Lambda 函数默认不柯里化.
+函数默认不柯里化.
 对象不可变.
 变量是指向对象的引用且一旦绑定就不可变.
 垃圾回收在预留堆空间占用率达到 80% 时自动运行,

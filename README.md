@@ -17,15 +17,22 @@ letrec (
 ```
 
 ExprScript is a dynamically typed functional programming language with first class continuations.
-It also features lexically / dynamically scoped variables, mark-and-sweep garbage collection, and a built-in code evaluator `eval`.
-The goals of this project are to experiment with language features and to demonstrate the implementation of interpreters.
+It also features lexically / dynamically scoped variables, mark-and-sweep garbage collection,
+and a built-in code evaluator `eval`.
+The goals of this project are to experiment with language features
+and to demonstrate the implementation of interpreters.
 
 Object-oriented programming ([test/oop.expr](test/oop.expr))
 can be implemented using closures and dynamically scoped variables.
-Coroutines ([test/coroutines.expr](test/coroutines.expr)) and exceptions ([test/exception.expr](test/exception.expr))
+Coroutines ([test/coroutines.expr](test/coroutines.expr))
+and exceptions ([test/exception.expr](test/exception.expr))
 can be implemented using continuations.
-Data structures such as lists ([test/quicksort.expr](test/quicksort.expr)) and binary trees ([test/binary-tree.expr](test/binary-tree.expr))
+Data structures such as lists ([test/quicksort.expr](test/quicksort.expr))
+and binary trees ([test/binary-tree.expr](test/binary-tree.expr))
 can be implemented using closures.
+User-defined evaluation order / lazy evaluation ([test/lazy-evaluation](test/lazy-evaluation))
+and the Y combinator ([test/y-combinator](test/y-combinator.expr))
+can be implemented using lambda functions.
 See [test/](test/) for more examples.
 
 ## dependencies
@@ -57,7 +64,7 @@ Python >= 3.9
 ```
 
 Supported object types: Void, Integer, String, Closure, Continuation.
-Lambdas are not curried by default.
+Functions are not curried by default.
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
 Garbage collection (GC) runs when 80% of the reserved heap space is occupied,

@@ -1,0 +1,12 @@
+letrec (
+  force = lambda (thunk) { (thunk) }
+  recur = lambda (n thunk) {
+    [
+      (put n "\n")
+      if (lt n 2) then (force thunk)
+      else (recur (sub n 1) thunk)
+    ]
+  }
+) {
+  (recur 3 lambda () { (put "thunk\n") })
+}

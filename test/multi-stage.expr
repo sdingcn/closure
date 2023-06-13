@@ -1,1 +1,6 @@
-(eval "(put \"EVAL\\n\")")
+letrec (
+  left = "(put "
+  right = "\"EVAL\\n\")"
+) {
+  (eval (strcat left right))
+}

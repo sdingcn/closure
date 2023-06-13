@@ -84,6 +84,8 @@ def main():
 
         ('test/intensive.expr', '', '(Integer 50005000)\n'),
 
+        ('test/lazy-evaluation.expr', '', '3\n2\n1\nthunk\nVoid\n'),
+
         ('test/lexical-scope.expr', '', '1\n100\nVoid\n'),
 
         ('test/mixed-scope.expr', '', '1\n303\nVoid\n'),
@@ -114,7 +116,9 @@ def main():
         ('test/string-reverse.expr', "12 ccc\n", "ccc 21\nVoid\n"),
         ('test/string-reverse.expr', "\t <>///\n", "///>< \t\nVoid\n"),
 
-        ('test/type.expr', '', '0\n1\n2\n3\n4\nVoid\n')
+        ('test/type.expr', '', '0\n1\n2\n3\n4\nVoid\n'),
+
+        ('test/y-combinator.expr', '', '1 120 3628800\nVoid\n')
     ]
     cnt = 0
     for test in tests:
