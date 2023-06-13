@@ -22,6 +22,8 @@ and a built-in code evaluator `eval`.
 The goals of this project are to experiment with language features
 and to demonstrate the implementation of interpreters.
 
+One design goal of ExprScript is to use a small language core
+to implement/simulate many language features.
 Object-oriented programming ([test/oop.expr](test/oop.expr))
 can be implemented using closures and dynamically scoped variables.
 Coroutines ([test/coroutines.expr](test/coroutines.expr))

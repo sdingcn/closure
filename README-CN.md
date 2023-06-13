@@ -19,6 +19,8 @@ ExprScript 是一个动态类型函数式语言, 支持一等续延.
 和内置代码执行器 `eval`.
 本项目的目标是试验语言特性和示意解释器的实现.
 
+ExprScript 的一个设计目标是用一个小语言核心
+来实现/模拟很多语言特性.
 面向对象编程 ([test/oop.expr](test/oop.expr))
 可以用闭包和动态作用域变量模拟.
 协程 ([test/coroutines.expr](test/coroutines.expr))
