@@ -30,8 +30,8 @@ can be implemented using continuations.
 Data structures such as lists ([test/quicksort.expr](test/quicksort.expr))
 and binary trees ([test/binary-tree.expr](test/binary-tree.expr))
 can be implemented using closures.
-User-defined evaluation order / lazy evaluation ([test/lazy-evaluation](test/lazy-evaluation))
-and the Y combinator ([test/y-combinator](test/y-combinator.expr))
+User-defined evaluation order / lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr))
+and the Y combinator ([test/y-combinator.expr](test/y-combinator.expr))
 can be implemented using lambda functions.
 See [test/](test/) for more examples.
 

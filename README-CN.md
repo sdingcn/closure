@@ -27,8 +27,8 @@ ExprScript 是一个动态类型函数式语言, 支持一等续延.
 数据结构如链表 ([test/quicksort.expr](test/quicksort.expr))
 和二叉树 ([test/binary-tree.expr](test/binary-tree.expr))
 可以用闭包模拟.
-自定义求值顺序/惰性求值 ([test/lazy-evaluation](test/lazy-evaluation))
-和 Y 组合子 ([test/y-combinator](test/y-combinator.expr))
+自定义求值顺序/惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr))
+和 Y 组合子 ([test/y-combinator.expr](test/y-combinator.expr))
 可以用 lambda 函数模拟.
 [test/](test/) 包含更多例子.
 
