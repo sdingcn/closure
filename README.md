@@ -16,26 +16,25 @@ letrec (
 }
 ```
 
-ExprScript is a dynamically typed functional programming language with first class continuations.
-It also features lexically / dynamically scoped variables, mark-and-sweep garbage collection,
+ExprScript is a dynamically typed functional programming language with first class continuations,
+lexically / dynamically scoped variables, mark-and-sweep garbage collection,
 and a built-in code evaluator `eval`.
 The goals of this project are to experiment with language features
 and to demonstrate the implementation of interpreters.
 
 One design goal of ExprScript is to use a small language core
-to implement/simulate many language features.
-Object-oriented programming ([test/oop.expr](test/oop.expr))
-can be implemented using closures and dynamically scoped variables.
-Coroutines ([test/coroutines.expr](test/coroutines.expr))
-and exceptions ([test/exception.expr](test/exception.expr))
-can be implemented using continuations.
-Data structures such as lists ([test/quicksort.expr](test/quicksort.expr))
-and binary trees ([test/binary-tree.expr](test/binary-tree.expr))
-can be implemented using closures.
-User-defined evaluation order / lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr))
-and the Y combinator ([test/y-combinator.expr](test/y-combinator.expr))
-can be implemented using lambda functions.
-See [test/](test/) for more examples.
+to implement/simulate other language features.
+In theory, using `eval` we can also define new syntax and perform
+multi-stage evaluation, which is similar to what macros can do.
+
+| Feature | Underlying implementation |
+| --- | --- |
+| Object-oriented programming ([test/oop.expr](test/oop.expr)) | closures and dynamically scoped variables |
+| Coroutines ([test/coroutines.expr](test/coroutines.expr)) | continuations |
+| Exceptions ([test/exception.expr](test/exception.expr)) | continuations |
+| Compound data types ([test/quicksort.expr](test/quicksort.expr), [test/binary-tree.expr](test/binary-tree.expr)) | closures |
+| User-defined evaluation order / lazy evaluation
+([test/lazy-evaluation.expr](test/lazy-evaluation.expr), [test/y-combinator.expr](test/y-combinator.expr)) | zero-argument functions |
 
 ## dependencies
 

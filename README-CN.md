@@ -14,25 +14,21 @@ letrec (
 }
 ```
 
-ExprScript 是一个动态类型函数式语言, 支持一等续延.
-其它特性包括词法/动态作用域变量, 标记-扫描式垃圾回收,
+ExprScript 是一个动态类型函数式语言, 支持一等续延,
+词法/动态作用域变量, 标记-扫描式垃圾回收,
 和内置代码执行器 `eval`.
-本项目的目标是试验语言特性和示意解释器的实现.
+本项目的目标是试验语言特性和演示解释器的实现.
 
-ExprScript 的一个设计目标是用一个小语言核心
-来实现/模拟很多语言特性.
-面向对象编程 ([test/oop.expr](test/oop.expr))
-可以用闭包和动态作用域变量模拟.
-协程 ([test/coroutines.expr](test/coroutines.expr))
-和异常 ([test/exception.expr](test/exception.expr))
-可以用续延模拟.
-数据结构如链表 ([test/quicksort.expr](test/quicksort.expr))
-和二叉树 ([test/binary-tree.expr](test/binary-tree.expr))
-可以用闭包模拟.
-自定义求值顺序/惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr))
-和 Y 组合子 ([test/y-combinator.expr](test/y-combinator.expr))
-可以用 lambda 函数模拟.
-[test/](test/) 包含更多例子.
+ExprScript 的一个设计目标是用一个小语言核心来实现/模拟其它语言特性.
+理论上, 使用 `eval` 还可以像宏一样自定义语法和进行多阶段求值.
+
+| 特性 | 实现原理 |
+| --- | --- |
+| 面向对象编程 ([test/oop.expr](test/oop.expr)) | 闭包和动态作用域变量 |
+| 协程 ([test/coroutines.expr](test/coroutines.expr)) | 续延 |
+| 异常 ([test/exception.expr](test/exception.expr)) | 续延 |
+| 复合数据类型 ([test/quicksort.expr](test/quicksort.expr), [test/binary-tree.expr](test/binary-tree.expr)) | 闭包 |
+| 自定义求值顺序/惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr), [test/y-combinator.expr](test/y-combinator.expr)) | 无参函数 |
 
 ## 依赖
 
