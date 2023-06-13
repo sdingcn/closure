@@ -29,12 +29,11 @@ multi-stage evaluation, which is similar to what macros can do.
 
 | Feature | Underlying implementation |
 | --- | --- |
-| Object-oriented programming ([test/oop.expr](test/oop.expr)) | closures and dynamically scoped variables |
-| Coroutines ([test/coroutines.expr](test/coroutines.expr)) | continuations |
-| Exceptions ([test/exception.expr](test/exception.expr)) | continuations |
-| Compound data types ([test/quicksort.expr](test/quicksort.expr), [test/binary-tree.expr](test/binary-tree.expr)) | closures |
-| User-defined evaluation order / lazy evaluation
-([test/lazy-evaluation.expr](test/lazy-evaluation.expr), [test/y-combinator.expr](test/y-combinator.expr)) | zero-argument functions |
+| Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
+| Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
+| Exceptions ([test/exception.expr](test/exception.expr)) | Continuations |
+| Compound data types ([test/quicksort.expr](test/quicksort.expr), [test/binary-tree.expr](test/binary-tree.expr)) | Closures |
+| User-defined evaluation order / lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr), [test/y-combinator.expr](test/y-combinator.expr)) | Zero-argument functions |
 
 ## dependencies
 
