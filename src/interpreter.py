@@ -48,6 +48,22 @@ def unfold(value: Union[list[Any], tuple[Any, ...], set[Any], dict[Any, Any]]) -
         s = '}'
     return s
 
+def indent(source: str, cnt: int) -> str:
+    return '\n'.join(list(map(lambda s: (' ' * cnt) + s, source.splitlines())))
+
+def double_quote(literal: str) -> str:
+    if literal[0] == "'":
+        ret = ''
+        for char in literal:
+            if char == '"':
+                char = "'"
+            elif char == "'":
+                char = '"'
+            ret += char
+        return ret
+    else:
+        return literal
+
 ### lexer
 
 class SourceLocation:
@@ -180,6 +196,9 @@ class Expr:
     def __str__(self) -> str:
         return 'Expr'
 
+    def pretty_print(self) -> str:
+        return ''
+
 class Int(Expr):
 
     def __init__(self, sl: SourceLocation, parent: Union[None, Expr], value: int):
@@ -190,6 +209,9 @@ class Int(Expr):
     def __str__(self) -> str:
         return f'(Int {self.sl} {self.value})'
 
+    def pretty_print(self) -> str:
+        return repr(self.value)
+
 class Str(Expr):
 
     def __init__(self, sl: SourceLocation, parent: Union[None, Expr], value: str):
@@ -198,7 +220,10 @@ class Str(Expr):
         self.value = value
 
     def __str__(self) -> str:
-        return f'(Str {self.sl} {self.value})'
+        return f'(Str {self.sl} {double_quote(repr(self.value))})'
+
+    def pretty_print(self) -> str:
+        return double_quote(repr(self.value))
 
 class Var(Expr):
 
@@ -209,6 +234,9 @@ class Var(Expr):
 
     def __str__(self) -> str:
         return f'(Var {self.sl} {self.name})'
+
+    def pretty_print(self) -> str:
+        return self.name
 
 class Lambda(Expr):
 
@@ -221,6 +249,11 @@ class Lambda(Expr):
     def __str__(self) -> str:
         return f'(Lambda {self.sl} {unfold(self.var_list)} {self.expr})'
 
+    def pretty_print(self) -> str:
+        return ('lambda (' + ' '.join(list(map(lambda v: v.pretty_print(), self.var_list))) + ') ' + '{\n'
+              + indent(self.expr.pretty_print(), 2) + '\n'
+              + '}')
+
 class Letrec(Expr):
 
     def __init__(self, sl: SourceLocation, parent: Union[None, Expr], var_expr_list: list[tuple[Var, Expr]], expr: Expr):
@@ -231,6 +264,13 @@ class Letrec(Expr):
 
     def __str__(self) -> str:
         return f'(Letrec {self.sl} {unfold(self.var_expr_list)} {self.expr})'
+
+    def pretty_print(self) -> str:
+        return ('letrec (\n'
+              + indent('\n'.join(list(map(lambda ve: ve[0].pretty_print() + ' = ' + ve[1].pretty_print(), self.var_expr_list))), 2) + '\n'
+              + ') {\n'
+              + indent(self.expr.pretty_print(), 2) + '\n'
+              + '}')
 
 class If(Expr):
 
@@ -244,6 +284,10 @@ class If(Expr):
     def __str__(self) -> str:
         return f'(If {self.sl} {self.cond} {self.branch1} {self.branch2})'
 
+    def pretty_print(self) -> str:
+        return ('if ' + self.cond.pretty_print() + ' then ' + self.branch1.pretty_print() + '\n'
+              + 'else ' + self.branch2.pretty_print())
+
 class Call(Expr):
 
     def __init__(self, sl: SourceLocation, parent: Union[None, Expr], callee: Expr, arg_list: list[Expr]):
@@ -255,6 +299,9 @@ class Call(Expr):
     def __str__(self) -> str:
         return f'(Call {self.sl} {self.callee} {unfold(self.arg_list)})'
 
+    def pretty_print(self) -> str:
+        return '(' + ' '.join([self.callee.pretty_print()] + list(map(lambda a: a.pretty_print(), self.arg_list))) + ')'
+
 class Seq(Expr):
 
     def __init__(self, sl: SourceLocation, parent: Union[None, Expr], expr_list: list[Expr]):
@@ -264,6 +311,11 @@ class Seq(Expr):
 
     def __str__(self) -> str:
         return f'(Seq {self.sl} {unfold(self.expr_list)})'
+
+    def pretty_print(self) -> str:
+        return ('[\n'
+              + indent('\n'.join(list(map(lambda e: e.pretty_print(), self.expr_list))), 2) + '\n'
+              + ']')
 
 def parse(tokens: deque[Token], debug: bool) -> Expr:
     if debug:
@@ -467,7 +519,7 @@ class String(Value):
         self.value = value
 
     def __str__(self) -> str:
-        return f'(String {self.value})'
+        return f'(String {double_quote(repr(self.value))})'
 
 class Closure(Value):
 
@@ -1013,16 +1065,21 @@ def main(option: str, source: str) -> None:
         tokens = lex(source, False)
         tree = parse(tokens, False)
         print(tree)
+    elif option == 'pretty-print':
+        tokens = lex(source, False)
+        tree = parse(tokens, False)
+        print(tree.pretty_print())
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'time', 'space', 'debug', 'dump-ast']:
+    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'time', 'space', 'debug', 'dump-ast', 'pretty-print']:
         sys.exit(
             'Usage:\n'
             f'\tpython3 {sys.argv[0]} run <source-file>\n'
             f'\tpython3 {sys.argv[0]} time <source-file>\n'
             f'\tpython3 {sys.argv[0]} space <source-file>\n'
             f'\tpython3 {sys.argv[0]} debug <source-file>\n'
-            f'\tpython3 {sys.argv[0]} dump-ast <source-file>'
+            f'\tpython3 {sys.argv[0]} dump-ast <source-file>\n'
+            f'\tpython3 {sys.argv[0]} pretty-print <source-file>'
         )
     with open(sys.argv[2], 'r') as f:
         main(sys.argv[1], f.read())

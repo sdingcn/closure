@@ -79,5 +79,6 @@ The full semantic reference is the interpreter ([src/interpreter.py](src/interpr
   - `time` run code in `<file>` and print (to `stderr`) the execution time;
   - `space` run code in `<file>` and print (to `stderr`) the peak memory use (this option could slow down the interpreter);
   - `debug` run code in `<file>` and print (to `stderr`) the intermediate execution steps;
-  - `dump-ast` print (to `stdout`) the AST of code in `<file>`.
+  - `dump-ast` print (to `stdout`) the AST of code in `<file>`;
+  - `pretty-print` print (to `stdout`) the formatted version of code in `<file>`.
 + `python3 test.py` runs all tests (see [test.py](test.py) for inputs/outputs for each test program).
