@@ -90,7 +90,7 @@ def main():
 
         ('test/mixed-scope.expr', '', '1\n303\nVoid\n'),
 
-        ('test/multi-stage.expr', '', 'EVAL\nVoid\n'),
+        ('test/multi-stage.expr', '', 'EVAL\nhello world\nVoid\n'),
 
         ('test/mutual-recursion.expr', '', '10\n9\n8\n7\n6\n5\n4\n3\n2\n1\n0\nVoid\n'),
 
@@ -106,7 +106,7 @@ def main():
             "aaa\"\n"
             "bbb\\\"\n"
             "ccc\\\n"
-            "dddeee\n"
+            "ddd\neee\n"
             "fff\n"
             "ggg\n"
             "Void\n"

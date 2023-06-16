@@ -2,7 +2,7 @@
   (put "aaa\"" "\n")
   (put "bbb\\\"" "\n")
   (put "ccc\\" "\n")
-  (put "ddd\
+  (put "ddd
 eee" "\n")
   (put "fff\nggg" "\n")
 ]

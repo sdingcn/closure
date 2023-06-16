@@ -51,18 +51,17 @@ def unfold(value: Union[list[Any], tuple[Any, ...], set[Any], dict[Any, Any]]) -
 def indent(source: str, cnt: int) -> str:
     return '\n'.join(list(map(lambda s: (' ' * cnt) + s, source.splitlines())))
 
-def double_quote(literal: str) -> str:
-    if literal[0] == "'":
-        ret = ''
-        for char in literal:
-            if char == '"':
-                char = "'"
-            elif char == "'":
-                char = '"'
+def quote(literal: str) -> str:
+    ret = '"'
+    for char in literal:
+        if char == '\\':
+            ret += '\\\\'
+        elif char == '"':
+            ret += '\\"'
+        else:
             ret += char
-        return ret
-    else:
-        return literal
+    ret += '"'
+    return ret
 
 ### lexer
 
@@ -152,6 +151,8 @@ def lex(source: str, debug: bool) -> deque[Token]:
                     if val[-1] == '\n':
                         line += 1
                         col = 1
+                        val = val[:-1]
+                        val += "\\n"
                     else:
                         col += 1
                 if chars and chars[0] == '"':
@@ -220,10 +221,10 @@ class Str(Expr):
         self.value = value
 
     def __str__(self) -> str:
-        return f'(Str {self.sl} {double_quote(repr(self.value))})'
+        return f'(Str {self.sl} {quote(self.value)})'
 
     def pretty_print(self) -> str:
-        return double_quote(repr(self.value))
+        return quote(self.value)
 
 class Var(Expr):
 
@@ -519,7 +520,7 @@ class String(Value):
         self.value = value
 
     def __str__(self) -> str:
-        return f'(String {double_quote(repr(self.value))})'
+        return f'(String {quote(self.value)})'
 
 class Closure(Value):
 
@@ -739,7 +740,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
 
     intrinsics = ['void',
                   'add', 'sub', 'mul', 'div', 'mod', 'lt',
-                  'strlen', 'strslice', 'strcat', 'strlt', 'strint',
+                  'strlen', 'strslice', 'strcat', 'strlt', 'strint', 'strquote',
                   'getline', 'put',
                   'callcc', 'type', 'eval', 'exit']
     
@@ -901,6 +902,9 @@ def interpret(tree: Expr, debug: bool) -> Value:
                     elif intrinsic == 'strint':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         value = Integer(int(args[0].value))
+                    elif intrinsic == 'strquote':
+                        check_args_error_exit(layer.expr.callee, args, [String])
+                        value = String(quote(args[0].value))
                     elif intrinsic == 'getline':
                         check_args_error_exit(layer.expr.callee, args, [])
                         try:

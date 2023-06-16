@@ -1,6 +1,9 @@
-letrec (
-  left = "(put "
-  right = "\"EVAL\\n\")"
-) {
-  (eval (strcat left right))
-}
+[
+  letrec (
+    left = "(put "
+    right = "\"EVAL\\n\")"
+  ) {
+    (eval (strcat left right))
+  }
+  (put (eval (eval (eval (strquote (strquote (strquote "hello world\n")))))))
+]

@@ -45,7 +45,7 @@ Python >= 3.9
 <var> := <lex-var> | <dyn-var>
 <intrinsic> := void
              | add | sub | mul | div | mod | lt
-             | strlen | strslice | strcat | strlt | strint
+             | strlen | strslice | strcat | strlt | strint | strquote
              | getline | put
              | callcc | type | eval | exit
 <binding> := <var> = <expr>
