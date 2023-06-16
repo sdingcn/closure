@@ -24,8 +24,6 @@ and to demonstrate the implementation of interpreters.
 
 One design goal of ExprScript is to use a small language core
 to implement/simulate other language features.
-In theory, using `eval` we can also define new syntax and perform
-multi-stage evaluation, which is similar to what macros can do.
 
 | Feature | Underlying implementation |
 | --- | --- |
@@ -34,6 +32,7 @@ multi-stage evaluation, which is similar to what macros can do.
 | Exceptions ([test/exception.expr](test/exception.expr)) | Continuations |
 | Compound data types ([test/quicksort.expr](test/quicksort.expr), [test/binary-tree.expr](test/binary-tree.expr)) | Closures |
 | User-defined evaluation order / lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr), [test/y-combinator.expr](test/y-combinator.expr)) | Zero-argument functions |
+| Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
 ## dependencies
 

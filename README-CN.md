@@ -20,7 +20,6 @@ ExprScript 是一个动态类型函数式语言, 支持一等续延,
 本项目的目标是试验语言特性和演示解释器的实现.
 
 ExprScript 的一个设计目标是用一个小语言核心来实现/模拟其它语言特性.
-理论上, 使用 `eval` 还可以像宏一样自定义语法和进行多阶段求值.
 
 | 特性 | 实现原理 |
 | --- | --- |
@@ -29,6 +28,7 @@ ExprScript 的一个设计目标是用一个小语言核心来实现/模拟其�
 | 异常 ([test/exception.expr](test/exception.expr)) | 续延 |
 | 复合数据类型 ([test/quicksort.expr](test/quicksort.expr), [test/binary-tree.expr](test/binary-tree.expr)) | 闭包 |
 | 自定义求值顺序/惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr), [test/y-combinator.expr](test/y-combinator.expr)) | 无参函数 |
+| 多阶段求值 ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
 ## 依赖
 
