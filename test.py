@@ -25,7 +25,7 @@ def check_io(prog: str, i: str, o: str) -> bool:
         return False
     else:
         if raw_o1 != o:
-            sys.stderr.write(f'*** Expected: {o}, Got: {raw_o1}\n')
+            sys.stderr.write(f'*** Expected: [{o}], Got: [{raw_o1}]\n')
             return False
         else:
             return True
@@ -129,9 +129,10 @@ def main():
     cnt = 0
     for test in tests:
         cnt += 1
-        sys.stderr.write(f'Running on test {cnt}, program\n{test[0]}\nwith input\n{test[1]}\n')
+        sys.stderr.write(f'==========\n')
+        sys.stderr.write(f'Running on test {cnt}, program\n{test[0]}\nwith input\n[{test[1]}]\n')
         if not check_io(*test):
-            sys.exit(f'*** Failed on test {cnt}, program\n{test[0]}\nwith input\n{test[1]}')
+            sys.exit(f'*** Failed on test {cnt}, program\n{test[0]}\nwith input\n[{test[1]}]')
     sys.stderr.write(f'Passed all {cnt} tests\n')
 
 if __name__ == '__main__':
