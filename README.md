@@ -27,11 +27,11 @@ to implement/simulate other language features.
 
 | Feature | Underlying implementation |
 | --- | --- |
+| Structures ([test/binary-tree.expr](test/binary-tree.expr)) | Closures |
 | Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
 | Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
 | Exceptions ([test/exception.expr](test/exception.expr)) | Continuations |
-| Compound data types ([test/quicksort.expr](test/quicksort.expr), [test/binary-tree.expr](test/binary-tree.expr)) | Closures |
-| User-defined evaluation order / lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr), [test/y-combinator.expr](test/y-combinator.expr)) | Zero-argument functions |
+| Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
 | Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
 ## dependencies
@@ -78,6 +78,6 @@ The full semantic reference is the interpreter ([src/interpreter.py](src/interpr
   - `time` run code in `<file>` and print (to `stderr`) the execution time;
   - `space` run code in `<file>` and print (to `stderr`) the peak memory use (this option could slow down the interpreter);
   - `debug` run code in `<file>` and print (to `stderr`) the intermediate execution steps;
-  - `dump-ast` print (to `stdout`) the AST of code in `<file>`;
-  - `pretty-print` print (to `stdout`) the formatted version of code in `<file>`.
+  - `ast` print (to `stdout`) the AST of code in `<file>`;
+  - `print` print (to `stdout`) the formatted version of code in `<file>`.
 + `python3 test.py` runs all tests (see [test.py](test.py) for inputs/outputs for each test program).

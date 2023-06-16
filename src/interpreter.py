@@ -1116,25 +1116,25 @@ def main(option: str, source: str) -> None:
         sys.stderr.write(f'Peak memory (KiB): {peak_memory / 1024}\n')
     elif option == 'debug':
         print(debug_run(source).pretty_print())
-    elif option == 'dump-ast':
+    elif option == 'ast':
         tokens = lex(source, False)
         tree = parse(tokens, False)
         print(tree)
-    elif option == 'pretty-print':
+    elif option == 'print':
         tokens = lex(source, False)
         tree = parse(tokens, False)
         print(tree.pretty_print())
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'time', 'space', 'debug', 'dump-ast', 'pretty-print']:
+    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'time', 'space', 'debug', 'ast', 'print']:
         sys.exit(
             'Usage:\n'
             f'\tpython3 {sys.argv[0]} run <source-file>\n'
             f'\tpython3 {sys.argv[0]} time <source-file>\n'
             f'\tpython3 {sys.argv[0]} space <source-file>\n'
             f'\tpython3 {sys.argv[0]} debug <source-file>\n'
-            f'\tpython3 {sys.argv[0]} dump-ast <source-file>\n'
-            f'\tpython3 {sys.argv[0]} pretty-print <source-file>'
+            f'\tpython3 {sys.argv[0]} ast <source-file>\n'
+            f'\tpython3 {sys.argv[0]} print <source-file>'
         )
     with open(sys.argv[2], 'r', encoding = 'utf-8') as f:
         main(sys.argv[1], f.read())

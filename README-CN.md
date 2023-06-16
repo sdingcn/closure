@@ -23,11 +23,11 @@ ExprScript 的一个设计目标是用一个小语言核心来实现/模拟其�
 
 | 特性 | 实现原理 |
 | --- | --- |
+| 结构 ([test/binary-tree.expr](test/binary-tree.expr)) | 闭包 |
 | 面向对象编程 ([test/oop.expr](test/oop.expr)) | 闭包和动态作用域变量 |
 | 协程 ([test/coroutines.expr](test/coroutines.expr)) | 续延 |
 | 异常 ([test/exception.expr](test/exception.expr)) | 续延 |
-| 复合数据类型 ([test/quicksort.expr](test/quicksort.expr), [test/binary-tree.expr](test/binary-tree.expr)) | 闭包 |
-| 自定义求值顺序/惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr), [test/y-combinator.expr](test/y-combinator.expr)) | 无参函数 |
+| 惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | 无参函数 |
 | 多阶段求值 ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
 ## 依赖
@@ -74,6 +74,6 @@ Python >= 3.9
   - `time` 运行 `<file>` 中的代码且将运行时间写入标准错误;
   - `space` 运行 `<file>` 中的代码且将内存峰值写入标准错误 (此选项可能拖慢解释器速度);
   - `debug` 运行 `<file>` 中的代码且将运行的中间过程写入标准错误;
-  - `dump-ast` 将 `<file>` 中代码的抽象语法树写入标准输出;
-  - `pretty-print` 将 `<file>` 中的代码格式化后写入标准输出.
+  - `ast` 将 `<file>` 中代码的抽象语法树写入标准输出;
+  - `print` 将 `<file>` 中的代码格式化后写入标准输出.
 + `python3 test.py` 运行所有测试 ([test.py](test.py) 包含每个测试程序的输入/输出).
