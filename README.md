@@ -43,7 +43,7 @@ Python >= 3.9
 ```
 <comment> := #.*?\n
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
-<str> := <Python-double-quote-str-literal>
+<str> := "( [-"\] | \" | \\ | \t | \n )*"
 <lex-var> := [a-z][a-zA-Z]*
 <dyn-var> := [A-Z][a-zA-Z]*
 <var> := <lex-var> | <dyn-var>
