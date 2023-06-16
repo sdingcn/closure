@@ -43,7 +43,7 @@ Python >= 3.9
 ```
 <comment> := #.*?\n
 <int> := [+-]?0 | [+-]?[1-9][0-9]*
-<str> := "( [^"\] | \" | \\ | \t | \n )*" // supported character set is everything typable by English keyboards
+<str> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
 <lex-var> := [a-z][a-zA-Z]*
 <dyn-var> := [A-Z][a-zA-Z]*
 <var> := <lex-var> | <dyn-var>
@@ -59,7 +59,7 @@ Python >= 3.9
         | letrec ( <binding>* ) { <expr> }
         | if <expr> then <expr> else <expr>
         | ( <callee> <expr>* )
-        | [ <expr>+ ]
+        | [ <expr>+ ] // sequence evaluation
 ```
 
 Supported object types: Void, Integer, String, Closure, Continuation.
