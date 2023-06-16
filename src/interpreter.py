@@ -498,6 +498,9 @@ class Value:
     def pretty_print(self) -> str:
         return ''
 
+    def type_id(self) -> int:
+        return -1
+
 class Void(Value):
 
     def __init__(self):
@@ -509,6 +512,9 @@ class Void(Value):
 
     def pretty_print(self) -> str:
         return '<void>'
+
+    def type_id(self) -> int:
+        return 0
 
 class Integer(Value):
 
@@ -522,6 +528,9 @@ class Integer(Value):
     def pretty_print(self) -> str:
         return str(self.value)
 
+    def type_id(self) -> int:
+        return 1
+
 class String(Value):
 
     def __init__(self, value: str):
@@ -533,6 +542,9 @@ class String(Value):
 
     def pretty_print(self) -> str:
         return self.value
+
+    def type_id(self) -> int:
+        return 2
 
 class Closure(Value):
 
@@ -546,6 +558,9 @@ class Closure(Value):
 
     def pretty_print(self) -> str:
         return '<closure>'
+
+    def type_id(self) -> int:
+        return 3
 
 class Layer:
     '''The layer class in the evaluation stack, where each layer is the expression currently under evaluation'''
@@ -584,6 +599,9 @@ class Continuation(Value):
 
     def pretty_print(self) -> str:
         return '<continuation>'
+
+    def type_id(self) -> int:
+        return 4
 
 class State:
     '''The state class for the interpretation, where each state object completely determines the current state (stack and store)'''
@@ -954,17 +972,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         continue
                     elif intrinsic == 'type':
                         check_args_error_exit(layer.expr.callee, args, [Value])
-                        arg = args[0]
-                        if type(arg) == Void:
-                            value = Integer(0)
-                        elif type(arg) == Integer:
-                            value = Integer(1)
-                        elif type(arg) == String:
-                            value = Integer(2)
-                        elif type(arg) == Closure:
-                            value = Integer(3)
-                        elif type(arg) == Continuation:
-                            value = Integer(4)
+                        value = Integer(args[0].type_id())
                     elif intrinsic == 'eval':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         arg = args[0]
