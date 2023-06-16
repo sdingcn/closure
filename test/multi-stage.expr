@@ -6,4 +6,6 @@
     (eval (strcat left right))
   }
   (put (eval (eval (eval (strquote (strquote (strquote "hello world\n")))))))
+  (put (eval (eval (eval (strquote (strquote (strquote "hello world
+")))))))
 ]

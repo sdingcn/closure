@@ -90,7 +90,7 @@ def main():
 
         ('test/mixed-scope.expr', '', '1\n303\n<void>\n'),
 
-        ('test/multi-stage.expr', '', 'EVAL\nhello world\n<void>\n'),
+        ('test/multi-stage.expr', '', 'EVAL\nhello world\nhello world\n<void>\n'),
 
         ('test/mutual-recursion.expr', '', '10\n9\n8\n7\n6\n5\n4\n3\n2\n1\n0\n<void>\n'),
 
