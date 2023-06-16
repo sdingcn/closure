@@ -87,6 +87,19 @@ def lex(source: str, debug: bool) -> deque[Token]:
     if debug:
         sys.stderr.write('[Debug] *** starting lexer ***\n')
 
+    # only support these characters in source code
+    charset = set(
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "0123456789"
+        "`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?"
+        " \t\n"
+    )
+
+    for char in source:
+        if char not in charset:
+            sys.exit(f'[Lexer Error] unsupported character {char} in the source')
+
     chars = deque(source)
     line = 1
     col = 1
@@ -116,13 +129,13 @@ def lex(source: str, debug: bool) -> deque[Token]:
         # read the next token
         if chars:
             sl = SourceLocation(line, col)
-            # integer without +/-
+            # integer literal without +/-
             if chars[0].isdigit():
                 val = ''
                 while chars and chars[0].isdigit():
                     val += chars.popleft()
                     col += 1
-            # integer with +/-
+            # integer literal with +/-
             elif chars[0] in ('-', '+'):
                 if len(chars) > 1 and chars[1].isdigit():
                     val = chars.popleft()
@@ -142,17 +155,16 @@ def lex(source: str, debug: bool) -> deque[Token]:
             elif chars[0] in ('(', ')', '{', '}', '[', ']', '='):
                 val = chars.popleft()
                 col += 1
-            # string
+            # string literal
             elif chars[0] == '"':
                 val = chars.popleft()
                 col += 1
                 while chars and (chars[0] != '"' or (chars[0] == '"' and count_trailing_escape(val) % 2 != 0)):
+                    # All original characters are kept, including real newlines (not escape sequences like "\n").
                     val += chars.popleft()
                     if val[-1] == '\n':
                         line += 1
                         col = 1
-                        val = val[:-1]
-                        val += "\\n"
                     else:
                         col += 1
                 if chars and chars[0] == '"':
@@ -359,7 +371,29 @@ def parse(tokens: deque[Token], debug: bool) -> Expr:
         token = tokens.popleft()
         if not is_str(token):
             sys.exit(f'[Parser Error] expected a string, got {token}')
-        node = Str(token.sl, None, eval(token.val))
+        # "abc" -> deque(abc)
+        content = deque(token.val[1:-1])
+        s = ''
+        while content:
+            char = content.popleft()
+            if char == '\\':
+                if content:
+                    nxt = content.popleft()
+                    if nxt == '\\':
+                        s += '\\'
+                    elif nxt == '"':
+                        s += '"'
+                    elif nxt == 't':
+                        s += '\t'
+                    elif nxt == 'n':
+                        s += '\n'
+                    else:
+                        sys.exit(f'[Parser Error] unsupported escape sequence at {token}')
+                else:
+                    sys.exit(f'[Parser Error] incomplete escape sequence at {token}')
+            else:
+                s += char
+        node = Str(token.sl, None, s)
         return node
 
     def parse_lambda() -> Lambda:
@@ -1102,5 +1136,5 @@ if __name__ == '__main__':
             f'\tpython3 {sys.argv[0]} dump-ast <source-file>\n'
             f'\tpython3 {sys.argv[0]} pretty-print <source-file>'
         )
-    with open(sys.argv[2], 'r') as f:
+    with open(sys.argv[2], 'r', encoding = 'utf-8') as f:
         main(sys.argv[1], f.read())
