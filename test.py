@@ -30,6 +30,10 @@ def check_io(prog: str, i: str, o: str) -> bool:
         else:
             return True
 
+def read_file(path: str) -> str:
+    with open(path, 'r', encoding = 'utf-8') as f:
+        return f.read()
+
 def main():
     tests = [
         ('test/abs.expr', '101', '101\n'),
@@ -101,6 +105,8 @@ def main():
         ('test/quicksort.expr', '3\n1\n3\n7\n', '1\n3\n7\n<void>\n'),
         ('test/quicksort.expr', '5\n5\n4\n3\n2\n1\n', '1\n2\n3\n4\n5\n<void>\n'),
         ('test/quicksort.expr', '6\n8\n-1\n3\n0\n6\n-5\n', '-5\n-1\n0\n3\n6\n8\n<void>\n'),
+
+        ('test/quine.expr', '', read_file('test/quine.expr')),
 
         ('test/string-literals.expr', '',
             "aaa\"\n"
