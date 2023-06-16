@@ -495,6 +495,9 @@ class Value:
     def __str__(self) -> str:
         return 'Value'
 
+    def pretty_print(self) -> str:
+        return ''
+
 class Void(Value):
 
     def __init__(self):
@@ -503,6 +506,9 @@ class Void(Value):
 
     def __str__(self) -> str:
         return 'Void'
+
+    def pretty_print(self) -> str:
+        return '<void>'
 
 class Integer(Value):
 
@@ -513,6 +519,9 @@ class Integer(Value):
     def __str__(self) -> str:
         return f'(Integer {self.value})'
 
+    def pretty_print(self) -> str:
+        return str(self.value)
+
 class String(Value):
 
     def __init__(self, value: str):
@@ -521,6 +530,9 @@ class String(Value):
 
     def __str__(self) -> str:
         return f'(String {quote(self.value)})'
+
+    def pretty_print(self) -> str:
+        return self.value
 
 class Closure(Value):
 
@@ -531,6 +543,9 @@ class Closure(Value):
 
     def __str__(self) -> str:
         return f'(Closure {unfold(self.env)} {self.fun})'
+
+    def pretty_print(self) -> str:
+        return '<closure>'
 
 class Layer:
     '''The layer class in the evaluation stack, where each layer is the expression currently under evaluation'''
@@ -566,6 +581,9 @@ class Continuation(Value):
 
     def __str__(self) -> str:
         return f'(Continuation {unfold(self.stack)})'
+
+    def pretty_print(self) -> str:
+        return '<continuation>'
 
 class State:
     '''The state class for the interpretation, where each state object completely determines the current state (stack and store)'''
@@ -917,16 +935,7 @@ def interpret(tree: Expr, debug: bool) -> Value:
                         output = ''
                         # the printing format of "put" is simpler than that of the classes' "__str__" functions
                         for v in args:
-                            if type(v) == Void:
-                                output += '<void>'
-                            elif type(v) == Integer:
-                                output += str(v.value)
-                            elif type(v) == String:
-                                output += v.value
-                            elif type(v) == Closure:
-                                output += '<closure>'
-                            elif type(v) == Continuation:
-                                output += '<continuation>'
+                            output += v.pretty_print()
                         print(output, end = '', flush = True)
                         # the return value of put is void
                         value = Void()
@@ -1051,20 +1060,20 @@ def debug_run(source: str) -> Value:
 
 def main(option: str, source: str) -> None:
     if option == 'run':
-        print(normal_run(source))
+        print(normal_run(source).pretty_print())
     elif option == 'time':
         start_time = time.time()
-        print(normal_run(source))
+        print(normal_run(source).pretty_print())
         end_time = time.time()
         sys.stderr.write(f'Total time (seconds): {end_time - start_time}\n')
     elif option == 'space':
         tracemalloc.start() 
-        print(normal_run(source))
+        print(normal_run(source).pretty_print())
         current_memory, peak_memory = tracemalloc.get_traced_memory()
         tracemalloc.stop()
         sys.stderr.write(f'Peak memory (KiB): {peak_memory / 1024}\n')
     elif option == 'debug':
-        print(debug_run(source))
+        print(debug_run(source).pretty_print())
     elif option == 'dump-ast':
         tokens = lex(source, False)
         tree = parse(tokens, False)

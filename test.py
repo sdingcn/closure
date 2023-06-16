@@ -32,17 +32,17 @@ def check_io(prog: str, i: str, o: str) -> bool:
 
 def main():
     tests = [
-        ('test/abs.expr', '101', '(Integer 101)\n'),
-        ('test/abs.expr', '0', '(Integer 0)\n'),
-        ('test/abs.expr', '-501', '(Integer 501)\n'),
+        ('test/abs.expr', '101', '101\n'),
+        ('test/abs.expr', '0', '0\n'),
+        ('test/abs.expr', '-501', '501\n'),
 
-        ('test/binary-tree.expr', '', '1\n2\n3\n4\n5\nVoid\n'),
+        ('test/binary-tree.expr', '', '1\n2\n3\n4\n5\n<void>\n'),
         
         ('test/comments.expr', '', 
             '123\n'
             '456 # message 2\n'
             '789\n'
-            'Void\n'
+            '<void>\n'
         ),
 
         ('test/coroutines.expr', '',
@@ -52,15 +52,15 @@ def main():
             'task 2\n'
             'main\n'
             'task 3\n'
-            'Void\n'
+            '<void>\n'
         ),
 
-        ('test/dynamic-scope.expr', '', '100\n200\nVoid\n'),
+        ('test/dynamic-scope.expr', '', '100\n200\n<void>\n'),
 
-        ('test/echo.expr', '', 'Void\n'),
-        ('test/echo.expr', '123 \n', '123 \nVoid\n'),
-        ('test/echo.expr', '100', '100\nVoid\n'),
-        ('test/echo.expr', ' \n  \n\n', ' \n  \n\nVoid\n'),
+        ('test/echo.expr', '', '<void>\n'),
+        ('test/echo.expr', '123 \n', '123 \n<void>\n'),
+        ('test/echo.expr', '100', '100\n<void>\n'),
+        ('test/echo.expr', ' \n  \n\n', ' \n  \n\n<void>\n'),
 
         ('test/exception.expr', '',
             'call n = 2\n'
@@ -73,34 +73,34 @@ def main():
             'call n = 1\n'
             'call n = 0\n'
             'exception\n'
-            'Void\n'
+            '<void>\n'
         ),
 
-        ('test/gcd.expr', '100\n0\n', '100\nVoid\n'),
-        ('test/gcd.expr', '0\n100\n', '100\nVoid\n'),
-        ('test/gcd.expr', '30\n30\n', '30\nVoid\n'),
-        ('test/gcd.expr', '25\n45\n', '5\nVoid\n'),
-        ('test/gcd.expr', '7\n100\n', '1\nVoid\n'),
+        ('test/gcd.expr', '100\n0\n', '100\n<void>\n'),
+        ('test/gcd.expr', '0\n100\n', '100\n<void>\n'),
+        ('test/gcd.expr', '30\n30\n', '30\n<void>\n'),
+        ('test/gcd.expr', '25\n45\n', '5\n<void>\n'),
+        ('test/gcd.expr', '7\n100\n', '1\n<void>\n'),
 
-        ('test/intensive.expr', '', '(Integer 50005000)\n'),
+        ('test/intensive.expr', '', '50005000\n'),
 
-        ('test/lazy-evaluation.expr', '', '3\n2\n1\nthunk\nVoid\n'),
+        ('test/lazy-evaluation.expr', '', '3\n2\n1\nthunk\n<void>\n'),
 
-        ('test/lexical-scope.expr', '', '1\n100\nVoid\n'),
+        ('test/lexical-scope.expr', '', '1\n100\n<void>\n'),
 
-        ('test/mixed-scope.expr', '', '1\n303\nVoid\n'),
+        ('test/mixed-scope.expr', '', '1\n303\n<void>\n'),
 
-        ('test/multi-stage.expr', '', 'EVAL\nhello world\nVoid\n'),
+        ('test/multi-stage.expr', '', 'EVAL\nhello world\n<void>\n'),
 
-        ('test/mutual-recursion.expr', '', '10\n9\n8\n7\n6\n5\n4\n3\n2\n1\n0\nVoid\n'),
+        ('test/mutual-recursion.expr', '', '10\n9\n8\n7\n6\n5\n4\n3\n2\n1\n0\n<void>\n'),
 
-        ('test/oop.expr', '', '1\n2\n100\n2\nVoid\n'),
+        ('test/oop.expr', '', '1\n2\n100\n2\n<void>\n'),
 
-        ('test/quicksort.expr', '0\n', 'Void\n'),
-        ('test/quicksort.expr', '1\n303\n', '303\nVoid\n'),
-        ('test/quicksort.expr', '3\n1\n3\n7\n', '1\n3\n7\nVoid\n'),
-        ('test/quicksort.expr', '5\n5\n4\n3\n2\n1\n', '1\n2\n3\n4\n5\nVoid\n'),
-        ('test/quicksort.expr', '6\n8\n-1\n3\n0\n6\n-5\n', '-5\n-1\n0\n3\n6\n8\nVoid\n'),
+        ('test/quicksort.expr', '0\n', '<void>\n'),
+        ('test/quicksort.expr', '1\n303\n', '303\n<void>\n'),
+        ('test/quicksort.expr', '3\n1\n3\n7\n', '1\n3\n7\n<void>\n'),
+        ('test/quicksort.expr', '5\n5\n4\n3\n2\n1\n', '1\n2\n3\n4\n5\n<void>\n'),
+        ('test/quicksort.expr', '6\n8\n-1\n3\n0\n6\n-5\n', '-5\n-1\n0\n3\n6\n8\n<void>\n'),
 
         ('test/string-literals.expr', '',
             "aaa\"\n"
@@ -109,16 +109,16 @@ def main():
             "ddd\neee\n"
             "fff\n"
             "ggg\n"
-            "Void\n"
+            "<void>\n"
         ),
 
-        ('test/string-reverse.expr', "abcde\n", "edcba\nVoid\n"),
-        ('test/string-reverse.expr', "12 ccc\n", "ccc 21\nVoid\n"),
-        ('test/string-reverse.expr', "\t <>///\n", "///>< \t\nVoid\n"),
+        ('test/string-reverse.expr', "abcde\n", "edcba\n<void>\n"),
+        ('test/string-reverse.expr', "12 ccc\n", "ccc 21\n<void>\n"),
+        ('test/string-reverse.expr', "\t <>///\n", "///>< \t\n<void>\n"),
 
-        ('test/type.expr', '', '0\n1\n2\n3\n4\nVoid\n'),
+        ('test/type.expr', '', '0\n1\n2\n3\n4\n<void>\n'),
 
-        ('test/y-combinator.expr', '', '1 120 3628800\nVoid\n')
+        ('test/y-combinator.expr', '', '1 120 3628800\n<void>\n')
     ]
     cnt = 0
     for test in tests:
