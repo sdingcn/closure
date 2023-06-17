@@ -1,4 +1,0 @@
-(
-  lambda (x) { if (lt x 0) then (sub 0 x) else x }
-  (strint (getline))
-)

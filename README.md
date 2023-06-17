@@ -30,7 +30,6 @@ to implement/simulate other language features.
 | Structures ([test/binary-tree.expr](test/binary-tree.expr)) | Closures |
 | Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
 | Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
-| Exceptions ([test/exception.expr](test/exception.expr)) | Continuations |
 | Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
 | Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 

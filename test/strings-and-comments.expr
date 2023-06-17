@@ -1,4 +1,7 @@
 [
+  (put "123\n") # message 1
+  (put "456 # message 2\n")
+  ## message 3
   (put "aaa\"" "\n")
   (put "bbb\\\"" "\n")
   (put "ccc\\" "\n")

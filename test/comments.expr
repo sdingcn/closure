@@ -1,7 +1,0 @@
-[
-  (put "123\n") # message 1
-  (put "456 # message 2\n")
-  (put "789\n") # message 3
-  # message 4
-  ## message 5
-]

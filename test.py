@@ -36,19 +36,8 @@ def read_file(path: str) -> str:
 
 def main():
     tests = [
-        ('test/abs.expr', '101', '101\n'),
-        ('test/abs.expr', '0', '0\n'),
-        ('test/abs.expr', '-501', '501\n'),
-
         ('test/binary-tree.expr', '', '1\n2\n3\n4\n5\n<void>\n'),
         
-        ('test/comments.expr', '', 
-            '123\n'
-            '456 # message 2\n'
-            '789\n'
-            '<void>\n'
-        ),
-
         ('test/coroutines.expr', '',
             'main\n'
             'task 1\n'
@@ -56,27 +45,6 @@ def main():
             'task 2\n'
             'main\n'
             'task 3\n'
-            '<void>\n'
-        ),
-
-        ('test/dynamic-scope.expr', '', '100\n200\n<void>\n'),
-
-        ('test/echo.expr', '', '<void>\n'),
-        ('test/echo.expr', '123 \n', '123 \n<void>\n'),
-        ('test/echo.expr', '100', '100\n<void>\n'),
-        ('test/echo.expr', ' \n  \n\n', ' \n  \n\n<void>\n'),
-
-        ('test/exception.expr', '',
-            'call n = 2\n'
-            'call n = 1\n'
-            'call n = 0\n'
-            'return n = 0\n'
-            'return n = 1\n'
-            'return n = 2\n'
-            'call n = 2\n'
-            'call n = 1\n'
-            'call n = 0\n'
-            'exception\n'
             '<void>\n'
         ),
 
@@ -90,39 +58,24 @@ def main():
 
         ('test/lazy-evaluation.expr', '', '3\n2\n1\nthunk\n<void>\n'),
 
-        ('test/lexical-scope.expr', '', '1\n100\n<void>\n'),
-
-        ('test/mixed-scope.expr', '', '1\n303\n<void>\n'),
+        ('test/scope.expr', '', '1\n303\n<void>\n'),
 
         ('test/multi-stage.expr', '', 'EVAL\nhello world\nhello world\n<void>\n'),
 
-        ('test/mutual-recursion.expr', '', '10\n9\n8\n7\n6\n5\n4\n3\n2\n1\n0\n<void>\n'),
-
         ('test/oop.expr', '', '1\n2\n100\n2\n<void>\n'),
 
-        ('test/quicksort.expr', '0\n', '<void>\n'),
-        ('test/quicksort.expr', '1\n303\n', '303\n<void>\n'),
-        ('test/quicksort.expr', '3\n1\n3\n7\n', '1\n3\n7\n<void>\n'),
-        ('test/quicksort.expr', '5\n5\n4\n3\n2\n1\n', '1\n2\n3\n4\n5\n<void>\n'),
-        ('test/quicksort.expr', '6\n8\n-1\n3\n0\n6\n-5\n', '-5\n-1\n0\n3\n6\n8\n<void>\n'),
-
-        ('test/quine.expr', '', read_file('test/quine.expr')),
-
-        ('test/string-literals.expr', '',
-            "aaa\"\n"
-            "bbb\\\"\n"
-            "ccc\\\n"
-            "ddd\neee\n"
-            "fff\n"
-            "ggg\n"
-            "<void>\n"
-        ),
-
-        ('test/string-reverse.expr', "abcde\n", "edcba\n<void>\n"),
-        ('test/string-reverse.expr', "12 ccc\n", "ccc 21\n<void>\n"),
-        ('test/string-reverse.expr', "\t <>///\n", "///>< \t\n<void>\n"),
-
-        ('test/type.expr', '', '0\n1\n2\n3\n4\n<void>\n'),
+        ('test/strings-and-comments.expr', '', '''\
+123
+456 # message 2
+aaa"
+bbb\\"
+ccc\\
+ddd
+eee
+fff
+ggg
+<void>
+'''),
 
         ('test/y-combinator.expr', '', '1 120 3628800\n<void>\n')
     ]

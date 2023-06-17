@@ -26,7 +26,6 @@ ExprScript 的一个设计目标是用一个小语言核心来实现/模拟其�
 | 结构 ([test/binary-tree.expr](test/binary-tree.expr)) | 闭包 |
 | 面向对象编程 ([test/oop.expr](test/oop.expr)) | 闭包和动态作用域变量 |
 | 协程 ([test/coroutines.expr](test/coroutines.expr)) | 续延 |
-| 异常 ([test/exception.expr](test/exception.expr)) | 续延 |
 | 惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | 无参函数 |
 | 多阶段求值 ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
