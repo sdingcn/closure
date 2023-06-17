@@ -3,7 +3,7 @@
     left = "(.put "
     right = "\"EVAL\\n\")"
   ) {
-    (.eval (.strcat left right))
+    (.eval (.str+ left right))
   }
   (.put (.eval (.eval (.eval (.strquote (.strquote (.strquote "hello world\n")))))))
   (.put (.eval (.eval (.eval (.strquote (.strquote (.strquote "hello world

@@ -47,8 +47,8 @@ Python >= 3.9
 <dynamic-variable> := [A-Z][a-zA-Z]* // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
-             | .add | .sub | .mul | .div | .mod | .lt
-             | .strlen | .strcut | .strcat | .strlt | .strint | .strquote
+             | .+ | .- | .* | ./ | .% | .<
+             | .strlen | .strcut | .str+ | .str< | .strint | .strquote
              | .getline | .put
              | .isvoid | .isint | .isstr | .isclo | .iscont
              | .callcc | .eval | .exit

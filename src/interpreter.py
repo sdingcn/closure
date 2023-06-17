@@ -948,22 +948,22 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     if intrinsic == '.void':
                         check_args_error_exit(layer.expr.callee, args, [])
                         value = Void()
-                    elif intrinsic == '.add':
+                    elif intrinsic == '.+':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value + args[1].value)
-                    elif intrinsic == '.sub':
+                    elif intrinsic == '.-':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value - args[1].value)
-                    elif intrinsic == '.mul':
+                    elif intrinsic == '.*':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value * args[1].value)
-                    elif intrinsic == '.div':
+                    elif intrinsic == './':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value // args[1].value)
-                    elif intrinsic == '.mod':
+                    elif intrinsic == '.%':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value % args[1].value)
-                    elif intrinsic == '.lt':
+                    elif intrinsic == '.<':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
                     elif intrinsic == '.strlen':
@@ -972,10 +972,10 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     elif intrinsic == '.strcut':
                         check_args_error_exit(layer.expr.callee, args, [String, Integer, Integer])
                         value = String(args[0].value[args[1].value : args[2].value])
-                    elif intrinsic == '.strcat':
+                    elif intrinsic == '.str+':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
                         value = String(args[0].value + args[1].value)
-                    elif intrinsic == '.strlt':
+                    elif intrinsic == '.str<':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
                     elif intrinsic == '.strint':
@@ -1043,6 +1043,8 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                             sys.stderr.write(f'[Debug] execution stopped by the intrinsic call {layer.expr}\n')
                         # the interpreter returns 0
                         sys.exit()
+                    else:
+                        sys.exit(f'[Runtime Error] unrecognized intrinsic function call at {layer.expr}')
                     state.stack.pop()
             # closure or continuation call
             else:
