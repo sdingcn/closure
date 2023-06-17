@@ -5,17 +5,17 @@ letrec (
   task = lambda (yield) {
     [
       letrec (c = (getCC)) {
-        if (.iscont c) then (yield c) # jump to main
+        if (.cont? c) then (yield c) # jump to main
         else (.void)
       }
       (.put "task 1\n")
       letrec (c = (getCC)) {
-        if (.iscont c) then (yield c)
+        if (.cont? c) then (yield c)
         else (.void)
       }
       (.put "task 2\n")
       letrec (c = (getCC)) {
-        if (.iscont c) then (yield c)
+        if (.cont? c) then (yield c)
         else (.void)
       }
       (.put "task 3\n")
@@ -25,7 +25,7 @@ letrec (
   letrec (
     c = (.callcc task)
   ) {
-    if (.iscont c) then [
+    if (.cont? c) then [
       (.put "main\n")
       (c (.void)) # jump to task
     ]

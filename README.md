@@ -50,7 +50,7 @@ Python >= 3.9
              | .+ | .- | .* | ./ | .% | .<
              | .strlen | .strcut | .str+ | .str< | .strint | .strquote
              | .getline | .put
-             | .isvoid | .isint | .isstr | .isclo | .iscont
+             | .void? | .int? | .str? | .clo? | .cont?
              | .callcc | .eval | .exit
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>

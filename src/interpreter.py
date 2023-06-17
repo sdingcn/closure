@@ -1013,19 +1013,19 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, 0, {}, True))
                         # we already popped the stack in this case, so just continue the evaluation
                         continue
-                    elif intrinsic == '.isvoid':
+                    elif intrinsic == '.void?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], Void) else 0)
-                    elif intrinsic == '.isint':
+                    elif intrinsic == '.int?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], Integer) else 0)
-                    elif intrinsic == '.isstr':
+                    elif intrinsic == '.str?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], String) else 0)
-                    elif intrinsic == '.isclo':
+                    elif intrinsic == '.clo?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], Closure) else 0)
-                    elif intrinsic == '.iscont':
+                    elif intrinsic == '.cont?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], Continuation) else 0)
                     elif intrinsic == '.eval':
