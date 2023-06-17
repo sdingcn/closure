@@ -76,12 +76,12 @@ class SourceLocation:
 
 class Token:
 
-    def __init__(self, sl: SourceLocation, val: str):
+    def __init__(self, sl: SourceLocation, src: str):
         self.sl = sl
-        self.val = val
+        self.src = src
 
     def __str__(self) -> str:
-        return f'(Token {self.sl} {self.val})'
+        return f'(Token {self.sl} {self.src})'
 
 def lex(source: str, debug: bool) -> deque[Token]:
     if debug:
@@ -131,44 +131,44 @@ def lex(source: str, debug: bool) -> deque[Token]:
             sl = SourceLocation(line, col)
             # integer literal without +/-
             if chars[0].isdigit():
-                val = ''
+                src = ''
                 while chars and chars[0].isdigit():
-                    val += chars.popleft()
+                    src += chars.popleft()
                     col += 1
             # integer literal with +/-
             elif chars[0] in ('-', '+'):
                 if len(chars) > 1 and chars[1].isdigit():
-                    val = chars.popleft()
+                    src = chars.popleft()
                     col += 1
                     while chars and chars[0].isdigit():
-                        val += chars.popleft()
+                        src += chars.popleft()
                         col += 1
                 else:
                     sys.exit(f'[Lexer Error] incomplete integer literal at {sl}')
             # variable / intrinsic / keyword
             elif chars[0].isalpha():
-                val = ''
+                src = ''
                 while chars and chars[0].isalpha():
-                    val += chars.popleft()
+                    src += chars.popleft()
                     col += 1
             # special symbol
             elif chars[0] in ('(', ')', '{', '}', '[', ']', '='):
-                val = chars.popleft()
+                src = chars.popleft()
                 col += 1
             # string literal
             elif chars[0] == '"':
-                val = chars.popleft()
+                src = chars.popleft()
                 col += 1
-                while chars and (chars[0] != '"' or (chars[0] == '"' and count_trailing_escape(val) % 2 != 0)):
+                while chars and (chars[0] != '"' or (chars[0] == '"' and count_trailing_escape(src) % 2 != 0)):
                     # All original characters are kept, including real newlines (not escape sequences like "\n").
-                    val += chars.popleft()
-                    if val[-1] == '\n':
+                    src += chars.popleft()
+                    if src[-1] == '\n':
                         line += 1
                         col = 1
                     else:
                         col += 1
                 if chars and chars[0] == '"':
-                    val += chars.popleft()
+                    src += chars.popleft()
                     col += 1
                 else:
                     sys.exit(f'[Lexer Error] incomplete string literal at {sl}')
@@ -182,7 +182,7 @@ def lex(source: str, debug: bool) -> deque[Token]:
                 return next_token()
             else:
                 sys.exit(f'[Lexer Error] unsupported character {chars[0]} at {sl}')
-            token = Token(sl, val)
+            token = Token(sl, src)
             return token
         else:
             return None
@@ -336,22 +336,22 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
     
     def is_integer_token(token: Token) -> bool:
         try:
-            int(token.val)
+            int(token.src)
             return True
         except ValueError:
             return False
 
     def is_string_token(token: Token) -> bool:
-        return len(token.val) and token.val[0] == '"'
+        return len(token.src) and token.src[0] == '"'
 
     def is_variable_token(token: Token) -> bool:
-        return token.val.isalpha()
+        return token.src.isalpha()
 
     def consume(expected: str) -> Token:
         if not tokens:
             sys.exit(f'[Parser Error] incomplete token stream')
         token = tokens.popleft()
-        if token.val == expected:
+        if token.src == expected:
             return token
         else:
             sys.exit(f'[Parser Error] expected {expected}, got {token}')
@@ -362,7 +362,7 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
         token = tokens.popleft()
         if not is_integer_token(token):
             sys.exit(f'[Parser Error] expected an integer, got {token}')
-        node = IntegerNode(token.sl, None, int(token.val))
+        node = IntegerNode(token.sl, None, int(token.src))
         return node
 
     def parse_string() -> StringNode:
@@ -372,7 +372,7 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
         if not is_string_token(token):
             sys.exit(f'[Parser Error] expected a string, got {token}')
         # "abc" -> deque(abc)
-        content = deque(token.val[1:-1])
+        content = deque(token.src[1:-1])
         s = ''
         while content:
             char = content.popleft()
@@ -455,7 +455,7 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
         token = tokens.popleft()
         if not is_variable_token(token):
             sys.exit(f'[Parser Error] expected a variable, got {token}')
-        node = VariableNode(token.sl, None, token.val)
+        node = VariableNode(token.sl, None, token.src)
         return node
 
     def parse_call() -> CallNode:
@@ -464,7 +464,7 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
         if not tokens:
             sys.exit(f'[Parser Error] incomplete token stream')
         arg_list = []
-        while tokens and tokens[0].val != ')':
+        while tokens and tokens[0].src != ')':
             arg_list.append(parse_expr())
         consume(')')
         node = CallNode(start.sl, None, callee, arg_list)
@@ -478,7 +478,7 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
         if not tokens:
             sys.exit(f'[Parser Error] incomplete token stream')
         expr_list = []
-        while tokens and tokens[0].val != ']':
+        while tokens and tokens[0].src != ']':
             expr_list.append(parse_expr())
         if len(expr_list) == 0:
             sys.exit('[Parser Error] zero-length sequence at {start}')
@@ -497,18 +497,18 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
             return parse_integer()
         elif is_string_token(tokens[0]):
             return parse_string()
-        elif tokens[0].val == 'lambda':
+        elif tokens[0].src == 'lambda':
             return parse_lambda()
-        elif tokens[0].val == 'letrec':
+        elif tokens[0].src == 'letrec':
             return parse_letrec()
-        elif tokens[0].val == 'if':
+        elif tokens[0].src == 'if':
             return parse_if()
         # check keywords before var to avoid recognizing keywords as vars
         elif is_variable_token(tokens[0]):
             return parse_variable()
-        elif tokens[0].val == '(':
+        elif tokens[0].src == '(':
             return parse_call()
-        elif tokens[0].val == '[':
+        elif tokens[0].src == '[':
             return parse_sequence()
         else:
             sys.exit(f'[Parser Error] unrecognized expression starting with {tokens[0]}')
