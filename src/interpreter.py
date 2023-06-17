@@ -145,10 +145,16 @@ def lex(source: str, debug: bool) -> deque[Token]:
                         col += 1
                 else:
                     sys.exit(f'[Lexer Error] incomplete integer literal at {sl}')
-            # variable / intrinsic / keyword
+            # variable / keyword
             elif chars[0].isalpha():
                 src = ''
                 while chars and chars[0].isalpha():
+                    src += chars.popleft()
+                    col += 1
+            # intrinsic
+            elif chars[0] == '.':
+                src = ''
+                while chars and (not (chars[0].isspace() or chars[0] == ')')):
                     src += chars.popleft()
                     col += 1
             # special symbol
@@ -237,6 +243,19 @@ class StringNode(ExprNode):
 
     def pretty_print(self) -> str:
         return quote(self.value)
+
+class IntrinsicNode(ExprNode):
+
+    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], name: str):
+        self.sl = sl
+        self.parent = parent
+        self.name = name
+
+    def __str__(self) -> str:
+        return f'(IntrinsicNode {self.sl} {self.name})'
+
+    def pretty_print(self) -> str:
+        return self.name
 
 class VariableNode(ExprNode):
 
@@ -344,6 +363,9 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
     def is_string_token(token: Token) -> bool:
         return len(token.src) and token.src[0] == '"'
 
+    def is_intrinsic_token(token: Token) -> bool:
+        return len(token.src) and token.src[0] == '.'
+
     def is_variable_token(token: Token) -> bool:
         return token.src.isalpha()
 
@@ -394,6 +416,15 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
             else:
                 s += char
         node = StringNode(token.sl, None, s)
+        return node
+
+    def parse_intrinsic() -> IntrinsicNode:
+        if not tokens:
+            sys.exit(f'[Parser Error] incomplete token stream')
+        token = tokens.popleft()
+        if not is_intrinsic_token(token):
+            sys.exit(f'[Parser Error] expected an intrinsic function, got {token}')
+        node = IntrinsicNode(token.sl, None, token.src)
         return node
 
     def parse_lambda() -> LambdaNode:
@@ -497,6 +528,8 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
             return parse_integer()
         elif is_string_token(tokens[0]):
             return parse_string()
+        elif is_intrinsic_token(tokens[0]):
+            return parse_intrinsic()
         elif tokens[0].src == 'lambda':
             return parse_lambda()
         elif tokens[0].src == 'letrec':
@@ -789,13 +822,6 @@ def lookup_stack(sl: SourceLocation, name: str, stack: list[Layer]) -> int:
 def interpret(tree: ExprNode, debug: bool) -> Value:
     if debug:
         sys.stderr.write('[Debug] *** starting interpreter ***\n')
-
-    intrinsics = ['void',
-                  'add', 'sub', 'mul', 'div', 'mod', 'lt',
-                  'strlen', 'strcut', 'strcat', 'strlt', 'strint', 'strquote',
-                  'getline', 'put',
-                  'isvoid', 'isint', 'isstr', 'isclo', 'iscont',
-                  'callcc', 'eval', 'exit']
     
     # state
     state = State(tree)
@@ -901,7 +927,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
             state.stack.pop()
         elif type(layer.expr) == CallNode:
             # intrinsic call
-            if type(layer.expr.callee) == VariableNode and layer.expr.callee.name in intrinsics:
+            if type(layer.expr.callee) == IntrinsicNode:
                 # initialize args
                 if layer.pc == 0:
                     layer.local['args'] = []
@@ -919,52 +945,52 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     intrinsic = layer.expr.callee.name
                     args = layer.local['args']
                     # a gigantic series of if conditions, one for each intrinsic function
-                    if intrinsic == 'void':
+                    if intrinsic == '.void':
                         check_args_error_exit(layer.expr.callee, args, [])
                         value = Void()
-                    elif intrinsic == 'add':
+                    elif intrinsic == '.add':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value + args[1].value)
-                    elif intrinsic == 'sub':
+                    elif intrinsic == '.sub':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value - args[1].value)
-                    elif intrinsic == 'mul':
+                    elif intrinsic == '.mul':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value * args[1].value)
-                    elif intrinsic == 'div':
+                    elif intrinsic == '.div':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value // args[1].value)
-                    elif intrinsic == 'mod':
+                    elif intrinsic == '.mod':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value % args[1].value)
-                    elif intrinsic == 'lt':
+                    elif intrinsic == '.lt':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
-                    elif intrinsic == 'strlen':
+                    elif intrinsic == '.strlen':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         value = Integer(len(args[0].value))
-                    elif intrinsic == 'strcut':
+                    elif intrinsic == '.strcut':
                         check_args_error_exit(layer.expr.callee, args, [String, Integer, Integer])
                         value = String(args[0].value[args[1].value : args[2].value])
-                    elif intrinsic == 'strcat':
+                    elif intrinsic == '.strcat':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
                         value = String(args[0].value + args[1].value)
-                    elif intrinsic == 'strlt':
+                    elif intrinsic == '.strlt':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
-                    elif intrinsic == 'strint':
+                    elif intrinsic == '.strint':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         value = Integer(int(args[0].value))
-                    elif intrinsic == 'strquote':
+                    elif intrinsic == '.strquote':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         value = String(quote(args[0].value))
-                    elif intrinsic == 'getline':
+                    elif intrinsic == '.getline':
                         check_args_error_exit(layer.expr.callee, args, [])
                         try:
                             value = String(input())
                         except EOFError:
                             value = Void()
-                    elif intrinsic == 'put':
+                    elif intrinsic == '.put':
                         if not (len(args) >= 1 and all(map(lambda v : isinstance(v, Value), args))):
                             sys.exit(f'[Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         output = ''
@@ -974,7 +1000,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         print(output, end = '', flush = True)
                         # the return value of put is void
                         value = Void()
-                    elif intrinsic == 'callcc':
+                    elif intrinsic == '.callcc':
                         check_args_error_exit(layer.expr.callee, args, [Closure])
                         state.stack.pop()
                         # obtain the continuation (this deepcopy will not copy the store)
@@ -987,22 +1013,22 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, 0, {}, True))
                         # we already popped the stack in this case, so just continue the evaluation
                         continue
-                    elif intrinsic == 'isvoid':
+                    elif intrinsic == '.isvoid':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], Void) else 0)
-                    elif intrinsic == 'isint':
+                    elif intrinsic == '.isint':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], Integer) else 0)
-                    elif intrinsic == 'isstr':
+                    elif intrinsic == '.isstr':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], String) else 0)
-                    elif intrinsic == 'isclo':
+                    elif intrinsic == '.isclo':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], Closure) else 0)
-                    elif intrinsic == 'iscont':
+                    elif intrinsic == '.iscont':
                         check_args_error_exit(layer.expr.callee, args, [Value])
                         value = Integer(1 if isinstance(args[0], Continuation) else 0)
-                    elif intrinsic == 'eval':
+                    elif intrinsic == '.eval':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         arg = args[0]
                         if debug:
@@ -1011,7 +1037,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                             sys.stderr.write(f'[Debug] eval stopped the new interpreter instance at {layer.expr}\n')
                         else:
                             value = normal_run(arg.value)
-                    elif intrinsic == 'exit':
+                    elif intrinsic == '.exit':
                         check_args_error_exit(layer.expr.callee, args, [])
                         if debug:
                             sys.stderr.write(f'[Debug] execution stopped by the intrinsic call {layer.expr}\n')

@@ -19,10 +19,10 @@ letrec (
     [
       # To call a "member function" on an "object",
       # just wrap the call in a lambda and then "pass" that lambda into the "object".
-      (put (base lambda () { (F) }) "\n")
-      (put (base lambda () { (G) }) "\n")
-      (put (derived lambda () { (F) }) "\n")
-      (put (derived lambda () { (G) }) "\n")
+      (.put (base lambda () { (F) }) "\n")
+      (.put (base lambda () { (G) }) "\n")
+      (.put (derived lambda () { (F) }) "\n")
+      (.put (derived lambda () { (G) }) "\n")
     ]
   }
 }

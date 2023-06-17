@@ -8,11 +8,11 @@
 letrec (
   # greatest common divisor of nonnegative integers
   gcd = lambda (a b) {
-    if (lt b 1) then a
-    else (gcd b (mod a b))
+    if (.lt b 1) then a
+    else (gcd b (.mod a b))
   }
 ) {
-  (put (gcd (strint (getline)) (strint (getline))) "\n")
+  (.put (gcd (.strint (.getline)) (.strint (.getline))) "\n")
 }
 ```
 
@@ -46,12 +46,12 @@ Python >= 3.9
 <lexical-variable> := [a-z][a-zA-Z]* // lexically scoped variable
 <dynamic-variable> := [A-Z][a-zA-Z]* // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
-<intrinsic> := void
-             | add | sub | mul | div | mod | lt
-             | strlen | strcut | strcat | strlt | strint | strquote
-             | getline | put
-             | isvoid | isint | isstr | isclo | iscont
-             | callcc | eval | exit
+<intrinsic> := .void
+             | .add | .sub | .mul | .div | .mod | .lt
+             | .strlen | .strcut | .strcat | .strlt | .strint | .strquote
+             | .getline | .put
+             | .isvoid | .isint | .isstr | .isclo | .iscont
+             | .callcc | .eval | .exit
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
 <expr> := <integer> | <string> | <variable>

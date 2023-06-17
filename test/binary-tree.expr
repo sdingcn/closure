@@ -1,6 +1,6 @@
 letrec (
   eq = lambda (a b) {
-    if (lt (add (lt a b) (lt b a)) 1) then 1 else 0
+    if (.lt (.add (.lt a b) (.lt b a)) 1) then 1 else 0
   }
   leaf = lambda () {
     lambda (x) {
@@ -17,10 +17,10 @@ letrec (
     }
   }
   dfs = lambda (tree) {
-    if (eq (tree 0) 0) then (void)
+    if (eq (tree 0) 0) then (.void)
     else [
       (dfs (tree 2))
-      (put (tree 1) "\n")
+      (.put (tree 1) "\n")
       (dfs (tree 3))
     ]
   }
