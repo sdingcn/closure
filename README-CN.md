@@ -44,9 +44,10 @@ Python >= 3.9
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := void
              | add | sub | mul | div | mod | lt
-             | strlen | strslice | strcat | strlt | strint | strquote
+             | strlen | strcut | strcat | strlt | strint | strquote
              | getline | put
-             | callcc | type | eval | exit
+             | isvoid | isint | isstr | isclo | iscont
+             | callcc | eval | exit
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
 <expr> := <integer> | <string> | <variable>

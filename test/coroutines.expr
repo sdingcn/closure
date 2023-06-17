@@ -4,22 +4,18 @@ letrec (
   }
   task = lambda (yield) {
     [
-      letrec (cc = (getCC)) {
-        # (lt 3 (type cc)) is to check whether cc is a continuation.
-        # (type cc) returns the type id of cc; continuation's type id is 4.
-        # If cc is a continuation, we know (getCC) just captured the continuation.
-        # Otherwise we know the previously captured continuation was just called somewhere else with another value.
-        if (lt 3 (type cc)) then (yield cc)
+      letrec (c = (getCC)) {
+        if (iscont c) then (yield c) # jump to main
         else (void)
       }
       (put "task 1\n")
-      letrec (cc = (getCC)) {
-        if (lt 3 (type cc)) then (yield cc)
+      letrec (c = (getCC)) {
+        if (iscont c) then (yield c)
         else (void)
       }
       (put "task 2\n")
-      letrec (cc = (getCC)) {
-        if (lt 3 (type cc)) then (yield cc)
+      letrec (c = (getCC)) {
+        if (iscont c) then (yield c)
         else (void)
       }
       (put "task 3\n")
@@ -27,11 +23,11 @@ letrec (
   }
 ) {
   letrec (
-    t = (callcc task)
+    c = (callcc task)
   ) {
-    if (lt 3 (type t)) then [
+    if (iscont c) then [
       (put "main\n")
-      (t (void))
+      (c (void)) # jump to task
     ]
     else (void)
   }

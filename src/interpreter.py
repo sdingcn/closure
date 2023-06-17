@@ -532,9 +532,6 @@ class Value:
     def pretty_print(self) -> str:
         return ''
 
-    def type_id(self) -> int:
-        return -1
-
 class Void(Value):
 
     def __init__(self):
@@ -546,9 +543,6 @@ class Void(Value):
 
     def pretty_print(self) -> str:
         return '<void>'
-
-    def type_id(self) -> int:
-        return 0
 
 class Integer(Value):
 
@@ -562,9 +556,6 @@ class Integer(Value):
     def pretty_print(self) -> str:
         return str(self.value)
 
-    def type_id(self) -> int:
-        return 1
-
 class String(Value):
 
     def __init__(self, value: str):
@@ -576,9 +567,6 @@ class String(Value):
 
     def pretty_print(self) -> str:
         return self.value
-
-    def type_id(self) -> int:
-        return 2
 
 class Closure(Value):
 
@@ -592,9 +580,6 @@ class Closure(Value):
 
     def pretty_print(self) -> str:
         return '<closure>'
-
-    def type_id(self) -> int:
-        return 3
 
 class Layer:
     '''The layer class in the evaluation stack, where each layer is the expression currently under evaluation'''
@@ -633,9 +618,6 @@ class Continuation(Value):
 
     def pretty_print(self) -> str:
         return '<continuation>'
-
-    def type_id(self) -> int:
-        return 4
 
 class State:
     '''The state class for the interpretation, where each state object completely determines the current state (stack and store)'''
@@ -810,9 +792,10 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
 
     intrinsics = ['void',
                   'add', 'sub', 'mul', 'div', 'mod', 'lt',
-                  'strlen', 'strslice', 'strcat', 'strlt', 'strint', 'strquote',
+                  'strlen', 'strcut', 'strcat', 'strlt', 'strint', 'strquote',
                   'getline', 'put',
-                  'callcc', 'type', 'eval', 'exit']
+                  'isvoid', 'isint', 'isstr', 'isclo', 'iscont',
+                  'callcc', 'eval', 'exit']
     
     # state
     state = State(tree)
@@ -960,7 +943,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     elif intrinsic == 'strlen':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         value = Integer(len(args[0].value))
-                    elif intrinsic == 'strslice':
+                    elif intrinsic == 'strcut':
                         check_args_error_exit(layer.expr.callee, args, [String, Integer, Integer])
                         value = String(args[0].value[args[1].value : args[2].value])
                     elif intrinsic == 'strcat':
@@ -1004,9 +987,21 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, 0, {}, True))
                         # we already popped the stack in this case, so just continue the evaluation
                         continue
-                    elif intrinsic == 'type':
+                    elif intrinsic == 'isvoid':
                         check_args_error_exit(layer.expr.callee, args, [Value])
-                        value = Integer(args[0].type_id())
+                        value = Integer(1 if isinstance(args[0], Void) else 0)
+                    elif intrinsic == 'isint':
+                        check_args_error_exit(layer.expr.callee, args, [Value])
+                        value = Integer(1 if isinstance(args[0], Integer) else 0)
+                    elif intrinsic == 'isstr':
+                        check_args_error_exit(layer.expr.callee, args, [Value])
+                        value = Integer(1 if isinstance(args[0], String) else 0)
+                    elif intrinsic == 'isclo':
+                        check_args_error_exit(layer.expr.callee, args, [Value])
+                        value = Integer(1 if isinstance(args[0], Closure) else 0)
+                    elif intrinsic == 'iscont':
+                        check_args_error_exit(layer.expr.callee, args, [Value])
+                        value = Integer(1 if isinstance(args[0], Continuation) else 0)
                     elif intrinsic == 'eval':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         arg = args[0]
