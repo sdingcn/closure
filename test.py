@@ -36,17 +36,26 @@ def read_file(path: str) -> str:
 
 def main():
     tests = [
-        ('test/binary-tree.expr', '', '1\n2\n3\n4\n5\n<void>\n'),
+        ('test/binary-tree.expr', '',
+'''\
+1
+2
+3
+4
+5
+<void>
+'''),
         
         ('test/coroutines.expr', '',
-            'main\n'
-            'task 1\n'
-            'main\n'
-            'task 2\n'
-            'main\n'
-            'task 3\n'
-            '<void>\n'
-        ),
+'''\
+main
+task 1
+main
+task 2
+main
+task 3
+<void>
+'''),
 
         ('test/gcd.expr', '100\n0\n', '100\n<void>\n'),
         ('test/gcd.expr', '0\n100\n', '100\n<void>\n'),
@@ -56,15 +65,36 @@ def main():
 
         ('test/intensive.expr', '', '50005000\n'),
 
-        ('test/lazy-evaluation.expr', '', '3\n2\n1\nthunk\n<void>\n'),
+        ('test/lazy-evaluation.expr', '',
+'''\
+3
+2
+1
+thunk
+<void>
+'''),
 
         ('test/scope.expr', '', '1\n303\n<void>\n'),
 
-        ('test/multi-stage.expr', '', 'EVAL\nhello world\nhello world\n<void>\n'),
+        ('test/multi-stage.expr', '',
+'''\
+EVAL
+hello world
+hello world
+<void>
+'''),
 
-        ('test/oop.expr', '', '1\n2\n100\n2\n<void>\n'),
+        ('test/oop.expr', '',
+'''\
+1
+2
+100
+2
+<void>
+'''),
 
-        ('test/strings-and-comments.expr', '', '''\
+        ('test/strings-and-comments.expr', '',
+'''\
 123
 456 # message 2
 aaa"
