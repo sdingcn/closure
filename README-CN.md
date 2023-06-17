@@ -37,20 +37,20 @@ Python >= 3.9
 
 ```
 <comment> := #.*?\n
-<int> := [+-]?0 | [+-]?[1-9][0-9]*
-<str> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
-<lex-var> := [a-z][a-zA-Z]*
-<dyn-var> := [A-Z][a-zA-Z]*
-<var> := <lex-var> | <dyn-var>
+<integer> := [+-]?0 | [+-]?[1-9][0-9]*
+<string> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
+<lexical-variable> := [a-z][a-zA-Z]* // lexically scoped variable
+<dynamic-variable> := [A-Z][a-zA-Z]* // dynamically scoped variable
+<variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := void
              | add | sub | mul | div | mod | lt
              | strlen | strslice | strcat | strlt | strint | strquote
              | getline | put
              | callcc | type | eval | exit
-<binding> := <var> = <expr>
+<binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
-<expr> := <int> | <str> | <var>
-        | lambda ( <var>* ) { <expr> }
+<expr> := <integer> | <string> | <variable>
+        | lambda ( <variable>* ) { <expr> }
         | letrec ( <binding>* ) { <expr> }
         | if <expr> then <expr> else <expr>
         | ( <callee> <expr>* )
