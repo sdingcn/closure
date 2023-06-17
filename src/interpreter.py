@@ -966,6 +966,15 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     elif intrinsic == '.<':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
+                    elif intrinsic == '.and':
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
+                        value = Integer(1) if args[0].value != 0 and args[1].value != 0 else Integer(0)
+                    elif intrinsic == '.or':
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
+                        value = Integer(1) if args[0].value != 0 or args[1].value != 0 else Integer(0)
+                    elif intrinsic == '.not':
+                        check_args_error_exit(layer.expr.callee, args, [Integer])
+                        value = Integer(1) if args[0].value == 0 else Integer(0)
                     elif intrinsic == '.strlen':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         value = Integer(len(args[0].value))

@@ -48,6 +48,7 @@ Python >= 3.9
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
              | .+ | .- | .* | ./ | .% | .<
+             | .and | .or | .not // for simplicity these act on integers
              | .strlen | .strcut | .str+ | .str< | .strint | .strquote
              | .getline | .put
              | .void? | .int? | .str? | .clo? | .cont?
