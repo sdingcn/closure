@@ -47,9 +47,9 @@ Python >= 3.9
 <dynamic-variable> := [A-Z][a-zA-Z]*    // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
-             | .+ | .- | .* | ./ | .%
+             | .+ | .- | .* | ./ | .^ | .%
              | .< | .<= | .> | .>= | .== | .!=
-             | .and | .or | .not    // for simplicity these act on integers
+             | .and | .or | .not    // for simplicity these operators act on integers
              | .strlen | .strcut | .str+ | .strint | .strquote
              | .str< | .str<= | .str> | .str>= | .str== | .str!= 
              | .getline | .put

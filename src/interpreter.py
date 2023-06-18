@@ -960,6 +960,9 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     elif intrinsic == './':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value // args[1].value)
+                    elif intrinsic == '.^':
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
+                        value = Integer(args[0].value ** args[1].value)
                     elif intrinsic == '.%':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(args[0].value % args[1].value)
