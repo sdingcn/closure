@@ -7,7 +7,7 @@ letrec (
   }
   fac = lambda (fix) {
     lambda (v) {
-      if (.< v 2) then 1
+      if (.<= v 1) then 1
       else (.* v (fix (.- v 1)))
     }
   }

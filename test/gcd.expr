@@ -1,7 +1,7 @@
 letrec (
   # greatest common divisor of nonnegative integers
   gcd = lambda (a b) {
-    if (.< b 1) then a
+    if (.== b 0) then a
     else (gcd b (.% a b))
   }
 ) {

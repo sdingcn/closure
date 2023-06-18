@@ -6,7 +6,7 @@
 letrec (
   # greatest common divisor of nonnegative integers
   gcd = lambda (a b) {
-    if (.< b 1) then a
+    if (.== b 0) then a
     else (gcd b (.% a b))
   }
 ) {
@@ -43,9 +43,9 @@ Python >= 3.9
 <dynamic-variable> := [A-Z][a-zA-Z]* // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
-             | .+ | .- | .* | ./ | .% | .<
+             | .+ | .- | .* | ./ | .% | .< | .<= | .> | .>= | .== | .!=
              | .and | .or | .not // for simplicity these act on integers
-             | .strlen | .strcut | .str+ | .str< | .strint | .strquote
+             | .strlen | .strcut | .str+ | .str< | .str<= | .str> | .str>= | .str== | .str!= | .strint | .strquote
              | .getline | .put
              | .void? | .int? | .str? | .clo? | .cont?
              | .callcc | .eval | .exit

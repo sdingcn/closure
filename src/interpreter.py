@@ -966,6 +966,21 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     elif intrinsic == '.<':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
+                    elif intrinsic == '.<=':
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
+                        value = Integer(1) if args[0].value <= args[1].value else Integer(0)
+                    elif intrinsic == '.>':
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
+                        value = Integer(1) if args[0].value > args[1].value else Integer(0)
+                    elif intrinsic == '.>=':
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
+                        value = Integer(1) if args[0].value >= args[1].value else Integer(0)
+                    elif intrinsic == '.==':
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
+                        value = Integer(1) if args[0].value == args[1].value else Integer(0)
+                    elif intrinsic == '.!=':
+                        check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
+                        value = Integer(1) if args[0].value != args[1].value else Integer(0)
                     elif intrinsic == '.and':
                         check_args_error_exit(layer.expr.callee, args, [Integer, Integer])
                         value = Integer(1) if args[0].value != 0 and args[1].value != 0 else Integer(0)
@@ -987,6 +1002,21 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     elif intrinsic == '.str<':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
                         value = Integer(1) if args[0].value < args[1].value else Integer(0)
+                    elif intrinsic == '.str<=':
+                        check_args_error_exit(layer.expr.callee, args, [String, String])
+                        value = Integer(1) if args[0].value <= args[1].value else Integer(0)
+                    elif intrinsic == '.str>':
+                        check_args_error_exit(layer.expr.callee, args, [String, String])
+                        value = Integer(1) if args[0].value > args[1].value else Integer(0)
+                    elif intrinsic == '.str>=':
+                        check_args_error_exit(layer.expr.callee, args, [String, String])
+                        value = Integer(1) if args[0].value >= args[1].value else Integer(0)
+                    elif intrinsic == '.str==':
+                        check_args_error_exit(layer.expr.callee, args, [String, String])
+                        value = Integer(1) if args[0].value == args[1].value else Integer(0)
+                    elif intrinsic == '.str!=':
+                        check_args_error_exit(layer.expr.callee, args, [String, String])
+                        value = Integer(1) if args[0].value != args[1].value else Integer(0)
                     elif intrinsic == '.strint':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         value = Integer(int(args[0].value))

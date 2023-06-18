@@ -1,6 +1,6 @@
 letrec (
   sum = lambda (n) {
-    if (.< n 1) then 0
+    if (.== n 0) then 0
     else (.+ n (sum (.- n 1)))
   }
 ) {

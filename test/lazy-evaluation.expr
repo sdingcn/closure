@@ -3,7 +3,7 @@ letrec (
   recur = lambda (n thunk) {
     [
       (.put n "\n")
-      if (.< n 2) then (force thunk)
+      if (.== n 1) then (force thunk)
       else (recur (.- n 1) thunk)
     ]
   }
