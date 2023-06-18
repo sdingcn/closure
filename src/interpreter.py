@@ -1234,6 +1234,8 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     state.stack.append(Layer(layer.env, layer.expr.expr_box[0], 0, {}, False))
                     layer.pc += 1
                 else:
+                    if type(value) != Closure:
+                        sys.exit(f'[Runtime Error] lexical variable query applied to non-closure type at {layer.expr}')
                     # the closure's value is already in "value", so we just use it and then update "value"
                     value = Integer(1) if query_env(layer.expr.var.name, value.env) else Integer(0)
                     state.stack.pop()
@@ -1248,6 +1250,8 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                 state.stack.append(Layer(layer.env, layer.expr.expr, 0, {}, False))
                 layer.pc += 1
             else:
+                if type(value) != Closure:
+                    sys.exit(f'[Runtime Error] lexical variable access applied to non-closure type at {layer.expr}')
                 # again, "value" already contains the closure's evaluation result
                 value = state.store[lookup_env(layer.expr.sl, layer.expr.var.name, value.env)]
                 state.stack.pop()
