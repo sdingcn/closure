@@ -158,7 +158,7 @@ def lex(source: str, debug: bool) -> deque[Token]:
                     src += chars.popleft()
                     col += 1
             # special symbol
-            elif chars[0] in ('(', ')', '{', '}', '[', ']', '='):
+            elif chars[0] in ('(', ')', '{', '}', '[', ']', '=', '@', '&'):
                 src = chars.popleft()
                 col += 1
             # string literal
@@ -270,6 +270,12 @@ class VariableNode(ExprNode):
     def pretty_print(self) -> str:
         return self.name
 
+    def is_lex(self) -> bool:
+        return self.name[0].islower()
+
+    def is_dyn(self) -> bool:
+        return self.name[0].isupper()
+
 class LambdaNode(ExprNode):
 
     def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], var_list: list[VariableNode], expr: ExprNode):
@@ -348,6 +354,38 @@ class SequenceNode(ExprNode):
         return ('[\n'
               + indent('\n'.join(list(map(lambda e: e.pretty_print(), self.expr_list))), 2) + '\n'
               + ']')
+
+class QueryNode(ExprNode):
+
+    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], var: VariableNode, expr_box: list[ExprNode]):
+        self.sl = sl
+        self.parent = parent
+        self.var = var
+        self.expr_box = expr_box
+
+    def __str__(self) -> str:
+        return f'(QueryNode {self.sl} {self.var} {unfold(self.expr_box)})'
+
+    def pretty_print(self) -> str:
+        if len(self.expr_box) == 0:
+            tail = ''
+        else:
+            tail = ' ' + self.expr_box[0].pretty_print()
+        return '@' + self.var.pretty_print() + tail
+
+class AccessNode(ExprNode):
+
+    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], var: VariableNode, expr: ExprNode):
+        self.sl = sl
+        self.parent = parent
+        self.var = var
+        self.expr = expr
+
+    def __str__(self) -> str:
+        return f'(AccessNode {self.sl} {self.var} {self.expr})'
+
+    def pretty_print(self) -> str:
+        return '&' + self.var.pretty_print() + ' ' + self.expr.pretty_print()
 
 def parse(tokens: deque[Token], debug: bool) -> ExprNode:
     if debug:
@@ -430,8 +468,6 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
     def parse_lambda() -> LambdaNode:
         start = consume('lambda')
         consume('(')
-        if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
         var_list = []
         while tokens and is_variable_token(tokens[0]):
             var_list.append(parse_variable())
@@ -448,8 +484,6 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
     def parse_letrec() -> LetrecNode:
         start = consume('letrec')
         consume('(')
-        if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
         var_expr_list = []
         while tokens and is_variable_token(tokens[0]):
             v = parse_variable()
@@ -492,8 +526,6 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
     def parse_call() -> CallNode:
         start = consume('(')
         callee = parse_expr()
-        if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
         arg_list = []
         while tokens and tokens[0].src != ')':
             arg_list.append(parse_expr())
@@ -506,8 +538,6 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
 
     def parse_sequence() -> SequenceNode:
         start = consume('[')
-        if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
         expr_list = []
         while tokens and tokens[0].src != ']':
             expr_list.append(parse_expr())
@@ -517,6 +547,28 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
         node = SequenceNode(start.sl, None, expr_list)
         for e in node.expr_list:
             e.parent = node
+        return node
+
+    def parse_query() -> QueryNode:
+        start = consume('@')
+        var = parse_variable()
+        if var.is_lex():
+            expr = parse_expr()
+            node = QueryNode(start.sl, None, var, [expr])
+            var.parent = node
+            expr.parent = node
+        else:
+            node = QueryNode(start.sl, None, var, [])
+            var.parent = node
+        return node
+
+    def parse_access() -> AccessNode:
+        start = consume('&')
+        var = parse_variable()
+        expr = parse_expr()
+        node = AccessNode(start.sl, None, var, expr)
+        var.parent = node
+        expr.parent = node
         return node
 
     def parse_expr() -> ExprNode:
@@ -543,6 +595,10 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
             return parse_call()
         elif tokens[0].src == '[':
             return parse_sequence()
+        elif tokens[0].src == '@':
+            return parse_query()
+        elif tokens[0].src == '&':
+            return parse_access()
         else:
             sys.exit(f'[Parser Error] unrecognized expression starting with {tokens[0]}')
     
@@ -816,6 +872,22 @@ def lookup_stack(sl: SourceLocation, name: str, stack: list[Layer]) -> int:
                 if stack[i].env[j][0] == name:
                     return stack[i].env[j][1]
     sys.exit(f'[Runtime Error] undefined variable {name} at {sl} (intrinsic functions cannot be treated as variables)')
+
+def query_env(name: str, env: list[tuple[str, int]]) -> bool:
+    ''' lexically scoped variable query '''
+    for i in range(len(env) - 1, -1, -1):
+        if env[i][0] == name:
+            return True
+    return False
+
+def query_stack(name: str, stack: list[Layer]) -> bool:
+    ''' dynamically scoped variable query '''
+    for i in range(len(stack) - 1, -1, -1):
+        if stack[i].frame:
+            for j in range(len(stack[i].env) - 1, -1, -1):
+                if stack[i].env[j][0] == name:
+                    return True
+    return False
 
 ### interpreter
 
@@ -1152,6 +1224,32 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                 layer.pc += 1
             # finish the sequence
             else:
+                state.stack.pop()
+        elif type(layer.expr) == QueryNode:
+            if debug:
+                sys.stderr.write(f'[Debug] querying the variable {layer.expr.var}\n')
+            if layer.expr.var.is_lex():
+                # evaluate the closure
+                if layer.pc == 0:
+                    state.stack.append(Layer(layer.env, layer.expr.expr_box[0], 0, {}, False))
+                    layer.pc += 1
+                else:
+                    # the closure's value is already in "value", so we just use it and then update "value"
+                    value = Integer(1) if query_env(layer.expr.var.name, value.env) else Integer(0)
+                    state.stack.pop()
+            else:
+                value = Integer(1) if query_stack(layer.expr.var.name, state.stack) else Integer(0)
+                state.stack.pop()
+        elif type(layer.expr) == AccessNode:
+            if debug:
+                sys.stderr.write(f'[Debug] accessing the variable {layer.expr.var}\n')
+            # evaluate the closure
+            if layer.pc == 0:
+                state.stack.append(Layer(layer.env, layer.expr.expr, 0, {}, False))
+                layer.pc += 1
+            else:
+                # again, "value" already contains the closure's evaluation result
+                value = state.store[lookup_env(layer.expr.sl, layer.expr.var.name, value.env)]
                 state.stack.pop()
         else:
             sys.exit(f'[Runtime Error] unrecognized AST node {layer.expr}')

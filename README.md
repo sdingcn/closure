@@ -6,13 +6,28 @@
 
 ```
 letrec (
-  # greatest common divisor of nonnegative integers
-  gcd = lambda (a b) {
-    if (.== b 0) then a
-    else (gcd b (.% a b))
+  leaf = lambda () {
+    lambda () { 0 }
+  }
+  node = lambda (value left right) {
+    lambda () { 1 }
+  }
+  dfs = lambda (tree) {
+    if (.not (tree)) then (.void)
+    else [
+      (dfs &left tree)
+      (.put &value tree "\n")
+      (dfs &right tree)
+    ]
   }
 ) {
-  (.put (gcd (.strint (.getline)) (.strint (.getline))) "\n")
+  # in-order traversal
+  (dfs
+    (node 4
+      (node 2
+        (node 1 (leaf) (leaf))
+        (node 3 (leaf) (leaf)))
+      (node 5 (leaf) (leaf))))
 }
 ```
 
@@ -27,7 +42,6 @@ to implement/simulate other language features.
 
 | Feature | Underlying implementation |
 | --- | --- |
-| Structures ([test/binary-tree.expr](test/binary-tree.expr)) | Closures |
 | Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
 | Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
 | Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
@@ -42,14 +56,14 @@ Python >= 3.9
 ```
 <comment> := #.*?\n
 <integer> := [+-]?0 | [+-]?[1-9][0-9]*
-<string> := "( [^"\] | \" | \\ | \t | \n )*"    // charset is English keyboard
-<lexical-variable> := [a-z][a-zA-Z]*    // lexically scoped variable
-<dynamic-variable> := [A-Z][a-zA-Z]*    // dynamically scoped variable
+<string> := "( [^"\] | \" | \\ | \t | \n )*"                     // charset is English keyboard
+<lexical-variable> := [a-z][a-zA-Z]*                             // lexically scoped variable
+<dynamic-variable> := [A-Z][a-zA-Z]*                             // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
              | .+ | .- | .* | ./ | .^ | .%
              | .< | .<= | .> | .>= | .== | .!=
-             | .and | .or | .not    // for simplicity these operators act on integers
+             | .and | .or | .not                                 // for simplicity these operators act on integers
              | .strlen | .strcut | .str+ | .strint | .strquote
              | .str< | .str<= | .str> | .str>= | .str== | .str!= 
              | .getline | .put
@@ -58,12 +72,16 @@ Python >= 3.9
              | .python    // Python FFI
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
+<query-body> := <dynamic-variable>                               // Is it defined here?
+              | <lexical-variable> <expr>                        // Is it defined in the closure's environment?
 <expr> := <integer> | <string> | <variable>
         | lambda ( <variable>* ) { <expr> }
         | letrec ( <binding>* ) { <expr> }
         | if <expr> then <expr> else <expr>
         | ( <callee> <expr>* )
-        | [ <expr>+ ]    // sequence evaluation
+        | [ <expr>+ ]                                            // sequence evaluation
+        | @ <query-body>                                         // query whether a variable is defined
+        | & <lexical-variable> <expr>                            // access a variable in a closure's env
 ```
 
 Supported object types: Void, Integer, String, Closure, Continuation.
