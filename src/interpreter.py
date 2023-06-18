@@ -1114,7 +1114,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         print(output, end = '', flush = True)
                         # the return value of put is void
                         value = Void()
-                    elif intrinsic == '.callcc':
+                    elif intrinsic == '.call/cc':
                         check_args_error_exit(layer.expr.callee, args, [Closure])
                         state.stack.pop()
                         # obtain the continuation (this deepcopy will not copy the store)

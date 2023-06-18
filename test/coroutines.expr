@@ -1,6 +1,6 @@
 letrec (
   getCC = lambda () {
-    (.callcc lambda (k) { (k k) })
+    (.call/cc lambda (k) { (k k) })
   }
   task = lambda (yield) {
     [
@@ -23,7 +23,7 @@ letrec (
   }
 ) {
   letrec (
-    c = (.callcc task)
+    c = (.call/cc task)
   ) {
     if (.cont? c) then [
       (.put "main\n")

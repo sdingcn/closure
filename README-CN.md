@@ -64,7 +64,7 @@ Python >= 3.9
              | .str< | .str<= | .str> | .str>= | .str== | .str!= 
              | .getline | .put
              | .void? | .int? | .str? | .clo? | .cont?
-             | .callcc | .eval | .exit
+             | .call/cc | .eval | .exit
              | .python                       // Python FFI
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
