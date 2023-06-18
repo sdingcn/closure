@@ -31,16 +31,10 @@ letrec (
 }
 ```
 
-ExprScript is a dynamically typed functional programming language with first class continuations,
-lexically / dynamically scoped variables, mark-and-sweep garbage collection,
-a built-in code evaluator `eval`, and a simple Python FFI.
-The goals of this project are to experiment with language features
-and to demonstrate the implementation of interpreters.
+ExprScript is a dynamically typed functional programming language.
+It has a small language core, but can implement/simulate many other features.
 
-One design goal of ExprScript is to use a small language core
-to implement/simulate other language features.
-
-| Feature | Underlying implementation |
+| Feature | Implementation |
 | --- | --- |
 | Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
 | Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
