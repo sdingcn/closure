@@ -18,7 +18,7 @@ letrec (
 
 ExprScript is a dynamically typed functional programming language with first class continuations,
 lexically / dynamically scoped variables, mark-and-sweep garbage collection,
-and a built-in code evaluator `eval`.
+a built-in code evaluator `eval`, and a simple Python FFI.
 The goals of this project are to experiment with language features
 and to demonstrate the implementation of interpreters.
 
@@ -55,6 +55,7 @@ Python >= 3.9
              | .getline | .put
              | .void? | .int? | .str? | .clo? | .cont?
              | .callcc | .eval | .exit
+             | .python    // Python FFI
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
 <expr> := <integer> | <string> | <variable>

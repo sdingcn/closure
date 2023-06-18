@@ -1085,6 +1085,11 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                             sys.stderr.write(f'[Debug] execution stopped by the intrinsic call {layer.expr}\n')
                         # the interpreter returns 0
                         sys.exit()
+                    elif intrinsic == '.python':
+                        check_args_error_exit(layer.expr.callee, args, [String, String])
+                        if debug:
+                            sys.stderr.write(f'[Debug] calling Python FFI {layer.expr}\n')
+                        value = String(eval(args[0].value + '({!r})'.format(args[1].value)))
                     else:
                         sys.exit(f'[Runtime Error] unrecognized intrinsic function call at {layer.expr}')
                     state.stack.pop()

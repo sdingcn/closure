@@ -8,4 +8,5 @@
   (.put "ddd
 eee" "\n")
   (.put "fff\nggg" "\n")
+  (.put (.python "(lambda s : s.strip())" " hhh ") "\n")
 ]

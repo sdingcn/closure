@@ -16,7 +16,7 @@ letrec (
 
 ExprScript 是一个动态类型函数式语言, 支持一等续延,
 词法/动态作用域变量, 标记-扫描式垃圾回收,
-和内置代码执行器 `eval`.
+内置代码执行器 `eval`, 和一个简单的 Python FFI.
 本项目的目标是试验语言特性和演示解释器的实现.
 
 ExprScript 的一个设计目标是用一个小语言核心来实现/模拟其它语言特性.
@@ -51,6 +51,7 @@ Python >= 3.9
              | .getline | .put
              | .void? | .int? | .str? | .clo? | .cont?
              | .callcc | .eval | .exit
+             | .python    // Python FFI
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
 <expr> := <integer> | <string> | <variable>
