@@ -42,14 +42,16 @@ Python >= 3.9
 ```
 <comment> := #.*?\n
 <integer> := [+-]?0 | [+-]?[1-9][0-9]*
-<string> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
-<lexical-variable> := [a-z][a-zA-Z]* // lexically scoped variable
-<dynamic-variable> := [A-Z][a-zA-Z]* // dynamically scoped variable
+<string> := "( [^"\] | \" | \\ | \t | \n )*"    // charset is English keyboard
+<lexical-variable> := [a-z][a-zA-Z]*    // lexically scoped variable
+<dynamic-variable> := [A-Z][a-zA-Z]*    // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
-             | .+ | .- | .* | ./ | .% | .< | .<= | .> | .>= | .== | .!=
-             | .and | .or | .not // for simplicity these act on integers
-             | .strlen | .strcut | .str+ | .str< | .str<= | .str> | .str>= | .str== | .str!= | .strint | .strquote
+             | .+ | .- | .* | ./ | .%
+             | .< | .<= | .> | .>= | .== | .!=
+             | .and | .or | .not    // for simplicity these act on integers
+             | .strlen | .strcut | .str+ | .strint | .strquote
+             | .str< | .str<= | .str> | .str>= | .str== | .str!= 
              | .getline | .put
              | .void? | .int? | .str? | .clo? | .cont?
              | .callcc | .eval | .exit
@@ -60,7 +62,7 @@ Python >= 3.9
         | letrec ( <binding>* ) { <expr> }
         | if <expr> then <expr> else <expr>
         | ( <callee> <expr>* )
-        | [ <expr>+ ] // sequence evaluation
+        | [ <expr>+ ]    // sequence evaluation
 ```
 
 Supported object types: Void, Integer, String, Closure, Continuation.
