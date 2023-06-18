@@ -52,32 +52,32 @@ Python >= 3.9
 ```
 <comment> := #.*?\n
 <integer> := [+-]?0 | [+-]?[1-9][0-9]*
-<string> := "( [^"\] | \" | \\ | \t | \n )*"                     // charset is English keyboard
-<lexical-variable> := [a-z][a-zA-Z]*                             // lexically scoped variable
-<dynamic-variable> := [A-Z][a-zA-Z]*                             // dynamically scoped variable
+<string> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
+<lexical-variable> := [a-z][a-zA-Z]*         // lexically scoped variable
+<dynamic-variable> := [A-Z][a-zA-Z]*         // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
              | .+ | .- | .* | ./ | .^ | .%
              | .< | .<= | .> | .>= | .== | .!=
-             | .and | .or | .not                                 // for simplicity these operators act on integers
+             | .and | .or | .not             // for simplicity use integers as Booleans
              | .strlen | .strcut | .str+ | .strint | .strquote
              | .str< | .str<= | .str> | .str>= | .str== | .str!= 
              | .getline | .put
              | .void? | .int? | .str? | .clo? | .cont?
              | .callcc | .eval | .exit
-             | .python    // Python FFI
+             | .python                       // Python FFI
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
-<query-body> := <dynamic-variable>                               // Is it defined here?
-              | <lexical-variable> <expr>                        // Is it defined in the closure's environment?
+<query-body> := <dynamic-variable>           // Is it defined here?
+              | <lexical-variable> <expr>    // Is it defined in the closure's environment?
 <expr> := <integer> | <string> | <variable>
         | lambda ( <variable>* ) { <expr> }
         | letrec ( <binding>* ) { <expr> }
         | if <expr> then <expr> else <expr>
         | ( <callee> <expr>* )
-        | [ <expr>+ ]                                            // sequence evaluation
-        | @ <query-body>                                         // query whether a variable is defined
-        | & <lexical-variable> <expr>                            // access a variable in a closure's env
+        | [ <expr>+ ]                        // sequence evaluation
+        | @ <query-body>                     // query whether a variable is defined
+        | & <lexical-variable> <expr>        // access a variable in a closure's env
 ```
 
 支持的对象类型: Void, Integer, String, Closure, Continuation.

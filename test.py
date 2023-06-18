@@ -93,20 +93,7 @@ hello world
 <void>
 '''),
 
-        ('test/strings-and-comments.expr', '',
-'''\
-123
-456 # message 2
-aaa"
-bbb\\"
-ccc\\
-ddd
-eee
-fff
-ggg
-hhh
-<void>
-'''),
+        ('test/comprehensive.expr', '', '0\n1\n' * 15),
 
         ('test/y-combinator.expr', '', '1 120 3628800\n<void>\n')
     ]
