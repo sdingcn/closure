@@ -55,7 +55,7 @@ Python >= 3.9
 <dynamic-variable> := [A-Z][a-zA-Z]*         // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
-             | .+ | .- | .* | ./ | .^ | .%
+             | .+ | .- | .* | ./ | .%
              | .< | .<= | .> | .>= | .== | .!=
              | .and | .or | .not             // for simplicity use integers as Booleans
              | .strlen | .strcut | .str+ | .strint | .strquote
