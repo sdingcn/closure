@@ -12,12 +12,8 @@ $ cat test/average.expr
 letrec (
   null = lambda () { lambda () { 0 } }
   cons = lambda (head tail) { lambda () { 1 } }
-  len = lambda (list) {
-    if (list) then (.+ 1 (len &tail list)) else 0
-  }
-  sum = lambda (list) {
-    if (list) then (.+ &head list (sum &tail list)) else 0
-  }
+  len = lambda (list) { if (list) then (.+ 1 (len &tail list)) else 0 }
+  sum = lambda (list) { if (list) then (.+ &head list (sum &tail list)) else 0 }
 ) {
   letrec (
     list = (cons 100/11 (cons 61 (cons +15/7 (cons 1.355 (cons -41.06 (null))))))
