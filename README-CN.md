@@ -3,13 +3,13 @@
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
 ExprScript 是一个动态类型函数式语言.
-此项目有以下三个主要目标.
 
 + 直接支持全精度有理数计算
 
 ```
 $ cat test/average.expr
 letrec (
+  # It's easy to implement your own data structures.
   null = lambda () { lambda () { 0 } }
   cons = lambda (head tail) { lambda () { 1 } }
   len = lambda (list) { if (list) then (.+ 1 (len &tail list)) else 0 }
@@ -34,7 +34,7 @@ $ python3 src/interpreter.py run test/average.expr
 | 惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | 无参函数 |
 | 多阶段求值 ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
-+ 展示解释器实现
++ 展示如何实现一个简单的解释器
 
 参见 ([src/interpreter.py](src/interpreter.py)).
 

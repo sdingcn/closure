@@ -1,4 +1,5 @@
 letrec (
+  # It's easy to implement your own data structures.
   null = lambda () { lambda () { 0 } }
   cons = lambda (head tail) { lambda () { 1 } }
   len = lambda (list) { if (list) then (.+ 1 (len &tail list)) else 0 }

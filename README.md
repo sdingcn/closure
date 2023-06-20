@@ -5,13 +5,13 @@
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
 ExprScript is a dynamically typed functional programming language.
-This repository has the following 3 main goals.
 
 + Directly support full-precision rational number computations
 
 ```
 $ cat test/average.expr
 letrec (
+  # It's easy to implement your own data structures.
   null = lambda () { lambda () { 0 } }
   cons = lambda (head tail) { lambda () { 1 } }
   len = lambda (list) { if (list) then (.+ 1 (len &tail list)) else 0 }
@@ -36,7 +36,7 @@ $ python3 src/interpreter.py run test/average.expr
 | Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
 | Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
-+ Demonstrate interpreter implementations
++ Demonstrate the implementation of a simple interpreter
 
 See ([src/interpreter.py](src/interpreter.py)).
 
