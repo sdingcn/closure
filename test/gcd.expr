@@ -5,5 +5,5 @@ letrec (
     else (gcd b (.% a b))
   }
 ) {
-  (.put (gcd (.strint (.getline)) (.strint (.getline))) "\n")
+  (.put (gcd (.strnum (.getline)) (.strnum (.getline))) "\n")
 }

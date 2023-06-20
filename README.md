@@ -4,35 +4,34 @@
 
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
+ExprScript is a dynamically typed functional programming language.
+This repository has the following 3 main goals.
+
++ Directly support full-precision rational number computations
+
 ```
+$ cat test/average.expr
 letrec (
-  leaf = lambda () {
-    lambda () { 0 }
+  null = lambda () { lambda () { 0 } }
+  cons = lambda (head tail) { lambda () { 1 } }
+  len = lambda (list) {
+    if (list) then (.+ 1 (len &tail list)) else 0
   }
-  node = lambda (value left right) {
-    lambda () { 1 }
-  }
-  dfs = lambda (tree) {
-    if (.not (tree)) then (.void)
-    else [
-      (dfs &left tree)
-      (.put &value tree "\n")
-      (dfs &right tree)
-    ]
+  sum = lambda (list) {
+    if (list) then (.+ &head list (sum &tail list)) else 0
   }
 ) {
-  # in-order traversal
-  (dfs
-    (node 4
-      (node 2
-        (node 1 (leaf) (leaf))
-        (node 3 (leaf) (leaf)))
-      (node 5 (leaf) (leaf))))
+  letrec (
+    list = (cons 100/11 (cons 61 (cons +15/7 (cons 1.355 (cons -41.06 (null))))))
+  ) {
+    (./ (sum list) (len list))
+  }
 }
+$ python3 src/interpreter.py run test/average.expr
+500943/77000
 ```
 
-ExprScript is a dynamically typed functional programming language.
-It has a small language core, but can implement/simulate many other features.
++ Use a small language core to implement many language features
 
 | Feature | Implementation |
 | --- | --- |
@@ -40,6 +39,10 @@ It has a small language core, but can implement/simulate many other features.
 | Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
 | Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
 | Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
+
++ Demonstrate interpreter implementations
+
+See ([src/interpreter.py](src/interpreter.py)).
 
 ## dependencies
 
@@ -49,26 +52,33 @@ Python >= 3.9
 
 ```
 <comment> := #.*?\n
-<integer> := [+-]?0 | [+-]?[1-9][0-9]*
+<head-nonzero> := [1-9][0-9]*
+<tail-nonzero> := [0-9]*[1-9]
+<number> := [+-]?0
+          | [+-]?<head-nonzero>
+          | [+-]?0.<tail-nonzero>
+          | [+-]?<head-nonzero>.<tail-nonzero>
+          | [+-]?0/<head-nonzero>
+          | [+-]?<head-nonzero>/<head-nonzero>
 <string> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
 <lexical-variable> := [a-z][a-zA-Z]*         // lexically scoped variable
 <dynamic-variable> := [A-Z][a-zA-Z]*         // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
-             | .+ | .- | .* | ./ | .%
+             | .+ | .- | .* | ./ | .% | .floor | .ceil
              | .< | .<= | .> | .>= | .== | .!=
-             | .and | .or | .not             // for simplicity use integers as Booleans
-             | .strlen | .strcut | .str+ | .strint | .strquote
+             | .and | .or | .not             // for simplicity use numbers as Booleans
+             | .strlen | .strcut | .str+ | .strnum | .strquote
              | .str< | .str<= | .str> | .str>= | .str== | .str!= 
              | .getline | .put
-             | .void? | .int? | .str? | .clo? | .cont?
+             | .void? | .num? | .str? | .clo? | .cont?
              | .call/cc | .eval | .exit
              | .python                       // Python FFI
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
 <query-body> := <dynamic-variable>           // Is it defined here?
               | <lexical-variable> <expr>    // Is it defined in the closure's environment?
-<expr> := <integer> | <string> | <variable>
+<expr> := <number> | <string> | <variable>
         | lambda ( <variable>* ) { <expr> }
         | letrec ( <binding>* ) { <expr> }
         | if <expr> then <expr> else <expr>
@@ -78,14 +88,13 @@ Python >= 3.9
         | & <lexical-variable> <expr>        // access a variable in a closure's env
 ```
 
-Supported object types: Void, Integer, String, Closure, Continuation.
+Supported object types: Void, Number, String, Closure, Continuation.
 Functions are not curried by default.
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
 Garbage collection (GC) runs when 80% of the reserved heap space is occupied,
 and if GC cannot reduce the occupancy to be < 80%, the reserved heap space will grow.
 The evaluation result of the entire program is printed to `stdout`.
-The full semantic reference is the interpreter ([src/interpreter.py](src/interpreter.py)).
 
 ## usage
 

@@ -2,35 +2,34 @@
 
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
+ExprScript 是一个动态类型函数式语言.
+此项目有以下三个主要目标.
+
++ 直接支持全精度有理数计算
+
 ```
+$ cat test/average.expr
 letrec (
-  leaf = lambda () {
-    lambda () { 0 }
+  null = lambda () { lambda () { 0 } }
+  cons = lambda (head tail) { lambda () { 1 } }
+  len = lambda (list) {
+    if (list) then (.+ 1 (len &tail list)) else 0
   }
-  node = lambda (value left right) {
-    lambda () { 1 }
-  }
-  dfs = lambda (tree) {
-    if (.not (tree)) then (.void)
-    else [
-      (dfs &left tree)
-      (.put &value tree "\n")
-      (dfs &right tree)
-    ]
+  sum = lambda (list) {
+    if (list) then (.+ &head list (sum &tail list)) else 0
   }
 ) {
-  # in-order traversal
-  (dfs
-    (node 4
-      (node 2
-        (node 1 (leaf) (leaf))
-        (node 3 (leaf) (leaf)))
-      (node 5 (leaf) (leaf))))
+  letrec (
+    list = (cons 100/11 (cons 61 (cons +15/7 (cons 1.355 (cons -41.06 (null))))))
+  ) {
+    (./ (sum list) (len list))
+  }
 }
+$ python3 src/interpreter.py run test/average.expr
+500943/77000
 ```
 
-ExprScript 是一个动态类型函数式语言.
-它的语言核心很小, 但可以实现/模拟很多其它特性.
++ 利用一个小语言核心实现很多语言特性
 
 | 特性 | 实现 |
 | --- | --- |
@@ -38,6 +37,10 @@ ExprScript 是一个动态类型函数式语言.
 | 协程 ([test/coroutines.expr](test/coroutines.expr)) | 续延 |
 | 惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | 无参函数 |
 | 多阶段求值 ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
+
++ 展示解释器实现
+
+参见 ([src/interpreter.py](src/interpreter.py)).
 
 ## 依赖
 
@@ -47,26 +50,33 @@ Python >= 3.9
 
 ```
 <comment> := #.*?\n
-<integer> := [+-]?0 | [+-]?[1-9][0-9]*
+<head-nonzero> := [1-9][0-9]*
+<tail-nonzero> := [0-9]*[1-9]
+<number> := [+-]?0
+          | [+-]?<head-nonzero>
+          | [+-]?0.<tail-nonzero>
+          | [+-]?<head-nonzero>.<tail-nonzero>
+          | [+-]?0/<head-nonzero>
+          | [+-]?<head-nonzero>/<head-nonzero>
 <string> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
 <lexical-variable> := [a-z][a-zA-Z]*         // lexically scoped variable
 <dynamic-variable> := [A-Z][a-zA-Z]*         // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
-             | .+ | .- | .* | ./ | .%
+             | .+ | .- | .* | ./ | .% | .floor | .ceil
              | .< | .<= | .> | .>= | .== | .!=
-             | .and | .or | .not             // for simplicity use integers as Booleans
-             | .strlen | .strcut | .str+ | .strint | .strquote
+             | .and | .or | .not             // for simplicity use numbers as Booleans
+             | .strlen | .strcut | .str+ | .strnum | .strquote
              | .str< | .str<= | .str> | .str>= | .str== | .str!= 
              | .getline | .put
-             | .void? | .int? | .str? | .clo? | .cont?
+             | .void? | .num? | .str? | .clo? | .cont?
              | .call/cc | .eval | .exit
              | .python                       // Python FFI
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
 <query-body> := <dynamic-variable>           // Is it defined here?
               | <lexical-variable> <expr>    // Is it defined in the closure's environment?
-<expr> := <integer> | <string> | <variable>
+<expr> := <number> | <string> | <variable>
         | lambda ( <variable>* ) { <expr> }
         | letrec ( <binding>* ) { <expr> }
         | if <expr> then <expr> else <expr>
@@ -76,7 +86,7 @@ Python >= 3.9
         | & <lexical-variable> <expr>        // access a variable in a closure's env
 ```
 
-支持的对象类型: Void, Integer, String, Closure, Continuation.
+支持的对象类型: Void, Number, String, Closure, Continuation.
 函数默认不柯里化.
 对象不可变.
 变量是指向对象的引用且一旦绑定就不可变.

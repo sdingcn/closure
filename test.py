@@ -36,6 +36,8 @@ def read_file(path: str) -> str:
 
 def main():
     tests = [
+        ('test/average.expr', '', '500943/77000\n'),
+
         ('test/binary-tree.expr', '',
 '''\
 1
