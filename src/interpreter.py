@@ -783,10 +783,16 @@ class Layer:
             # env will be shared among layers in each frame
             env: list[tuple[str, int]], 
             expr: ExprNode,
-            pc: int,
-            local: dict[str, Union[Value, list[Value]]],
-            frame: bool
+            pc: int = None,
+            local: dict[str, Union[Value, list[Value]]] = None,
+            frame: bool = None
         ):
+        if pc is None:
+            pc = 0
+        if local is None:
+            local = {}
+        if frame is None:
+            frame = False
         # environment for the evaluation of the current expression
         self.env = env 
         # the current expression under evaluation
@@ -1061,7 +1067,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     var = layer.expr.var_expr_list[layer.pc - 2][0]
                     last_location = lookup_env(var.sl, var.name, layer.env)
                     state.store[last_location] = value
-                state.stack.append(Layer(layer.env, layer.expr.var_expr_list[layer.pc - 1][1], 0, {}, False))
+                state.stack.append(Layer(layer.env, layer.expr.var_expr_list[layer.pc - 1][1]))
                 layer.pc += 1
             # evaluate body expression
             elif layer.pc == len(layer.expr.var_expr_list) + 1:
@@ -1070,7 +1076,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     var = layer.expr.var_expr_list[layer.pc - 2][0]
                     last_location = lookup_env(var.sl, var.name, layer.env)
                     state.store[last_location] = value
-                state.stack.append(Layer(layer.env, layer.expr.expr, 0, {}, False))
+                state.stack.append(Layer(layer.env, layer.expr.expr))
                 layer.pc += 1
             # finish letrec
             else:
@@ -1080,16 +1086,16 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
         elif type(layer.expr) == IfNode:
             # evaluate the condition
             if layer.pc == 0:
-                state.stack.append(Layer(layer.env, layer.expr.cond, 0, {}, False))
+                state.stack.append(Layer(layer.env, layer.expr.cond))
                 layer.pc += 1
             # choose the branch to evaluate
             elif layer.pc == 1:
                 if type(value) != Number:
                     sys.exit(f'[Runtime Error] the condition of {layer.expr} evaluated to a value ({value}) of wrong type')
                 if value.n != 0:
-                    state.stack.append(Layer(layer.env, layer.expr.branch1, 0, {}, False))
+                    state.stack.append(Layer(layer.env, layer.expr.branch1))
                 else:
-                    state.stack.append(Layer(layer.env, layer.expr.branch2, 0, {}, False))
+                    state.stack.append(Layer(layer.env, layer.expr.branch2))
                 layer.pc += 1
             # finish if
             else:
@@ -1114,7 +1120,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                 elif layer.pc <= len(layer.expr.arg_list):
                     if layer.pc > 1:
                         layer.local['args'].append(value)
-                    state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 1], 0, {}, False))
+                    state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 1]))
                     layer.pc += 1
                 # intrinsic call doesn't need to grow the stack, so this is the final step for this call
                 else:
@@ -1238,7 +1244,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         closure = args[0]
                         # make a closure call layer and pass in the continuation
                         addr = cont.location if cont.location != None else state.new(cont)
-                        state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, 0, {}, True))
+                        state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, frame = True))
                         # we already popped the stack in this case, so just continue the evaluation
                         continue
                     elif intrinsic == '.void?':
@@ -1283,7 +1289,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
             else:
                 # evaluate the callee
                 if layer.pc == 0:
-                    state.stack.append(Layer(layer.env, layer.expr.callee, 0, {}, False))
+                    state.stack.append(Layer(layer.env, layer.expr.callee))
                     layer.pc += 1
                 # initialize callee and args
                 elif layer.pc == 1:
@@ -1294,7 +1300,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                 elif layer.pc - 1 <= len(layer.expr.arg_list):
                     if layer.pc - 1 > 1:
                         layer.local['args'].append(value)
-                    state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 2], 0, {}, False))
+                    state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 2]))
                     layer.pc += 1
                 # evaluate the call
                 elif layer.pc - 1 == len(layer.expr.arg_list) + 1:
@@ -1312,7 +1318,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                             addr = args[i].location if args[i].location != None else state.new(args[i])
                             new_env.append((v.name, addr))
                         # evaluate the closure call
-                        state.stack.append(Layer(new_env, closure.fun.expr, 0, {}, True))
+                        state.stack.append(Layer(new_env, closure.fun.expr, frame = True))
                         layer.pc += 1
                     elif type(callee) == Continuation:
                         cont = callee
@@ -1334,7 +1340,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
         elif type(layer.expr) == SequenceNode:
             # evaluate the expressions, without the need of storing the results to local
             if layer.pc < len(layer.expr.expr_list):
-                state.stack.append(Layer(layer.env, layer.expr.expr_list[layer.pc], 0, {}, False))
+                state.stack.append(Layer(layer.env, layer.expr.expr_list[layer.pc]))
                 layer.pc += 1
             # finish the sequence
             else:
@@ -1345,7 +1351,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
             if layer.expr.var.is_lex():
                 # evaluate the closure
                 if layer.pc == 0:
-                    state.stack.append(Layer(layer.env, layer.expr.expr_box[0], 0, {}, False))
+                    state.stack.append(Layer(layer.env, layer.expr.expr_box[0]))
                     layer.pc += 1
                 else:
                     if type(value) != Closure:
@@ -1361,7 +1367,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                 sys.stderr.write(f'[Debug] accessing the variable {layer.expr.var}\n')
             # evaluate the closure
             if layer.pc == 0:
-                state.stack.append(Layer(layer.env, layer.expr.expr, 0, {}, False))
+                state.stack.append(Layer(layer.env, layer.expr.expr))
                 layer.pc += 1
             else:
                 if type(value) != Closure:
