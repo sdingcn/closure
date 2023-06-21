@@ -824,7 +824,8 @@ class State:
     '''The state class for the interpretation, where each state object completely determines the current state (stack and store)'''
 
     def __init__(self, expr: ExprNode):
-        self.stack = [Layer([], expr, 0, {}, True)]
+        # the first layer is always a frame
+        self.stack = [Layer([], expr, frame = True)]
         # the heap
         self.store = []
         # the next available addess in the store
