@@ -940,7 +940,7 @@ class State:
                         for i in range(len(layer.env)):
                             layer.env[i] = (layer.env[i][0], relocation[layer.env[i][1]])
 
-    def gc(self, value) -> int:
+    def gc(self, value: Value) -> int:
         ''' mark-and-sweep garbage collection '''
         visited_locations, visited_values = self.mark(value)
         removed, relocation = self.sweep_and_compact(visited_locations)
