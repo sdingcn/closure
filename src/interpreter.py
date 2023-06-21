@@ -1080,6 +1080,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                 layer.pc += 1
             # finish letrec
             else:
+                # this is necessary because letrec layer's env is shared with its previous frame
                 for i in range(len(layer.expr.var_expr_list)):
                     layer.env.pop()
                 state.stack.pop()
