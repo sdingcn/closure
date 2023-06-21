@@ -684,12 +684,19 @@ class Void(Value):
 
 class Number(Value):
 
-    def __init__(self, n: int, d: int = None):
-        if d is None:
-            d = 1
+    def __init__(self, n: Union[int, bool], d: int = None):
         self.location = None
-        self.n = n
-        self.d = d
+        if type(n) == bool:
+            if n:
+                self.n = 1
+            else:
+                self.n = 0
+            self.d = 1
+        else:
+            if d is None:
+                d = 1
+            self.n = n
+            self.d = d
 
     def __str__(self) -> str:
         return f'(Number {self.n} {self.d})'
@@ -1162,31 +1169,31 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         value = args[0].ceil()
                     elif intrinsic == '.<':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(1) if args[0].lt(args[1]) else Number(0)
+                        value = Number(args[0].lt(args[1]))
                     elif intrinsic == '.<=':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(1) if (not args[1].lt(args[0])) else Number(0)
+                        value = Number(not args[1].lt(args[0]))
                     elif intrinsic == '.>':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(1) if (args[1].lt(args[0])) else Number(0)
+                        value = Number(args[1].lt(args[0]))
                     elif intrinsic == '.>=':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(1) if (not args[0].lt(args[1])) else Number(0)
+                        value = Number(not args[0].lt(args[1]))
                     elif intrinsic == '.==':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(1) if (not args[0].lt(args[1])) and (not args[1].lt(args[0])) else Number(0)
+                        value = Number((not args[0].lt(args[1])) and (not args[1].lt(args[0])))
                     elif intrinsic == '.!=':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(1) if args[0].lt(args[1]) or args[1].lt(args[0]) else Number(0)
+                        value = Number(args[0].lt(args[1]) or args[1].lt(args[0]))
                     elif intrinsic == '.and':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(1) if args[0].n != 0 and args[1].n != 0 else Number(0)
+                        value = Number(args[0].n != 0 and args[1].n != 0)
                     elif intrinsic == '.or':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(1) if args[0].n != 0 or args[1].n != 0 else Number(0)
+                        value = Number(args[0].n != 0 or args[1].n != 0)
                     elif intrinsic == '.not':
                         check_args_error_exit(layer.expr.callee, args, [Number])
-                        value = Number(1) if args[0].n == 0 else Number(0)
+                        value = Number(args[0].n == 0)
                     elif intrinsic == '.strlen':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         value = Number(len(args[0].value))
@@ -1200,22 +1207,22 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         value = String(args[0].value + args[1].value)
                     elif intrinsic == '.str<':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
-                        value = Number(1) if args[0].value < args[1].value else Number(0)
+                        value = Number(args[0].value < args[1].value)
                     elif intrinsic == '.str<=':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
-                        value = Number(1) if args[0].value <= args[1].value else Number(0)
+                        value = Number(args[0].value <= args[1].value)
                     elif intrinsic == '.str>':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
-                        value = Number(1) if args[0].value > args[1].value else Number(0)
+                        value = Number(args[0].value > args[1].value)
                     elif intrinsic == '.str>=':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
-                        value = Number(1) if args[0].value >= args[1].value else Number(0)
+                        value = Number(args[0].value >= args[1].value)
                     elif intrinsic == '.str==':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
-                        value = Number(1) if args[0].value == args[1].value else Number(0)
+                        value = Number(args[0].value == args[1].value)
                     elif intrinsic == '.str!=':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
-                        value = Number(1) if args[0].value != args[1].value else Number(0)
+                        value = Number(args[0].value != args[1].value)
                     elif intrinsic == '.strnum':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         node = parse(deque([Token(layer.expr.sl, args[0].value)]), debug)
@@ -1256,19 +1263,19 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         continue
                     elif intrinsic == '.void?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
-                        value = Number(1 if isinstance(args[0], Void) else 0)
+                        value = Number(isinstance(args[0], Void))
                     elif intrinsic == '.num?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
-                        value = Number(1 if isinstance(args[0], Number) else 0)
+                        value = Number(isinstance(args[0], Number))
                     elif intrinsic == '.str?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
-                        value = Number(1 if isinstance(args[0], String) else 0)
+                        value = Number(isinstance(args[0], String))
                     elif intrinsic == '.clo?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
-                        value = Number(1 if isinstance(args[0], Closure) else 0)
+                        value = Number(isinstance(args[0], Closure))
                     elif intrinsic == '.cont?':
                         check_args_error_exit(layer.expr.callee, args, [Value])
-                        value = Number(1 if isinstance(args[0], Continuation) else 0)
+                        value = Number(isinstance(args[0], Continuation))
                     elif intrinsic == '.eval':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         arg = args[0]
@@ -1364,10 +1371,10 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     if type(value) != Closure:
                         sys.exit(f'[Runtime Error] lexical variable query applied to non-closure type at {layer.expr}')
                     # the closure's value is already in "value", so we just use it and then update "value"
-                    value = Number(1) if query_env(layer.expr.var.name, value.env) else Number(0)
+                    value = Number(query_env(layer.expr.var.name, value.env))
                     state.stack.pop()
             else:
-                value = Number(1) if query_stack(layer.expr.var.name, state.stack) else Number(0)
+                value = Number(query_stack(layer.expr.var.name, state.stack))
                 state.stack.pop()
         elif type(layer.expr) == AccessNode:
             if debug:
