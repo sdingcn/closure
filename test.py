@@ -47,6 +47,8 @@ def main():
 5
 <void>
 '''),
+
+        ('test/comprehensive.expr', '', '0\n1\n' * 15),
         
         ('test/coroutines.expr', '',
 '''\
@@ -94,8 +96,6 @@ hello world
 2
 <void>
 '''),
-
-        ('test/comprehensive.expr', '', '0\n1\n' * 15),
 
         ('test/y-combinator.expr', '', '1 120 3628800\n<void>\n')
     ]

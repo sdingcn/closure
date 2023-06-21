@@ -1147,14 +1147,18 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         check_args_error_exit(layer.expr.callee, args, [])
                         value = Void()
                     elif intrinsic == '.+':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = args[0].add(args[1])
+                        check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
+                        value = Number(0)
+                        for a in args:
+                            value = value.add(a)
                     elif intrinsic == '.-':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
                         value = args[0].sub(args[1])
                     elif intrinsic == '.*':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = args[0].mul(args[1])
+                        check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
+                        value = Number(1)
+                        for a in args:
+                            value = value.mul(a)
                     elif intrinsic == './':
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
                         value = args[0].div(args[1], layer.expr)
@@ -1186,11 +1190,17 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         check_args_error_exit(layer.expr.callee, args, [Number, Number])
                         value = Number(args[0].lt(args[1]) or args[1].lt(args[0]))
                     elif intrinsic == '.and':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(args[0].n != 0 and args[1].n != 0)
+                        check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
+                        b = True
+                        for a in args:
+                            b = b and (a.n != 0)
+                        value = Number(b)
                     elif intrinsic == '.or':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        value = Number(args[0].n != 0 or args[1].n != 0)
+                        check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
+                        b = False
+                        for a in args:
+                            b = b or (a.n != 0)
+                        value = Number(b)
                     elif intrinsic == '.not':
                         check_args_error_exit(layer.expr.callee, args, [Number])
                         value = Number(args[0].n == 0)
@@ -1203,8 +1213,11 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                             sys.exit(f'[Runtime Error] .strcut is applied to non-integer(s) at {layer.expr}')
                         value = String(args[0].value[args[1].n : args[2].n])
                     elif intrinsic == '.str+':
-                        check_args_error_exit(layer.expr.callee, args, [String, String])
-                        value = String(args[0].value + args[1].value)
+                        check_args_error_exit(layer.expr.callee, args, [String] * len(args))
+                        s = ""
+                        for a in args:
+                            s += a.value
+                        value = String(s)
                     elif intrinsic == '.str<':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
                         value = Number(args[0].value < args[1].value)

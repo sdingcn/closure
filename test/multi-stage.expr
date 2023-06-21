@@ -1,9 +1,10 @@
 [
   letrec (
     left = "(.put "
-    right = "\"EVAL\\n\")"
+    middle = "\""
+    right = "EVAL\\n\")"
   ) {
-    (.eval (.str+ left right))
+    (.eval (.str+ left middle right))
   }
   (.put (.eval (.eval (.eval (.strquote (.strquote (.strquote "hello world\n")))))))
   (.put (.eval (.eval (.eval (.strquote (.strquote (.strquote "hello world

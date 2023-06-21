@@ -35,7 +35,7 @@ letrec (
     if 0 then (putln "1") else (putln "0")
     if -1 then (putln "1") else (putln "0")
     # function call
-    (putln (lambda (x) { (.+ x 1) } -1))
+    (putln (lambda (x) { (.+ x 1 0) } -1))
     # intrinsic call
     (putln (.python "(lambda s : s.strip())" " 1 "))
     # sequence
