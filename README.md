@@ -57,8 +57,8 @@ Python >= 3.9
           | [+-]?0/<head-nonzero>
           | [+-]?<head-nonzero>/<head-nonzero>
 <string> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
-<lexical-variable> := [a-z][a-zA-Z]*         // lexically scoped variable
-<dynamic-variable> := [A-Z][a-zA-Z]*         // dynamically scoped variable
+<lexical-variable> := [a-z][a-zA-Z0-9_]*         // lexically scoped variable
+<dynamic-variable> := [A-Z][a-zA-Z0-9_]*         // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
 <intrinsic> := .void
              | .+ | .- | .* | ./ | .% | .floor | .ceil

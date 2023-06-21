@@ -172,7 +172,7 @@ def lex(source: str, debug: bool) -> deque[Token]:
             # variable / keyword
             elif chars[0].isalpha():
                 src = ''
-                while chars and chars[0].isalpha():
+                while chars and (chars[0].isalpha() or chars[0].isdigit() or chars[0] == '_'):
                     src += chars.popleft()
                     col += 1
             # intrinsic
@@ -435,7 +435,7 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
         return len(token.src) and token.src[0] == '.'
 
     def is_variable_token(token: Token) -> bool:
-        return token.src.isalpha()
+        return len(token.src) and token.src[0].isalpha()
 
     # specific token consumer
 
