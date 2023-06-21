@@ -824,8 +824,10 @@ class State:
     '''The state class for the interpretation, where each state object completely determines the current state (stack and store)'''
 
     def __init__(self, expr: ExprNode):
-        # the first layer is always a frame
-        self.stack = [Layer([], expr, frame = True)]
+        # the main frame
+        self.stack = [Layer([], None, frame = True)]
+        # the first evaluation layer
+        self.stack.append(Layer(self.stack[0].env, expr))
         # the heap
         self.store = []
         # the next available addess in the store
@@ -1046,7 +1048,10 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
         layer = state.stack[-1]
         if debug:
             sys.stderr.write(f'[Debug] evaluating AST node of type {type(layer.expr)} at {layer.expr.sl}\n')
-        if type(layer.expr) == NumberNode:
+        if layer.expr is None:
+            # end of evaluation, pop the main frame
+            state.stack.pop()
+        elif type(layer.expr) == NumberNode:
             value = Number(layer.expr.n, layer.expr.d)
             state.stack.pop()
         elif type(layer.expr) == StringNode:
