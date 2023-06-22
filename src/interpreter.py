@@ -630,7 +630,7 @@ class Continuation(Value):
         return '<continuation>'
 
 class State:
-    '''The state class for the interpretation, where each state object completely determines the current state (stack and store)'''
+    '''The class for the complete state during interpretation'''
 
     def __init__(self, expr: ExprNode):
         # stack
@@ -792,37 +792,21 @@ def filter_lexical(env: list[tuple[str, int]]) -> list[tuple[str, int]]:
             lex_env.append((v, l))
     return lex_env
 
-def lookup_env(sl: SourceLocation, name: str, env: list[tuple[str, int]]) -> int:
+def lookup_env(name: str, env: list[tuple[str, int]]) -> Union[int, None]:
     ''' lexically scoped variable lookup '''
     for i in range(len(env) - 1, -1, -1):
         if env[i][0] == name:
             return env[i][1]
-    sys.exit(f'[Runtime Error] undefined variable {name} at {sl} (intrinsic functions cannot be treated as variables)')
+    return None
 
-def lookup_stack(sl: SourceLocation, name: str, stack: list[Layer]) -> int:
+def lookup_stack(name: str, stack: list[Layer]) -> Union[int, None]:
     ''' dynamically scoped variable lookup '''
     for i in range(len(stack) - 1, -1, -1):
         if stack[i].frame:
             for j in range(len(stack[i].env) - 1, -1, -1):
                 if stack[i].env[j][0] == name:
                     return stack[i].env[j][1]
-    sys.exit(f'[Runtime Error] undefined variable {name} at {sl} (intrinsic functions cannot be treated as variables)')
-
-def query_env(name: str, env: list[tuple[str, int]]) -> bool:
-    ''' lexically scoped variable query '''
-    for i in range(len(env) - 1, -1, -1):
-        if env[i][0] == name:
-            return True
-    return False
-
-def query_stack(name: str, stack: list[Layer]) -> bool:
-    ''' dynamically scoped variable query '''
-    for i in range(len(stack) - 1, -1, -1):
-        if stack[i].frame:
-            for j in range(len(stack[i].env) - 1, -1, -1):
-                if stack[i].env[j][0] == name:
-                    return True
-    return False
+    return None
 
 ### interpreter
 
@@ -879,7 +863,9 @@ def interpret(state: State) -> Value:
                 # update location content
                 if layer.pc > 1:
                     var = layer.expr.var_expr_list[layer.pc - 2][0]
-                    last_location = lookup_env(var.sl, var.name, layer.env)
+                    last_location = lookup_env(var.name, layer.env)
+                    if last_location is None:
+                        sys.exit(f'[Runtime Error] undefined variable {var.name} at {var.sl}')
                     state.store[last_location] = state.value
                 state.stack.append(Layer(layer.env, layer.expr.var_expr_list[layer.pc - 1][1]))
                 layer.pc += 1
@@ -888,7 +874,9 @@ def interpret(state: State) -> Value:
                 # update location content
                 if layer.pc > 1:
                     var = layer.expr.var_expr_list[layer.pc - 2][0]
-                    last_location = lookup_env(var.sl, var.name, layer.env)
+                    last_location = lookup_env(var.name, layer.env)
+                    if last_location is None:
+                        sys.exit(f'[Runtime Error] undefined variable {var.name} at {var.sl}')
                     state.store[last_location] = state.value
                 state.stack.append(Layer(layer.env, layer.expr.expr))
                 layer.pc += 1
@@ -918,9 +906,15 @@ def interpret(state: State) -> Value:
         elif type(layer.expr) == VariableNode:
             # two types of variables
             if is_lexical_name(layer.expr.name):
-                state.value = state.store[lookup_env(layer.expr.sl, layer.expr.name, layer.env)]
+                location = lookup_env(layer.expr.name, layer.env)
+                if location is None:
+                    sys.exit(f'[Runtime Error] undefined variable {layer.expr.name} at {layer.expr.sl}')
+                state.value = state.store[location]
             else:
-                state.value = state.store[lookup_stack(layer.expr.sl, layer.expr.name, state.stack)]
+                location = lookup_stack(layer.expr.name, state.stack)
+                if location is None:
+                    sys.exit(f'[Runtime Error] undefined variable {layer.expr.name} at {layer.expr.sl}')
+                state.value = state.store[location]
             state.stack.pop()
         elif type(layer.expr) == CallNode:
             # intrinsic call
@@ -1167,10 +1161,10 @@ def interpret(state: State) -> Value:
                     if type(state.value) != Closure:
                         sys.exit(f'[Runtime Error] lexical variable query applied to non-closure type at {layer.expr.sl}')
                     # the closure's value is already in "state.value", so we just use it and then update it
-                    state.value = Number(query_env(layer.expr.var.name, state.value.env))
+                    state.value = Number(not (lookup_env(layer.expr.var.name, state.value.env) is None))
                     state.stack.pop()
             else:
-                state.value = Number(query_stack(layer.expr.var.name, state.stack))
+                state.value = Number(not (lookup_stack(layer.expr.var.name, state.stack) is None))
                 state.stack.pop()
         elif type(layer.expr) == AccessNode:
             # evaluate the closure
@@ -1181,7 +1175,10 @@ def interpret(state: State) -> Value:
                 if type(state.value) != Closure:
                     sys.exit(f'[Runtime Error] lexical variable access applied to non-closure type at {layer.expr.sl}')
                 # again, "state.value" already contains the closure's evaluation result
-                state.value = state.store[lookup_env(layer.expr.sl, layer.expr.var.name, state.value.env)]
+                location = lookup_env(layer.expr.var.name, state.value.env)
+                if location is None:
+                    sys.exit(f'[Runtime Error] undefined variable {layer.expr.var.name} at {layer.expr.sl}')
+                state.value = state.store[location]
                 state.stack.pop()
         else:
             sys.exit(f'[Runtime Error] unrecognized AST node at {layer.expr.sl}')
