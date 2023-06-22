@@ -187,9 +187,8 @@ class ExprNode:
 
 class NumberNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], n: int, d: int):
+    def __init__(self, sl: SourceLocation, n: int, d: int):
         self.sl = sl
-        self.parent = parent
         # simplify it to avoid repeatedly doing this when evaluating the AST node
         g = gcd(abs(n), d)
         self.n = n // g
@@ -197,23 +196,20 @@ class NumberNode(ExprNode):
 
 class StringNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], value: str):
+    def __init__(self, sl: SourceLocation, value: str):
         self.sl = sl
-        self.parent = parent
         self.value = value
 
 class IntrinsicNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], name: str):
+    def __init__(self, sl: SourceLocation, name: str):
         self.sl = sl
-        self.parent = parent
         self.name = name
 
 class VariableNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], name: str):
+    def __init__(self, sl: SourceLocation, name: str):
         self.sl = sl
-        self.parent = parent
         self.name = name
 
     def is_lex(self) -> bool:
@@ -224,57 +220,50 @@ class VariableNode(ExprNode):
 
 class LambdaNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], var_list: list[VariableNode], expr: ExprNode):
+    def __init__(self, sl: SourceLocation, var_list: list[VariableNode], expr: ExprNode):
         self.sl = sl
-        self.parent = parent
         self.var_list = var_list
         self.expr = expr
 
 class LetrecNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], var_expr_list: list[tuple[VariableNode, ExprNode]], expr: ExprNode):
+    def __init__(self, sl: SourceLocation, var_expr_list: list[tuple[VariableNode, ExprNode]], expr: ExprNode):
         self.sl = sl
-        self.parent = parent
         self.var_expr_list = var_expr_list
         self.expr = expr
 
 class IfNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], cond: ExprNode, branch1: ExprNode, branch2: ExprNode):
+    def __init__(self, sl: SourceLocation, cond: ExprNode, branch1: ExprNode, branch2: ExprNode):
         self.sl = sl
-        self.parent = parent
         self.cond = cond
         self.branch1 = branch1
         self.branch2 = branch2
 
 class CallNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], callee: ExprNode, arg_list: list[ExprNode]):
+    def __init__(self, sl: SourceLocation, callee: ExprNode, arg_list: list[ExprNode]):
         self.sl = sl
-        self.parent = parent
         self.callee = callee
         self.arg_list = arg_list
 
 class SequenceNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], expr_list: list[ExprNode]):
+    def __init__(self, sl: SourceLocation, expr_list: list[ExprNode]):
         self.sl = sl
-        self.parent = parent
         self.expr_list = expr_list
 
 class QueryNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], var: VariableNode, expr_box: list[ExprNode]):
+    def __init__(self, sl: SourceLocation, var: VariableNode, expr_box: list[ExprNode]):
         self.sl = sl
-        self.parent = parent
         self.var = var
         self.expr_box = expr_box
 
 class AccessNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, parent: Union[None, ExprNode], var: VariableNode, expr: ExprNode):
+    def __init__(self, sl: SourceLocation, var: VariableNode, expr: ExprNode):
         self.sl = sl
-        self.parent = parent
         self.var = var
         self.expr = expr
 
@@ -320,13 +309,13 @@ def parse(tokens: deque[Token]) -> ExprNode:
             s = s[1:]
         if '/' in s:
             parts = s.split('/')
-            node = NumberNode(token.sl, None, sign * int(parts[0]), int(parts[1]))
+            node = NumberNode(token.sl, sign * int(parts[0]), int(parts[1]))
         elif '.' in s:
             parts = s.split('.')
             depth = len(parts[1])
-            node = NumberNode(token.sl, None, sign * (int(parts[0]) * (10 ** depth) + int(parts[1])), 10 ** depth)
+            node = NumberNode(token.sl, sign * (int(parts[0]) * (10 ** depth) + int(parts[1])), 10 ** depth)
         else:
-            node = NumberNode(token.sl, None, sign * int(s), 1)
+            node = NumberNode(token.sl, sign * int(s), 1)
         return node
 
     def parse_string() -> StringNode:
@@ -357,7 +346,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
                     sys.exit(f'[Parser Error] incomplete escape sequence at {token.sl}')
             else:
                 s += char
-        node = StringNode(token.sl, None, s)
+        node = StringNode(token.sl, s)
         return node
 
     def parse_intrinsic() -> IntrinsicNode:
@@ -366,7 +355,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         token = tokens.popleft()
         if not is_intrinsic_token(token):
             sys.exit(f'[Parser Error] expected an intrinsic function, got {token.src} at {token.sl}')
-        node = IntrinsicNode(token.sl, None, token.src)
+        node = IntrinsicNode(token.sl, token.src)
         return node
 
     def parse_lambda() -> LambdaNode:
@@ -379,10 +368,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         consume('{')
         expr = parse_expr()
         consume('}')
-        node = LambdaNode(start.sl, None, var_list, expr)
-        for v in node.var_list:
-            v.parent = node
-        node.expr.parent = node
+        node = LambdaNode(start.sl, var_list, expr)
         return node
 
     def parse_letrec() -> LetrecNode:
@@ -398,11 +384,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         consume('{')
         expr = parse_expr()
         consume('}')
-        node = LetrecNode(start.sl, None, var_expr_list, expr)
-        for v, e in node.var_expr_list:
-            v.parent = node
-            e.parent = node
-        node.expr.parent = node
+        node = LetrecNode(start.sl, var_expr_list, expr)
         return node
 
     def parse_if() -> IfNode:
@@ -412,10 +394,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         branch1 = parse_expr()
         consume('else')
         branch2 = parse_expr()
-        node = IfNode(start.sl, None, cond, branch1, branch2)
-        node.cond.parent = node
-        node.branch1.parent = node
-        node.branch2.parent = node
+        node = IfNode(start.sl, cond, branch1, branch2)
         return node
 
     def parse_variable() -> VariableNode:
@@ -424,7 +403,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         token = tokens.popleft()
         if not is_variable_token(token):
             sys.exit(f'[Parser Error] expected a variable, got {token.src} at {token.sl}')
-        node = VariableNode(token.sl, None, token.src)
+        node = VariableNode(token.sl, token.src)
         return node
 
     def parse_call() -> CallNode:
@@ -434,10 +413,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         while tokens and tokens[0].src != ')':
             arg_list.append(parse_expr())
         consume(')')
-        node = CallNode(start.sl, None, callee, arg_list)
-        node.callee.parent = node
-        for a in node.arg_list:
-            a.parent = node
+        node = CallNode(start.sl, callee, arg_list)
         return node
 
     def parse_sequence() -> SequenceNode:
@@ -448,9 +424,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         if len(expr_list) == 0:
             sys.exit('[Parser Error] zero-length sequence at {start.sl}')
         consume(']')
-        node = SequenceNode(start.sl, None, expr_list)
-        for e in node.expr_list:
-            e.parent = node
+        node = SequenceNode(start.sl, expr_list)
         return node
 
     def parse_query() -> QueryNode:
@@ -458,21 +432,16 @@ def parse(tokens: deque[Token]) -> ExprNode:
         var = parse_variable()
         if var.is_lex():
             expr = parse_expr()
-            node = QueryNode(start.sl, None, var, [expr])
-            var.parent = node
-            expr.parent = node
+            node = QueryNode(start.sl, var, [expr])
         else:
-            node = QueryNode(start.sl, None, var, [])
-            var.parent = node
+            node = QueryNode(start.sl, var, [])
         return node
 
     def parse_access() -> AccessNode:
         start = consume('&')
         var = parse_variable()
         expr = parse_expr()
-        node = AccessNode(start.sl, None, var, expr)
-        var.parent = node
-        expr.parent = node
+        node = AccessNode(start.sl, var, expr)
         return node
 
     def parse_expr() -> ExprNode:
