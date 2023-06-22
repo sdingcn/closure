@@ -94,7 +94,5 @@ The evaluation result of the entire program is printed to `stdout`.
 
 ## usage
 
-+ `python3 src/interpreter.py <option> <file>`, where `<option>` can be
-  - `run` run code in `<file>`;
-  - `format` print (to `stdout`) the formatted version of code in `<file>`.
++ `python3 src/interpreter.py <file>` runs code in `<file>`.
 + `python3 test.py` runs all tests (see [test.py](test.py) for inputs/outputs for each test program).

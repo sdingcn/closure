@@ -233,9 +233,6 @@ class ExprNode:
         pass
 
     def __str__(self) -> str:
-        return 'ExprNode'
-
-    def pretty_print(self) -> str:
         return ''
 
 class NumberNode(ExprNode):
@@ -249,13 +246,10 @@ class NumberNode(ExprNode):
         self.d = d // g
 
     def __str__(self) -> str:
-        return f'(NumberNode {self.sl} {self.n} {self.d})'
-
-    def pretty_print(self) -> str:
-        s = repr(self.n)
+        s = str(self.n)
         if self.d != 1:
             s += '/'
-            s += repr(self.d)
+            s += str(self.d)
         return s
 
 class StringNode(ExprNode):
@@ -266,9 +260,6 @@ class StringNode(ExprNode):
         self.value = value
 
     def __str__(self) -> str:
-        return f'(StringNode {self.sl} {quote(self.value)})'
-
-    def pretty_print(self) -> str:
         return quote(self.value)
 
 class IntrinsicNode(ExprNode):
@@ -279,9 +270,6 @@ class IntrinsicNode(ExprNode):
         self.name = name
 
     def __str__(self) -> str:
-        return f'(IntrinsicNode {self.sl} {self.name})'
-
-    def pretty_print(self) -> str:
         return self.name
 
 class VariableNode(ExprNode):
@@ -292,9 +280,6 @@ class VariableNode(ExprNode):
         self.name = name
 
     def __str__(self) -> str:
-        return f'(VariableNode {self.sl} {self.name})'
-
-    def pretty_print(self) -> str:
         return self.name
 
     def is_lex(self) -> bool:
@@ -312,11 +297,8 @@ class LambdaNode(ExprNode):
         self.expr = expr
 
     def __str__(self) -> str:
-        return f'(LambdaNode {self.sl} {unfold(self.var_list)} {self.expr})'
-
-    def pretty_print(self) -> str:
-        return ('lambda (' + ' '.join(list(map(lambda v: v.pretty_print(), self.var_list))) + ') ' + '{\n'
-              + indent(self.expr.pretty_print(), 2) + '\n'
+        return ('lambda (' + ' '.join(list(map(lambda v: str(v), self.var_list))) + ') ' + '{\n'
+              + indent(str(self.expr), 2) + '\n'
               + '}')
 
 class LetrecNode(ExprNode):
@@ -328,13 +310,10 @@ class LetrecNode(ExprNode):
         self.expr = expr
 
     def __str__(self) -> str:
-        return f'(LetrecNode {self.sl} {unfold(self.var_expr_list)} {self.expr})'
-
-    def pretty_print(self) -> str:
         return ('letrec (\n'
-              + indent('\n'.join(list(map(lambda ve: ve[0].pretty_print() + ' = ' + ve[1].pretty_print(), self.var_expr_list))), 2) + '\n'
+              + indent('\n'.join(list(map(lambda ve: str(ve[0]) + ' = ' + str(ve[1]), self.var_expr_list))), 2) + '\n'
               + ') {\n'
-              + indent(self.expr.pretty_print(), 2) + '\n'
+              + indent(str(self.expr), 2) + '\n'
               + '}')
 
 class IfNode(ExprNode):
@@ -347,11 +326,8 @@ class IfNode(ExprNode):
         self.branch2 = branch2
 
     def __str__(self) -> str:
-        return f'(IfNode {self.sl} {self.cond} {self.branch1} {self.branch2})'
-
-    def pretty_print(self) -> str:
-        return ('if ' + self.cond.pretty_print() + ' then ' + self.branch1.pretty_print() + '\n'
-              + 'else ' + self.branch2.pretty_print())
+        return ('if ' + str(self.cond) + ' then ' + str(self.branch1) + '\n'
+              + 'else ' + str(self.branch2))
 
 class CallNode(ExprNode):
 
@@ -362,10 +338,7 @@ class CallNode(ExprNode):
         self.arg_list = arg_list
 
     def __str__(self) -> str:
-        return f'(CallNode {self.sl} {self.callee} {unfold(self.arg_list)})'
-
-    def pretty_print(self) -> str:
-        return '(' + ' '.join([self.callee.pretty_print()] + list(map(lambda a: a.pretty_print(), self.arg_list))) + ')'
+        return '(' + ' '.join([str(self.callee)] + list(map(lambda a: str(a), self.arg_list))) + ')'
 
 class SequenceNode(ExprNode):
 
@@ -375,11 +348,8 @@ class SequenceNode(ExprNode):
         self.expr_list = expr_list
 
     def __str__(self) -> str:
-        return f'(SequenceNode {self.sl} {unfold(self.expr_list)})'
-
-    def pretty_print(self) -> str:
         return ('[\n'
-              + indent('\n'.join(list(map(lambda e: e.pretty_print(), self.expr_list))), 2) + '\n'
+              + indent('\n'.join(list(map(lambda e: str(e), self.expr_list))), 2) + '\n'
               + ']')
 
 class QueryNode(ExprNode):
@@ -391,14 +361,11 @@ class QueryNode(ExprNode):
         self.expr_box = expr_box
 
     def __str__(self) -> str:
-        return f'(QueryNode {self.sl} {self.var} {unfold(self.expr_box)})'
-
-    def pretty_print(self) -> str:
         if len(self.expr_box) == 0:
             tail = ''
         else:
-            tail = ' ' + self.expr_box[0].pretty_print()
-        return '@' + self.var.pretty_print() + tail
+            tail = ' ' + str(self.expr_box[0])
+        return '@' + str(self.var) + tail
 
 class AccessNode(ExprNode):
 
@@ -409,10 +376,7 @@ class AccessNode(ExprNode):
         self.expr = expr
 
     def __str__(self) -> str:
-        return f'(AccessNode {self.sl} {self.var} {self.expr})'
-
-    def pretty_print(self) -> str:
-        return '&' + self.var.pretty_print() + ' ' + self.expr.pretty_print()
+        return '&' + str(self.var) + ' ' + str(self.expr)
 
 def parse(tokens: deque[Token]) -> ExprNode:
     # token checkers
@@ -655,9 +619,6 @@ class Value:
         pass
 
     def __str__(self) -> str:
-        return 'Value'
-
-    def pretty_print(self) -> str:
         return ''
 
 class Void(Value):
@@ -667,9 +628,6 @@ class Void(Value):
         self.location = None
 
     def __str__(self) -> str:
-        return 'Void'
-
-    def pretty_print(self) -> str:
         return '<void>'
 
 class Number(Value):
@@ -689,13 +647,10 @@ class Number(Value):
             self.d = d
 
     def __str__(self) -> str:
-        return f'(Number {self.n} {self.d})'
-
-    def pretty_print(self) -> str:
-        s = repr(self.n)
+        s = str(self.n)
         if self.d != 1:
             s += '/'
-            s += repr(self.d)
+            s += str(self.d)
         return s
 
     def add(self, other: 'Number') -> 'Number':
@@ -755,9 +710,6 @@ class String(Value):
         self.value = value
 
     def __str__(self) -> str:
-        return f'(String {quote(self.value)})'
-
-    def pretty_print(self) -> str:
         return self.value
 
 class Closure(Value):
@@ -768,9 +720,6 @@ class Closure(Value):
         self.fun = fun
 
     def __str__(self) -> str:
-        return f'(Closure {unfold(self.env)} {self.fun})'
-
-    def pretty_print(self) -> str:
         return '<closure>'
 
 class Layer:
@@ -812,9 +761,6 @@ class Continuation(Value):
         self.stack = stack
 
     def __str__(self) -> str:
-        return f'(Continuation {unfold(self.stack)})'
-
-    def pretty_print(self) -> str:
         return '<continuation>'
 
 class State:
@@ -1252,7 +1198,7 @@ def interpret(tree: ExprNode) -> Value:
                         output = ''
                         # the printing format of "put" is simpler than that of the classes' "__str__" functions
                         for v in args:
-                            output += v.pretty_print()
+                            output += str(v)
                         print(output, end = '', flush = True)
                         # the return value of put is void
                         value = Void()
@@ -1285,7 +1231,7 @@ def interpret(tree: ExprNode) -> Value:
                     elif intrinsic == '.eval':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         arg = args[0]
-                        value = run_instance(arg.value)
+                        value = run_code(arg.value)
                     elif intrinsic == '.exit':
                         check_args_error_exit(layer.expr.callee, args, [])
                         # the interpreter returns 0
@@ -1385,26 +1331,14 @@ def interpret(tree: ExprNode) -> Value:
 
 ### main
 
-def run_instance(source: str) -> Value:
+def run_code(source: str) -> Value:
     tokens = lex(source)
     tree = parse(tokens)
     result = interpret(tree)
     return result
 
-def main(option: str, source: str) -> None:
-    if option == 'run':
-        print(run_instance(source).pretty_print())
-    elif option == 'format':
-        tokens = lex(source, False)
-        tree = parse(tokens, False)
-        print(tree.pretty_print())
-
 if __name__ == '__main__':
-    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'format']:
-        sys.exit(
-            'Usage:\n'
-            f'\tpython3 {sys.argv[0]} run <source-file>\n'
-            f'\tpython3 {sys.argv[0]} format <source-file>'
-        )
-    with open(sys.argv[2], 'r', encoding = 'utf-8') as f:
-        main(sys.argv[1], f.read())
+    if len(sys.argv) != 2:
+        sys.exit(f'Usage:\n\tpython3 {sys.argv[0]} <source-file>')
+    with open(sys.argv[1], 'r', encoding = 'utf-8') as f:
+        print(run_code(f.read()))

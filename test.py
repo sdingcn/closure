@@ -12,7 +12,7 @@ def run_and_read(cmd: str, inp: str) -> str:
 
 def check_io(prog: str, i: str, o: str) -> bool:
     try:
-        raw_o = run_and_read(['python3', 'src/interpreter.py', 'run', prog], i)
+        raw_o = run_and_read(['python3', 'src/interpreter.py', prog], i)
     except subprocess.TimeoutExpired:
         sys.stderr.write('*** Timeout expired\n')
         return False
