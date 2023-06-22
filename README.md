@@ -69,7 +69,7 @@ Python >= 3.9
              | .getline | .put
              | .void? | .num? | .str? | .clo? | .cont?
              | .call/cc | .eval | .exit
-             | .python                       // Python FFI
+             | .py                           // Python FFI
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
 <query-body> := <dynamic-variable>           // Is it defined here?

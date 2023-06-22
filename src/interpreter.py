@@ -1124,7 +1124,7 @@ def interpret(state: State) -> Value:
                         check_args_error_exit(layer.expr.callee, args, [])
                         # the interpreter returns 0
                         sys.exit()
-                    elif intrinsic == '.python':
+                    elif intrinsic == '.py':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
                         state.value = String(eval(args[0].value + '({!r})'.format(args[1].value)))
                     else:
