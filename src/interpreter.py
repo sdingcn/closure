@@ -1285,7 +1285,7 @@ def interpret(tree: ExprNode) -> Value:
                     elif intrinsic == '.eval':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         arg = args[0]
-                        value = normal_run(arg.value)
+                        value = run_instance(arg.value)
                     elif intrinsic == '.exit':
                         check_args_error_exit(layer.expr.callee, args, [])
                         # the interpreter returns 0
@@ -1385,7 +1385,7 @@ def interpret(tree: ExprNode) -> Value:
 
 ### main
 
-def normal_run(source: str) -> Value:
+def run_instance(source: str) -> Value:
     tokens = lex(source)
     tree = parse(tokens)
     result = interpret(tree)
@@ -1393,18 +1393,7 @@ def normal_run(source: str) -> Value:
 
 def main(option: str, source: str) -> None:
     if option == 'run':
-        print(normal_run(source).pretty_print())
-    elif option == 'time':
-        start_time = time.time()
-        print(normal_run(source).pretty_print())
-        end_time = time.time()
-        sys.stderr.write(f'Total time (seconds): {end_time - start_time}\n')
-    elif option == 'space':
-        tracemalloc.start() 
-        print(normal_run(source).pretty_print())
-        current_memory, peak_memory = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-        sys.stderr.write(f'Peak memory (KiB): {peak_memory / 1024}\n')
+        print(run_instance(source).pretty_print())
     elif option == 'ast':
         tokens = lex(source, False)
         tree = parse(tokens, False)
@@ -1415,12 +1404,10 @@ def main(option: str, source: str) -> None:
         print(tree.pretty_print())
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'time', 'space', 'ast', 'print']:
+    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'ast', 'print']:
         sys.exit(
             'Usage:\n'
             f'\tpython3 {sys.argv[0]} run <source-file>\n'
-            f'\tpython3 {sys.argv[0]} time <source-file>\n'
-            f'\tpython3 {sys.argv[0]} space <source-file>\n'
             f'\tpython3 {sys.argv[0]} ast <source-file>\n'
             f'\tpython3 {sys.argv[0]} print <source-file>'
         )

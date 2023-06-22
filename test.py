@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import time
 
 def run_and_read(cmd: str, inp: str) -> str:
     return subprocess.run(cmd,
@@ -11,24 +12,15 @@ def run_and_read(cmd: str, inp: str) -> str:
 
 def check_io(prog: str, i: str, o: str) -> bool:
     try:
-        raw_o1 = run_and_read(['python3', 'src/interpreter.py', 'time', prog], i)
+        raw_o = run_and_read(['python3', 'src/interpreter.py', 'run', prog], i)
     except subprocess.TimeoutExpired:
-        sys.stderr.write('*** Timeout expired on time mode\n')
+        sys.stderr.write('*** Timeout expired\n')
         return False
-    try:
-        raw_o2 = run_and_read(['python3', 'src/interpreter.py', 'space', prog], i)
-    except subprocess.TimeoutExpired:
-        sys.stderr.write('*** Timeout expired on space mode\n')
-        return False
-    if raw_o1 != raw_o2:
-        sys.stderr.write('*** Time mode and space mode give different outputs.\n')
+    if raw_o != o:
+        sys.stderr.write(f'*** Expected: [{o}], Got: [{raw_o}]\n')
         return False
     else:
-        if raw_o1 != o:
-            sys.stderr.write(f'*** Expected: [{o}], Got: [{raw_o1}]\n')
-            return False
-        else:
-            return True
+        return True
 
 def read_file(path: str) -> str:
     with open(path, 'r', encoding = 'utf-8') as f:
@@ -102,11 +94,15 @@ hello world
     cnt = 0
     for test in tests:
         cnt += 1
-        sys.stderr.write(f'==========\n')
+        sys.stderr.write(f'====================\n')
         sys.stderr.write(f'Running on test {cnt}, program\n{test[0]}\nwith input\n[{test[1]}]\n')
-        if not check_io(*test):
+        start_time = time.time()
+        ok = check_io(*test)
+        end_time = time.time()
+        sys.stderr.write(f'Total time (seconds): {end_time - start_time}\n')
+        if not ok:
             sys.exit(f'*** Failed on test {cnt}, program\n{test[0]}\nwith input\n[{test[1]}]')
-    sys.stderr.write(f'Passed all {cnt} tests\n')
+    sys.stderr.write(f'\nPassed all {cnt} tests\n')
 
 if __name__ == '__main__':
     main()

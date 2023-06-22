@@ -96,8 +96,6 @@ The evaluation result of the entire program is printed to `stdout`.
 
 + `python3 src/interpreter.py <option> <file>`, where `<option>` can be
   - `run` run code in `<file>`;
-  - `time` run code in `<file>` and print (to `stderr`) the execution time;
-  - `space` run code in `<file>` and print (to `stderr`) the peak memory use (this option could slow down the interpreter);
   - `ast` print (to `stdout`) the AST of code in `<file>`;
   - `print` print (to `stdout`) the formatted version of code in `<file>`.
 + `python3 test.py` runs all tests (see [test.py](test.py) for inputs/outputs for each test program).
