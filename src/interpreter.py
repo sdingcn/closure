@@ -817,7 +817,7 @@ def lookup_stack(name: str, stack: list[Layer]) -> Union[int, None]:
 
 ### interpreter
 
-def interpret(state: State) -> Value:
+def interpret(state: State) -> None:
     # used for GC control
     insufficient_capacity = -1
 
@@ -827,7 +827,7 @@ def interpret(state: State) -> Value:
         
         # end of evaluation
         if len(state.stack) == 0:
-            return state.value
+            return
 
         # GC control
         capacity = state.get_store_capacity()
@@ -1212,8 +1212,9 @@ def interpret(state: State) -> Value:
 def run_code(source: str) -> Value:
     tokens = lex(source)
     tree = parse(tokens)
-    result = interpret(State(tree))
-    return result
+    state = State(tree)
+    interpret(state)
+    return state.value
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
