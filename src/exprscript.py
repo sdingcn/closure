@@ -3,7 +3,7 @@ import time
 import tracemalloc
 import re
 from collections import deque
-from typing import Union, Any
+from typing import Union, Any, Callable
 from copy import deepcopy
 
 ### helper functions
@@ -651,6 +651,9 @@ class State:
         # private values
         self._ref_size = 8
         self._empty_store_size = sys.getsizeof(self.store)
+
+    def add_py_function(self, f: Callable[..., Union[str, int]]) -> None:
+        self.py_functions[f.__name__] = f
 
     def get_store_capacity(self) -> int:
         # capacity >= length
