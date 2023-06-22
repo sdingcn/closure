@@ -53,6 +53,8 @@ task 3
 <void>
 '''),
 
+        ('test/ffi.expr', '', 'Hello FFI-Call from Python!\n'),
+
         ('test/gcd.expr', '100\n0\n', '100\n<void>\n'),
         ('test/gcd.expr', '0\n100\n', '100\n<void>\n'),
         ('test/gcd.expr', '30\n30\n', '30\n<void>\n'),

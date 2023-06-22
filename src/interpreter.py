@@ -522,6 +522,11 @@ class Number(Value):
             s += str(self.d)
         return s
 
+    def to_int(self, expr: ExprNode) -> int:
+        if self.d != 1:
+            sys.exit(f'[Runtime Error] cannot convert a non-integer Number to a Python int at {expr.sl}')
+        return self.n
+
     def add(self, other: 'Number') -> 'Number':
         n1 = self.n * other.d + other.n * self.d
         d1 = self.d * other.d
@@ -641,6 +646,8 @@ class State:
         self.location = 0
         # value
         self.value = None
+        # Python FFI
+        self.py_functions = {"py_hello": lambda s: f"Hello {s} from Python!"}
         # private values
         self._ref_size = 8
         self._empty_store_size = sys.getsizeof(self.store)
@@ -1088,8 +1095,25 @@ def interpret(state: State) -> Value:
                         # the interpreter returns 0
                         sys.exit()
                     elif intrinsic == '.py':
-                        check_args_error_exit(layer.expr.callee, args, [String, String])
-                        state.value = String(eval(args[0].value + '({!r})'.format(args[1].value)))
+                        if not (len(args) > 0 and type(args[0]) == String):
+                            sys.exit(f'[Runtime Error] .py FFI expects a string (Python function name) as the first argument at {layer.expr.sl}')
+                        py_args = []
+                        for i in range(1, len(args)):
+                            if type(args[i]) == Number:
+                                py_args.append(args[i].to_int(layer.expr))
+                            elif type(args[i]) == String:
+                                py_args.append(args[i].value)
+                            else:
+                                sys.exit(f'[Runtime Error] .py FFI only supports Number/String arguments at {layer.expr.sl}')
+                        if args[0].value not in state.py_functions:
+                            sys.exit(f'[Runtime Error] {args[0].value} is not installed in the state at {layer.expr.sl}')
+                        ret = state.py_functions[args[0].value](*py_args)
+                        if type(ret) == int:
+                            state.value = Number(ret)
+                        elif type(ret) == str:
+                            state.value = String(ret)
+                        else:
+                            sys.exit(f'[Runtime Error] .py FFI only supports Number/String return value at {layer.expr.sl}')
                     else:
                         sys.exit(f'[Runtime Error] unrecognized intrinsic function call at {layer.expr.sl}')
                     state.stack.pop()

@@ -37,7 +37,7 @@ letrec (
     # function call
     (putln (lambda (x) { (.+ x 1 0) } -1))
     # intrinsic call
-    (putln (.py "(lambda s : s.strip())" " 1 "))
+    (putln (.*))
     # sequence
     (putln [1 0])
     (putln [0 1])
