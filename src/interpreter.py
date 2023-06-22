@@ -90,10 +90,7 @@ class Token:
     def __str__(self) -> str:
         return f'(Token {self.sl} {self.src})'
 
-def lex(source: str, debug: bool) -> deque[Token]:
-    if debug:
-        sys.stderr.write('[Debug] *** starting lexer ***\n')
-
+def lex(source: str) -> deque[Token]:
     # only support these characters in source code
     charset = set(
         "abcdefghijklmnopqrstuvwxyz"
@@ -222,8 +219,6 @@ def lex(source: str, debug: bool) -> deque[Token]:
     while True:
         token = next_token()
         if token:
-            if debug:
-                sys.stderr.write(f'[Debug] read token {token}\n')
             tokens.append(token)
         else:
             break
@@ -419,10 +414,7 @@ class AccessNode(ExprNode):
     def pretty_print(self) -> str:
         return '&' + self.var.pretty_print() + ' ' + self.expr.pretty_print()
 
-def parse(tokens: deque[Token], debug: bool) -> ExprNode:
-    if debug:
-        sys.stderr.write('[Debug] *** starting parser ***\n')
-    
+def parse(tokens: deque[Token]) -> ExprNode:
     # token checkers
 
     def is_number_token(token: Token) -> bool:
@@ -622,8 +614,6 @@ def parse(tokens: deque[Token], debug: bool) -> ExprNode:
     def parse_expr() -> ExprNode:
         if not tokens:
             sys.exit(f'[Parser Error] incomplete token stream')
-        if debug:
-            sys.stderr.write(f'[Debug] parsing expression starting with {tokens[0]}\n')
         if is_number_token(tokens[0]):
             return parse_number()
         elif is_string_token(tokens[0]):
@@ -1027,10 +1017,7 @@ def query_stack(name: str, stack: list[Layer]) -> bool:
 
 ### interpreter
 
-def interpret(tree: ExprNode, debug: bool) -> Value:
-    if debug:
-        sys.stderr.write('[Debug] *** starting interpreter ***\n')
-    
+def interpret(tree: ExprNode) -> Value:
     # state
     state = State(tree)
     # the evaluation result of the last stack layer
@@ -1053,8 +1040,6 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
         if capacity > insufficient_capacity:
             if state.location >= 0.8 * capacity:
                 cnt = state.gc(value)
-                if debug:
-                    sys.stderr.write(f'[Debug] GC collected {cnt} store cells\n')
                 # GC failed to release enough memory, meaning that the capacity needs to grow
                 if state.location >= 0.8 * capacity:
                     insufficient_capacity = capacity
@@ -1067,8 +1052,6 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
 
         # evaluating the current layer
         layer = state.stack[-1]
-        if debug:
-            sys.stderr.write(f'[Debug] evaluating AST node of type {type(layer.expr)} at {layer.expr.sl}\n')
         if layer.expr is None:
             # end of evaluation, pop the main frame
             state.stack.pop()
@@ -1129,8 +1112,6 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
             else:
                 state.stack.pop()
         elif type(layer.expr) == VariableNode:
-            if debug:
-                sys.stderr.write(f'[Debug] looking up the variable {layer.expr}\n')
             # two types of variables
             if is_lexical_name(layer.expr.name):
                 value = state.store[lookup_env(layer.expr.sl, layer.expr.name, layer.env)]
@@ -1252,7 +1233,7 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         value = Number(args[0].value != args[1].value)
                     elif intrinsic == '.strnum':
                         check_args_error_exit(layer.expr.callee, args, [String])
-                        node = parse(deque([Token(layer.expr.sl, args[0].value)]), debug)
+                        node = parse(deque([Token(layer.expr.sl, args[0].value)]))
                         if not isinstance(node, NumberNode):
                             sys.exit(f'[Runtime Error] .strnum applied to non-number-string at {layer.expr}')
                         value = Number(node.n, node.d)
@@ -1280,8 +1261,6 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                         state.stack.pop()
                         # obtain the continuation (this deepcopy will not copy the store)
                         cont = Continuation(deepcopy(state.stack))
-                        if debug:
-                            sys.stderr.write(f'[Debug] captured continuation {cont}\n')
                         closure = args[0]
                         # make a closure call layer and pass in the continuation
                         addr = cont.location if cont.location != None else state.new(cont)
@@ -1306,22 +1285,13 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                     elif intrinsic == '.eval':
                         check_args_error_exit(layer.expr.callee, args, [String])
                         arg = args[0]
-                        if debug:
-                            sys.stderr.write(f'[Debug] eval started a new interpreter instance at {layer.expr}\n')
-                            value = debug_run(arg.value)
-                            sys.stderr.write(f'[Debug] eval stopped the new interpreter instance at {layer.expr}\n')
-                        else:
-                            value = normal_run(arg.value)
+                        value = normal_run(arg.value)
                     elif intrinsic == '.exit':
                         check_args_error_exit(layer.expr.callee, args, [])
-                        if debug:
-                            sys.stderr.write(f'[Debug] execution stopped by the intrinsic call {layer.expr}\n')
                         # the interpreter returns 0
                         sys.exit()
                     elif intrinsic == '.python':
                         check_args_error_exit(layer.expr.callee, args, [String, String])
-                        if debug:
-                            sys.stderr.write(f'[Debug] calling Python FFI {layer.expr}\n')
                         value = String(eval(args[0].value + '({!r})'.format(args[1].value)))
                     else:
                         sys.exit(f'[Runtime Error] unrecognized intrinsic function call at {layer.expr}')
@@ -1368,8 +1338,6 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                             sys.exit(f'[Runtime Error] wrong number/type of arguments given to {layer.expr.callee}')
                         # replace the stack
                         state.stack = deepcopy(cont.stack)
-                        if debug:
-                            sys.stderr.write(f'[Debug] applied continuation {cont}, stack switched\n')
                         # the stack has been replaced, so we don't need to pop the previous stack's call layer
                         # the previous stack is simply discarded
                         continue
@@ -1387,8 +1355,6 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
             else:
                 state.stack.pop()
         elif type(layer.expr) == QueryNode:
-            if debug:
-                sys.stderr.write(f'[Debug] querying the variable {layer.expr.var}\n')
             if layer.expr.var.is_lex():
                 # evaluate the closure
                 if layer.pc == 0:
@@ -1404,8 +1370,6 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
                 value = Number(query_stack(layer.expr.var.name, state.stack))
                 state.stack.pop()
         elif type(layer.expr) == AccessNode:
-            if debug:
-                sys.stderr.write(f'[Debug] accessing the variable {layer.expr.var}\n')
             # evaluate the closure
             if layer.pc == 0:
                 state.stack.append(Layer(layer.env, layer.expr.expr))
@@ -1422,15 +1386,9 @@ def interpret(tree: ExprNode, debug: bool) -> Value:
 ### main
 
 def normal_run(source: str) -> Value:
-    tokens = lex(source, False)
-    tree = parse(tokens, False)
-    result = interpret(tree, False)
-    return result
-
-def debug_run(source: str) -> Value:
-    tokens = lex(source, True)
-    tree = parse(tokens, True)
-    result = interpret(tree, True)
+    tokens = lex(source)
+    tree = parse(tokens)
+    result = interpret(tree)
     return result
 
 def main(option: str, source: str) -> None:
@@ -1447,8 +1405,6 @@ def main(option: str, source: str) -> None:
         current_memory, peak_memory = tracemalloc.get_traced_memory()
         tracemalloc.stop()
         sys.stderr.write(f'Peak memory (KiB): {peak_memory / 1024}\n')
-    elif option == 'debug':
-        print(debug_run(source).pretty_print())
     elif option == 'ast':
         tokens = lex(source, False)
         tree = parse(tokens, False)
@@ -1459,13 +1415,12 @@ def main(option: str, source: str) -> None:
         print(tree.pretty_print())
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'time', 'space', 'debug', 'ast', 'print']:
+    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'time', 'space', 'ast', 'print']:
         sys.exit(
             'Usage:\n'
             f'\tpython3 {sys.argv[0]} run <source-file>\n'
             f'\tpython3 {sys.argv[0]} time <source-file>\n'
             f'\tpython3 {sys.argv[0]} space <source-file>\n'
-            f'\tpython3 {sys.argv[0]} debug <source-file>\n'
             f'\tpython3 {sys.argv[0]} ast <source-file>\n'
             f'\tpython3 {sys.argv[0]} print <source-file>'
         )
