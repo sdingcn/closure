@@ -869,20 +869,16 @@ class State:
         visited_stacks = set()
         # integer locations
         visited_locations = set()
-        # Python references
-        visited_values = []
 
         def mark_closure(closure: Closure) -> None:
             if id(closure) not in visited_closures:
                 visited_closures.add(id(closure))
-                visited_values.append(closure)
                 for v, l in closure.env:
                     mark_location(l)
         
         def mark_stack(stack: list[Layer]) -> None:
             if id(stack) not in visited_stacks:
                 visited_stacks.add(id(stack))
-                visited_values.append(stack)
                 for layer in stack:
                     if layer.frame:
                         for v, l in layer.env:
@@ -915,17 +911,15 @@ class State:
         elif type(value) == Continuation:
             mark_stack(value.stack)
         mark_stack(self.stack)
-        # returning visited_values is for relocating their internal location values
-        return (visited_locations, visited_values)
+        return visited_locations
 
     def sweep_and_compact(self, visited_locations: set[int]) -> tuple[int, dict[int, int]]:
         removed = 0
         # old location -> new location
         relocation = {}
-        n = len(self.store)
         i = 0
         j = 0
-        while j < n:
+        while j < self.location:
             if j in visited_locations:
                 self.store[i] = self.store[j]
                 self.store[i].location = i
@@ -938,23 +932,43 @@ class State:
         self.location = i
         return (removed, relocation)
     
-    def relocate(self, visited_values: list[Value], relocation: dict[int, int]) -> None:
-        # don't need to recursively update because all descendant objects are in visited_values
-        for value in visited_values: 
-            if type(value) == Closure:
-                for i in range(len(value.env)):
-                    value.env[i] = (value.env[i][0], relocation[value.env[i][1]])
-            elif type(value) == list:
-                for layer in value:
-                    if layer.frame:
-                        for i in range(len(layer.env)):
-                            layer.env[i] = (layer.env[i][0], relocation[layer.env[i][1]])
+    def relocate(self, value: Value, relocation: dict[int, int]) -> None:
+        relocated = set()
+
+        def reloc(val: Value) -> None:
+            if id(val) not in relocated:
+                relocated.add(id(val))
+                if type(val) == Closure:
+                    for i in range(len(val.env)):
+                        val.env[i] = (val.env[i][0], relocation[val.env[i][1]])
+                elif type(val) == Continuation:
+                    for layer in val.stack:
+                        if layer.frame:
+                            for i in range(len(layer.env)):
+                                layer.env[i] = (layer.env[i][0], relocation[layer.env[i][1]])
+                        if layer.local:
+                            for name, value in layer.local.items():
+                                if type(value) == Closure:
+                                    reloc(value)
+                                elif type(value) == Continuation:
+                                    reloc(value)
+                                elif type(value) == list:
+                                    for elem in value:
+                                        if type(elem) == Closure:
+                                            reloc(elem)
+                                        elif type(elem) == Continuation:
+                                            reloc(elem)
+
+        reloc(value)
+        reloc(Continuation(self.stack))
+        for i in range(self.location):
+            reloc(self.store[i])
 
     def gc(self, value: Value) -> int:
         ''' mark-and-sweep garbage collection '''
-        visited_locations, visited_values = self.mark(value)
+        visited_locations = self.mark(value)
         removed, relocation = self.sweep_and_compact(visited_locations)
-        self.relocate(visited_values, relocation)
+        self.relocate(value, relocation)
         return removed
 
 def check_args_error_exit(callee: ExprNode, args: list[Value], ts: list[type]) -> bool:
