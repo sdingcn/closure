@@ -4,7 +4,17 @@
 
 ExprScript 是一个动态类型函数式语言.
 
-+ 直接支持全精度有理数计算
++ 小语言核心, 丰富的语言特性
+
+| 特性 | 实现 |
+| --- | --- |
+| 结构/记录 ([test/binary-tree.expr](test/binary-tree.expr)) | 闭包 |
+| 面向对象编程 ([test/oop.expr](test/oop.expr)) | 闭包和动态作用域变量 |
+| 协程 ([test/coroutines.expr](test/coroutines.expr)) | 续延 |
+| 惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | 无参函数 |
+| 多阶段求值 ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
+
++ 原生支持全精度有理数
 
 ```
 $ cat test/average.expr
@@ -17,20 +27,6 @@ $ python3 src/exprscript.py test/average.expr
 500943/77000
 ```
 
-+ 利用一个小语言核心实现很多语言特性
-
-| 特性 | 实现 |
-| --- | --- |
-| 结构/记录 ([test/binary-tree.expr](test/binary-tree.expr)) | 闭包 |
-| 面向对象编程 ([test/oop.expr](test/oop.expr)) | 闭包和动态作用域变量 |
-| 协程 ([test/coroutines.expr](test/coroutines.expr)) | 续延 |
-| 惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | 无参函数 |
-| 多阶段求值 ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
-
-+ 展示如何实现一个简单的解释器
-
-参见 ([src/exprscript.py](src/exprscript.py)).
-
 ## 依赖
 
 Python >= 3.9
@@ -41,12 +37,9 @@ Python >= 3.9
 <comment> := #.*?\n
 <head-nonzero> := [1-9][0-9]*
 <tail-nonzero> := [0-9]*[1-9]
-<number> := [+-]?0
-          | [+-]?<head-nonzero>
-          | [+-]?0.<tail-nonzero>
-          | [+-]?<head-nonzero>.<tail-nonzero>
-          | [+-]?0/<head-nonzero>
-          | [+-]?<head-nonzero>/<head-nonzero>
+<number> := [+-]?0 | [+-]?<head-nonzero>
+          | [+-]?0.<tail-nonzero> | [+-]?<head-nonzero>.<tail-nonzero>
+          | [+-]?0/<head-nonzero> | [+-]?<head-nonzero>/<head-nonzero>
 <string> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
 <lexical-variable> := [a-z][a-zA-Z0-9_]*         // lexically scoped variable
 <dynamic-variable> := [A-Z][a-zA-Z0-9_]*         // dynamically scoped variable

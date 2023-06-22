@@ -19,8 +19,7 @@ def check_io(prog: str, i: str, o: str) -> bool:
     if raw_o != o:
         sys.stderr.write(f'*** Expected: [{o}], Got: [{raw_o}]\n')
         return False
-    else:
-        return True
+    return True
 
 def read_file(path: str) -> str:
     with open(path, 'r', encoding = 'utf-8') as f:

@@ -6,7 +6,17 @@
 
 ExprScript is a dynamically typed functional programming language.
 
-+ Directly support full-precision rational number computations
++ Small language core, rich language features
+
+| Feature | Implementation |
+| --- | --- |
+| Structures / Records ([test/binary-tree.expr](test/binary-tree.expr)) | Closures |
+| Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
+| Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
+| Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
+| Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
+
++ Native support for full-precision rational numbers
 
 ```
 $ cat test/average.expr
@@ -19,20 +29,6 @@ $ python3 src/exprscript.py test/average.expr
 500943/77000
 ```
 
-+ Use a small language core to implement many language features
-
-| Feature | Implementation |
-| --- | --- |
-| Structures / Records ([test/binary-tree.expr](test/binary-tree.expr)) | Closures |
-| Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
-| Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
-| Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
-| Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
-
-+ Demonstrate the implementation of a simple interpreter
-
-See ([src/exprscript.py](src/exprscript.py)).
-
 ## dependencies
 
 Python >= 3.9
@@ -43,12 +39,9 @@ Python >= 3.9
 <comment> := #.*?\n
 <head-nonzero> := [1-9][0-9]*
 <tail-nonzero> := [0-9]*[1-9]
-<number> := [+-]?0
-          | [+-]?<head-nonzero>
-          | [+-]?0.<tail-nonzero>
-          | [+-]?<head-nonzero>.<tail-nonzero>
-          | [+-]?0/<head-nonzero>
-          | [+-]?<head-nonzero>/<head-nonzero>
+<number> := [+-]?0 | [+-]?<head-nonzero>
+          | [+-]?0.<tail-nonzero> | [+-]?<head-nonzero>.<tail-nonzero>
+          | [+-]?0/<head-nonzero> | [+-]?<head-nonzero>/<head-nonzero>
 <string> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
 <lexical-variable> := [a-z][a-zA-Z0-9_]*         // lexically scoped variable
 <dynamic-variable> := [A-Z][a-zA-Z0-9_]*         // dynamically scoped variable
