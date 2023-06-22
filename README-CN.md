@@ -9,19 +9,11 @@ ExprScript 是一个动态类型函数式语言.
 ```
 $ cat test/average.expr
 letrec (
-  # It's easy to implement your own data structures.
-  null = lambda () { lambda () { 0 } }
-  cons = lambda (head tail) { lambda () { 1 } }
-  len = lambda (list) { if (list) then (.+ 1 (len &tail list)) else 0 }
-  sum = lambda (list) { if (list) then (.+ &head list (sum &tail list)) else 0 }
+  sum = (.+ 100/11 61 +15/7 1.355 -41.06)
 ) {
-  letrec (
-    list = (cons 100/11 (cons 61 (cons +15/7 (cons 1.355 (cons -41.06 (null))))))
-  ) {
-    (./ (sum list) (len list))
-  }
+  (./ sum 5)
 }
-$ python3 src/interpreter.py run test/average.expr
+$ python3 src/interpreter.py test/average.expr
 500943/77000
 ```
 
@@ -29,6 +21,7 @@ $ python3 src/interpreter.py run test/average.expr
 
 | 特性 | 实现 |
 | --- | --- |
+| 结构/记录 ([test/binary-tree.expr](test/binary-tree.expr)) | 闭包 |
 | 面向对象编程 ([test/oop.expr](test/oop.expr)) | 闭包和动态作用域变量 |
 | 协程 ([test/coroutines.expr](test/coroutines.expr)) | 续延 |
 | 惰性求值 ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | 无参函数 |

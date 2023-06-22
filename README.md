@@ -11,19 +11,11 @@ ExprScript is a dynamically typed functional programming language.
 ```
 $ cat test/average.expr
 letrec (
-  # It's easy to implement your own data structures.
-  null = lambda () { lambda () { 0 } }
-  cons = lambda (head tail) { lambda () { 1 } }
-  len = lambda (list) { if (list) then (.+ 1 (len &tail list)) else 0 }
-  sum = lambda (list) { if (list) then (.+ &head list (sum &tail list)) else 0 }
+  sum = (.+ 100/11 61 +15/7 1.355 -41.06)
 ) {
-  letrec (
-    list = (cons 100/11 (cons 61 (cons +15/7 (cons 1.355 (cons -41.06 (null))))))
-  ) {
-    (./ (sum list) (len list))
-  }
+  (./ sum 5)
 }
-$ python3 src/interpreter.py run test/average.expr
+$ python3 src/interpreter.py test/average.expr
 500943/77000
 ```
 
@@ -31,6 +23,7 @@ $ python3 src/interpreter.py run test/average.expr
 
 | Feature | Implementation |
 | --- | --- |
+| Structures / Records ([test/binary-tree.expr](test/binary-tree.expr)) | Closures |
 | Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
 | Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
 | Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
