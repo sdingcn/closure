@@ -15,7 +15,7 @@ letrec (
 ) {
   (./ sum 5)
 }
-$ python3 src/interpreter.py test/average.expr
+$ python3 src/exprscript.py test/average.expr
 500943/77000
 ```
 
@@ -31,7 +31,7 @@ $ python3 src/interpreter.py test/average.expr
 
 + Demonstrate the implementation of a simple interpreter
 
-See ([src/interpreter.py](src/interpreter.py)).
+See ([src/exprscript.py](src/exprscript.py)).
 
 ## dependencies
 
@@ -87,5 +87,5 @@ The evaluation result of the entire program is printed to `stdout`.
 
 ## usage
 
-+ `python3 src/interpreter.py <file>` runs code in `<file>`.
++ `python3 src/exprscript.py <file>` runs code in `<file>`.
 + `python3 test.py` runs all tests (see [test.py](test.py) for inputs/outputs for each test program).

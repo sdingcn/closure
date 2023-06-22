@@ -652,7 +652,7 @@ class State:
         self._ref_size = 8
         self._empty_store_size = sys.getsizeof(self.store)
 
-    def add_py_function(self, f: Callable[..., Union[str, int]]) -> None:
+    def register_py_function(self, f: Callable[..., Union[str, int]]) -> None:
         self.py_functions[f.__name__] = f
 
     def get_store_capacity(self) -> int:

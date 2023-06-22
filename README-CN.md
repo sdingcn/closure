@@ -13,7 +13,7 @@ letrec (
 ) {
   (./ sum 5)
 }
-$ python3 src/interpreter.py test/average.expr
+$ python3 src/exprscript.py test/average.expr
 500943/77000
 ```
 
@@ -29,7 +29,7 @@ $ python3 src/interpreter.py test/average.expr
 
 + 展示如何实现一个简单的解释器
 
-参见 ([src/interpreter.py](src/interpreter.py)).
+参见 ([src/exprscript.py](src/exprscript.py)).
 
 ## 依赖
 
@@ -85,5 +85,5 @@ Python >= 3.9
 
 ## 用法
 
-+ `python3 src/interpreter.py <file>` 运行 `<file>` 中的代码.
++ `python3 src/exprscript.py <file>` 运行 `<file>` 中的代码.
 + `python3 test.py` 运行所有测试 ([test.py](test.py) 包含每个测试程序的输入/输出).
