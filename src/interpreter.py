@@ -1394,22 +1394,17 @@ def run_instance(source: str) -> Value:
 def main(option: str, source: str) -> None:
     if option == 'run':
         print(run_instance(source).pretty_print())
-    elif option == 'ast':
-        tokens = lex(source, False)
-        tree = parse(tokens, False)
-        print(tree)
-    elif option == 'print':
+    elif option == 'format':
         tokens = lex(source, False)
         tree = parse(tokens, False)
         print(tree.pretty_print())
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'ast', 'print']:
+    if len(sys.argv) != 3 or sys.argv[1] not in ['run', 'format']:
         sys.exit(
             'Usage:\n'
             f'\tpython3 {sys.argv[0]} run <source-file>\n'
-            f'\tpython3 {sys.argv[0]} ast <source-file>\n'
-            f'\tpython3 {sys.argv[0]} print <source-file>'
+            f'\tpython3 {sys.argv[0]} format <source-file>'
         )
     with open(sys.argv[2], 'r', encoding = 'utf-8') as f:
         main(sys.argv[1], f.read())

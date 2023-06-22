@@ -94,6 +94,5 @@ Python >= 3.9
 
 + `python3 src/interpreter.py <option> <file>`, 此处 `<option>` 可以是
   - `run` 运行 `<file>` 中的代码;
-  - `ast` 将 `<file>` 中代码的抽象语法树写入标准输出;
-  - `print` 将 `<file>` 中的代码格式化后写入标准输出.
+  - `format` 将 `<file>` 中的代码格式化后写入标准输出.
 + `python3 test.py` 运行所有测试 ([test.py](test.py) 包含每个测试程序的输入/输出).
