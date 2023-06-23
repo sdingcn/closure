@@ -37,6 +37,15 @@ class SourceLocation:
     def __str__(self) -> str:
         return f'(SourceLocation {self.line} {self.col})'
 
+def lexer_error(sl: SourceLocation, msg: str) -> None:
+    sys.exit(f'[Lexer Error {sl}] {msg}')
+
+def parser_error(sl: SourceLocation, msg: str) -> None:
+    sys.exit(f'[Parser Error {sl}] {msg}')
+
+def runtime_error(sl: SourceLocation, msg: str) -> None:
+    sys.exit(f'[Runtime Error {sl}] {msg}')
+
 class Token:
 
     def __init__(self, sl: SourceLocation, src: str):
@@ -52,10 +61,16 @@ def lex(source: str) -> deque[Token]:
         "`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?"
         " \t\n"
     )
-
+    line = 1
+    col = 1
     for char in source:
         if char not in charset:
-            sys.exit(f'[Lexer Error] unsupported character {char} in the source')
+            lexer_error(SourceLocation(line, col), 'unsupported character')
+        if char == '\n':
+            line += 1
+            col = 1
+        else:
+            col += 1
 
     # number format checker
 
@@ -118,7 +133,7 @@ def lex(source: str) -> deque[Token]:
                     src += chars.popleft()
                     col += 1
                 if not is_number_literal(src):
-                    sys.exit(f'[Lexer Error] invalid number literal at {sl} (note: do not use leading zeros or trailing zeros)')
+                    lexer_error(sl, 'invalid number literal (note: do not use leading / trailing zeros)')
             # variable / keyword
             elif chars[0].isalpha():
                 src = ''
@@ -151,7 +166,7 @@ def lex(source: str) -> deque[Token]:
                     src += chars.popleft()
                     col += 1
                 else:
-                    sys.exit(f'[Lexer Error] incomplete string literal at {sl}')
+                    lexer_error(sl, 'incomplete string literal')
             # comment
             elif chars[0] == '#':
                 chars.popleft()
@@ -161,7 +176,7 @@ def lex(source: str) -> deque[Token]:
                     col += 1
                 return next_token()
             else:
-                sys.exit(f'[Lexer Error] unsupported character {chars[0]} at {sl}')
+                lexer_error(sl, 'unsupported starting character')
             token = Token(sl, src)
             return token
         else:
@@ -286,21 +301,21 @@ def parse(tokens: deque[Token]) -> ExprNode:
 
     def consume(expected: str) -> Token:
         if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
+            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
         token = tokens.popleft()
         if token.src == expected:
             return token
         else:
-            sys.exit(f'[Parser Error] expected {expected}, got {token.src} at {token.sl}')
+            parser_error(token.sl, 'unexpected token')
 
     # parsers
 
     def parse_number() -> NumberNode:
         if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
+            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
         token = tokens.popleft()
         if not is_number_token(token):
-            sys.exit(f'[Parser Error] expected a number, got {token.src} at {token.sl}')
+            parser_error(token.sl, 'unexpected token')
         s = token.src
         sign = 1
         if len(s) and s[0] in ('-', '+'):
@@ -320,10 +335,10 @@ def parse(tokens: deque[Token]) -> ExprNode:
 
     def parse_string() -> StringNode:
         if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
+            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
         token = tokens.popleft()
         if not is_string_token(token):
-            sys.exit(f'[Parser Error] expected a string, got {token.src} at {token.sl}')
+            parser_error(token.sl, 'unexpected token')
         # "abc" -> deque(abc)
         content = deque(token.src[1:-1])
         s = ''
@@ -341,9 +356,9 @@ def parse(tokens: deque[Token]) -> ExprNode:
                     elif nxt == 'n':
                         s += '\n'
                     else:
-                        sys.exit(f'[Parser Error] unsupported escape sequence at {token.sl}')
+                        parser_error(token.sl, 'unsupported escape sequence')
                 else:
-                    sys.exit(f'[Parser Error] incomplete escape sequence at {token.sl}')
+                    parser_error(token.sl, 'incomplete escape sequence')
             else:
                 s += char
         node = StringNode(token.sl, s)
@@ -351,10 +366,10 @@ def parse(tokens: deque[Token]) -> ExprNode:
 
     def parse_intrinsic() -> IntrinsicNode:
         if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
+            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
         token = tokens.popleft()
         if not is_intrinsic_token(token):
-            sys.exit(f'[Parser Error] expected an intrinsic function, got {token.src} at {token.sl}')
+            parser_error(token.sl, 'unexpected token')
         node = IntrinsicNode(token.sl, token.src)
         return node
 
@@ -399,10 +414,10 @@ def parse(tokens: deque[Token]) -> ExprNode:
 
     def parse_variable() -> VariableNode:
         if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
+            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
         token = tokens.popleft()
         if not is_variable_token(token):
-            sys.exit(f'[Parser Error] expected a variable, got {token.src} at {token.sl}')
+            parser_error(token.sl, 'unexpected token')
         node = VariableNode(token.sl, token.src)
         return node
 
@@ -422,7 +437,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         while tokens and tokens[0].src != ']':
             expr_list.append(parse_expr())
         if len(expr_list) == 0:
-            sys.exit('[Parser Error] zero-length sequence at {start.sl}')
+            parser_error(start.sl, 'zero-length sequence')
         consume(']')
         node = SequenceNode(start.sl, expr_list)
         return node
@@ -446,7 +461,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
 
     def parse_expr() -> ExprNode:
         if not tokens:
-            sys.exit(f'[Parser Error] incomplete token stream')
+            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
         if is_number_token(tokens[0]):
             return parse_number()
         elif is_string_token(tokens[0]):
@@ -471,12 +486,12 @@ def parse(tokens: deque[Token]) -> ExprNode:
         elif tokens[0].src == '&':
             return parse_access()
         else:
-            sys.exit(f'[Parser Error] unrecognized expression starting with {tokens[0].src} at {tokens[0].sl}')
+            parser_error(tokens[0].sl, 'unrecognized token')
     
     # parser entry
     expr = parse_expr()
     if tokens:
-        sys.exit(f'[Parser Error] redundant token stream starting at {tokens[0].sl}')
+        parser_error(tokens[0].sl, 'redundant token')
     return expr
 
 ### runtime
@@ -524,7 +539,7 @@ class Number(Value):
 
     def to_int(self, expr: ExprNode) -> int:
         if self.d != 1:
-            sys.exit(f'[Runtime Error] cannot convert a non-integer Number to a Python int at {expr.sl}')
+            runtime_error(expr.sl, 'cannot convert a non-integer Number to a Python int')
         return self.n
 
     def add(self, other: 'Number') -> 'Number':
@@ -547,7 +562,7 @@ class Number(Value):
 
     def div(self, other: 'Number', expr: ExprNode) -> 'Number':
         if other.n == 0:
-            sys.exit(f'[Runtime Error] division by zero at {expr.sl}')
+            runtime_error(expr.sl, 'division by zero')
         n1 = self.n * other.d
         d1 = self.d * other.n
         if d1 < 0:
@@ -558,9 +573,9 @@ class Number(Value):
 
     def mod(self, other: 'Number', expr: ExprNode) -> 'Number':
         if self.d != 1 or other.d != 1:
-            sys.exit(f'[Runtime Error] mod applied to non-integer(s) at {expr.sl}')
-        if self.n < 0 or other.n < 0:
-            sys.exit(f'[Runtime Error] mod applied to negative integer(s) at {expr.sl}')
+            runtime_error(expr.sl, 'non-integer mod')
+        if self.n < 0 or other.n <= 0:
+            runtime_error(expr.sl, 'non-positive integer mod')
         return Number(self.n % other.n, 1)
 
     def floor(self) -> 'Number':
@@ -783,10 +798,10 @@ class State:
 def check_args_error_exit(callee: ExprNode, args: list[Value], ts: list[type]) -> bool:
     ''' check whether arguments conform to types '''
     if len(args) != len(ts):
-        sys.exit(f'[Runtime Error] wrong number of arguments given to callee at {callee.sl}')
+        runtime_error(callee.sl, 'wrong number of arguments given to callee')
     for i in range(len(args)):
         if not isinstance(args[i], ts[i]):
-            sys.exit(f'[Runtime Error] wrong type of arguments given to callee at {callee.sl}')
+            runtime_error(callee.sl, 'wrong type of arguments given to callee')
 
 def is_lexical_name(name: str) -> bool:
     return name[0].islower()
@@ -875,7 +890,7 @@ def interpret(state: State) -> None:
                     var = layer.expr.var_expr_list[layer.pc - 2][0]
                     last_location = lookup_env(var.name, layer.env)
                     if last_location is None:
-                        sys.exit(f'[Runtime Error] undefined variable {var.name} at {var.sl}')
+                        runtime_error(var.sl, 'undefined variable')
                     state.store[last_location] = state.value
                 state.stack.append(Layer(layer.env, layer.expr.var_expr_list[layer.pc - 1][1]))
                 layer.pc += 1
@@ -886,7 +901,7 @@ def interpret(state: State) -> None:
                     var = layer.expr.var_expr_list[layer.pc - 2][0]
                     last_location = lookup_env(var.name, layer.env)
                     if last_location is None:
-                        sys.exit(f'[Runtime Error] undefined variable {var.name} at {var.sl}')
+                        runtime_error(var.sl, 'undefined variable')
                     state.store[last_location] = state.value
                 state.stack.append(Layer(layer.env, layer.expr.expr))
                 layer.pc += 1
@@ -904,7 +919,7 @@ def interpret(state: State) -> None:
             # choose the branch to evaluate
             elif layer.pc == 1:
                 if type(state.value) != Number:
-                    sys.exit(f'[Runtime Error] the condition at {layer.expr.sl} evaluated to a value ({state.value}) of wrong type')
+                    runtime_error(layer.expr.cond.sl, 'wrong condition type')
                 if state.value.n != 0:
                     state.stack.append(Layer(layer.env, layer.expr.branch1))
                 else:
@@ -918,12 +933,12 @@ def interpret(state: State) -> None:
             if is_lexical_name(layer.expr.name):
                 location = lookup_env(layer.expr.name, layer.env)
                 if location is None:
-                    sys.exit(f'[Runtime Error] undefined variable {layer.expr.name} at {layer.expr.sl}')
+                    runtime_error(layer.expr.sl, 'undefined variable')
                 state.value = state.store[location]
             else:
                 location = lookup_stack(layer.expr.name, state.stack)
                 if location is None:
-                    sys.exit(f'[Runtime Error] undefined variable {layer.expr.name} at {layer.expr.sl}')
+                    runtime_error(layer.expr.sl, 'undefined variable')
                 state.value = state.store[location]
             state.stack.pop()
         elif type(layer.expr) == CallNode:
@@ -1013,7 +1028,7 @@ def interpret(state: State) -> None:
                     elif intrinsic == '.strcut':
                         check_args_error_exit(layer.expr.callee, args, [String, Number, Number])
                         if args[1].d != 1 or args[2].d != 1:
-                            sys.exit(f'[Runtime Error] .strcut is applied to non-integer(s) at {layer.expr.sl}')
+                            runtime_error(layer.expr.sl, '.strcut is applied to non-integer(s)')
                         state.value = String(args[0].value[args[1].n : args[2].n])
                     elif intrinsic == '.str+':
                         check_args_error_exit(layer.expr.callee, args, [String] * len(args))
@@ -1043,7 +1058,7 @@ def interpret(state: State) -> None:
                         check_args_error_exit(layer.expr.callee, args, [String])
                         node = parse(deque([Token(layer.expr.sl, args[0].value)]))
                         if not isinstance(node, NumberNode):
-                            sys.exit(f'[Runtime Error] .strnum applied to non-number-string at {layer.expr.sl}')
+                            runtime_error(layer.expr.sl, '.strnum is applied to non-number-string')
                         state.value = Number(node.n, node.d)
                     elif intrinsic == '.strquote':
                         check_args_error_exit(layer.expr.callee, args, [String])
@@ -1056,7 +1071,7 @@ def interpret(state: State) -> None:
                             state.value = Void()
                     elif intrinsic == '.put':
                         if not (len(args) >= 1 and all(map(lambda v : isinstance(v, Value), args))):
-                            sys.exit(f'[Runtime Error] wrong number/type of arguments given to callee at {layer.expr.callee.sl}')
+                            runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to .put')
                         output = ''
                         for v in args:
                             output += str(v)
@@ -1099,7 +1114,7 @@ def interpret(state: State) -> None:
                         sys.exit()
                     elif intrinsic == '.py':
                         if not (len(args) > 0 and type(args[0]) == String):
-                            sys.exit(f'[Runtime Error] .py FFI expects a string (Python function name) as the first argument at {layer.expr.sl}')
+                            runtime_error(layer.expr.sl, '.py FFI expects a string (Python function name) as the first argument')
                         py_args = []
                         for i in range(1, len(args)):
                             if type(args[i]) == Number:
@@ -1107,18 +1122,18 @@ def interpret(state: State) -> None:
                             elif type(args[i]) == String:
                                 py_args.append(args[i].value)
                             else:
-                                sys.exit(f'[Runtime Error] .py FFI only supports Number/String arguments at {layer.expr.sl}')
+                                runtime_error(layer.expr.sl, '.py FFI only supports Number/String arguments')
                         if args[0].value not in state.py_functions:
-                            sys.exit(f'[Runtime Error] {args[0].value} is not installed in the state at {layer.expr.sl}')
+                            runtime_error(layer.expr.sl, '.py FFI encountered unregistered function')
                         ret = state.py_functions[args[0].value](*py_args)
                         if type(ret) == int:
                             state.value = Number(ret)
                         elif type(ret) == str:
                             state.value = String(ret)
                         else:
-                            sys.exit(f'[Runtime Error] .py FFI only supports Number/String return value at {layer.expr.sl}')
+                            runtime_error(layer.expr.sl, '.py FFI only supports Number/String return value')
                     else:
-                        sys.exit(f'[Runtime Error] unrecognized intrinsic function call at {layer.expr.sl}')
+                        runtime_error(layer.expr.sl, 'unrecognized intrinsic function call')
                     state.stack.pop()
             # closure or continuation call
             else:
@@ -1147,7 +1162,7 @@ def interpret(state: State) -> None:
                         closure = callee
                         # types will be checked inside the closure call
                         if len(args) != len(closure.fun.var_list):
-                            sys.exit(f'[Runtime Error] wrong number/type of arguments given to callee at {layer.expr.callee.sl}')
+                            runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to callee')
                         new_env = closure.env[:]
                         for i, v in enumerate(closure.fun.var_list):
                             addr = args[i].location if args[i].location != None else state.new(args[i])
@@ -1159,14 +1174,14 @@ def interpret(state: State) -> None:
                         cont = callee
                         # the "value" variable already contains the last evaluation result of the args, so we just continue
                         if len(args) != 1:
-                            sys.exit(f'[Runtime Error] wrong number/type of arguments given to callee at {layer.expr.callee.sl}')
+                            runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to callee')
                         # replace the stack
                         state.stack = deepcopy(cont.stack)
                         # the stack has been replaced, so we don't need to pop the previous stack's call layer
                         # the previous stack is simply discarded
                         continue
                     else:
-                        sys.exit(f'[Runtime Error] the callee at {layer.expr.callee.sl} is not callable')
+                        runtime_error(layer.expr.callee.sl, 'calling non-callable object')
                 # finish the call
                 else:
                     state.stack.pop()
@@ -1186,7 +1201,7 @@ def interpret(state: State) -> None:
                     layer.pc += 1
                 else:
                     if type(state.value) != Closure:
-                        sys.exit(f'[Runtime Error] lexical variable query applied to non-closure type at {layer.expr.sl}')
+                        runtime_error(layer.expr.sl, 'lexical variable query applied to non-closure type')
                     # the closure's value is already in "state.value", so we just use it and then update it
                     state.value = Number(not (lookup_env(layer.expr.var.name, state.value.env) is None))
                     state.stack.pop()
@@ -1200,15 +1215,15 @@ def interpret(state: State) -> None:
                 layer.pc += 1
             else:
                 if type(state.value) != Closure:
-                    sys.exit(f'[Runtime Error] lexical variable access applied to non-closure type at {layer.expr.sl}')
+                    runtime_error(layer.expr.sl, 'lexical variable access applied to non-closure type')
                 # again, "state.value" already contains the closure's evaluation result
                 location = lookup_env(layer.expr.var.name, state.value.env)
                 if location is None:
-                    sys.exit(f'[Runtime Error] undefined variable {layer.expr.var.name} at {layer.expr.sl}')
+                    runtime_error(layer.expr.sl, 'undefined variable')
                 state.value = state.store[location]
                 state.stack.pop()
         else:
-            sys.exit(f'[Runtime Error] unrecognized AST node at {layer.expr.sl}')
+            runtime_error(layer.expr.sl, 'unrecognized AST node')
 
 ### main
 
