@@ -59,8 +59,6 @@ task 3
 <void>
 '''),
 
-        ('test/ffi.expr', '', 'Hello FFI-Call from Python!\n'),
-
         ('test/gcd.expr', '100\n0\n', '100\n<void>\n'),
         ('test/gcd.expr', '0\n100\n', '100\n<void>\n'),
         ('test/gcd.expr', '30\n30\n', '30\n<void>\n'),
@@ -97,14 +95,10 @@ hello world
 <void>
 '''),
 
-        ('test/reg.expr', '', 'registered function\n'),
-
         ('test/y-combinator.expr', '', '1 120 3628800\n<void>\n')
     ]
     py_tests = [
-        ('src/call-python-from-exprscript.py', '', 'EMAN\n'),
-        
-        ('src/call-exprscript-from-python.py', '', '15\n')
+        ('src/interaction.py', '', '-5\neman\n')
     ]
     cnt = 0
     for test in expr_tests:

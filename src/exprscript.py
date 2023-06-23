@@ -649,6 +649,44 @@ class Continuation(Value):
     def __str__(self) -> str:
         return '<continuation>'
 
+def check_args_error_exit(callee: ExprNode, args: list[Value], ts: list[type]) -> bool:
+    ''' check whether arguments conform to types '''
+    if len(args) != len(ts):
+        runtime_error(callee.sl, 'wrong number of arguments given to callee')
+    for i in range(len(args)):
+        if not isinstance(args[i], ts[i]):
+            runtime_error(callee.sl, 'wrong type of arguments given to callee')
+
+def is_lexical_name(name: str) -> bool:
+    return name[0].islower()
+
+def is_dynamic_name(name: str) -> bool:
+    return name[0].isupper()
+
+def filter_lexical(env: list[tuple[str, int]]) -> list[tuple[str, int]]:
+    ''' find out lexical variable-location pairs in an environment '''
+    lex_env = []
+    for v, l in env:
+        if is_lexical_name(v):
+            lex_env.append((v, l))
+    return lex_env
+
+def lookup_env(name: str, env: list[tuple[str, int]]) -> Union[int, None]:
+    ''' lexically scoped variable lookup '''
+    for i in range(len(env) - 1, -1, -1):
+        if env[i][0] == name:
+            return env[i][1]
+    return None
+
+def lookup_stack(name: str, stack: list[Layer]) -> Union[int, None]:
+    ''' dynamically scoped variable lookup '''
+    for i in range(len(stack) - 1, -1, -1):
+        if stack[i].frame:
+            for j in range(len(stack[i].env) - 1, -1, -1):
+                if stack[i].env[j][0] == name:
+                    return stack[i].env[j][1]
+    return None
+
 class State:
     '''The class for the complete state during execution'''
 
@@ -662,19 +700,435 @@ class State:
         # value
         self.value = None
         # Python FFI
-        self.py_functions = {"py_hello": lambda s: f"Hello {s} from Python!"}
+        self.py_functions = {}
         # private values
         self._ref_size = 8
         self._empty_store_size = sys.getsizeof(self.store)
 
-    def register_py_function(self, f: Callable[..., Union[str, int]]) -> None:
-        self.py_functions[f.__name__] = f
+    def register_py_function(self, name: str, f: Callable[..., Union[str, int]]) -> 'State':
+        self.py_functions[name] = f
+        return self
+    
+    def call_expr_function(self, name: str, args: list[Union[str, int]]) -> Union[str, int]:
+        sl = SourceLocation(-1, -1)
+        callee = VariableNode(sl, name)
+        arg_list = []
+        for a in args:
+            if type(a) == str:
+                arg_list.append(StringNode(sl, a))
+            elif type(a) == int:
+                arg_list.append(NumberNode(sl, a, 1))
+            else:
+                runtime_error(sl, 'Python can only use str/int as arguments when calling ExprScript functions')
+        call = CallNode(sl, callee, arg_list)
+        self.stack.append(Layer(self.stack[0].env, call))
+        self.execute()
+        if type(self.value) == String:
+            return self.value.value
+        elif type(self.value) == Number:
+            if self.value.d != 1:
+                runtime_error(sl, 'ExprScript returned a non-integer Number')
+            else:
+                return self.value.n
+        else:
+            runtime_error(sl, 'ExprScript returned a non-String non-Number result')
 
-    def get_store_capacity(self) -> int:
+    def execute(self) -> 'State':
+        # used for GC control
+        insufficient_capacity = -1
+
+        # we just adjust "state.stack" and "value"
+        # the evaluation will automatically continue along the while loop
+        while True:
+            
+            # GC control
+            capacity = self._get_store_capacity()
+            # insufficient_capacity is the last capacity where GC failed
+            if capacity > insufficient_capacity:
+                if self.location >= 0.8 * capacity:
+                    cnt = self._gc()
+                    # GC failed to release enough memory, meaning that the capacity needs to grow
+                    if self.location >= 0.8 * capacity:
+                        insufficient_capacity = capacity
+                    # after GC the current capacity is enough so we keep the previous insufficient_capacity
+                    else:
+                        pass
+            # the capacity is insufficient, so we allow it to naturally grow and don't run GC before the growing
+            else:
+                pass
+
+            # evaluating the current layer
+            layer = self.stack[-1]
+            if layer.expr is None:
+                # found the main frame, which is the end of evaluation
+                return self
+            elif type(layer.expr) == NumberNode:
+                self.value = Number(layer.expr.n, layer.expr.d)
+                self.stack.pop()
+            elif type(layer.expr) == StringNode:
+                self.value = String(layer.expr.value)
+                self.stack.pop()
+            elif type(layer.expr) == LambdaNode:
+                self.value = Closure(filter_lexical(layer.env), layer.expr)
+                self.stack.pop()
+            elif type(layer.expr) == LetrecNode:
+                # create locations and bind variables to them
+                if layer.pc == 0:
+                    for v, e in layer.expr.var_expr_list:
+                        layer.env.append((v.name, self._new(Void())))
+                    layer.pc += 1
+                # evaluate binding expressions
+                elif layer.pc <= len(layer.expr.var_expr_list):
+                    # update location content
+                    if layer.pc > 1:
+                        var = layer.expr.var_expr_list[layer.pc - 2][0]
+                        last_location = lookup_env(var.name, layer.env)
+                        if last_location is None:
+                            runtime_error(var.sl, 'undefined variable')
+                        self.store[last_location] = self.value
+                    self.stack.append(Layer(layer.env, layer.expr.var_expr_list[layer.pc - 1][1]))
+                    layer.pc += 1
+                # evaluate body expression
+                elif layer.pc == len(layer.expr.var_expr_list) + 1:
+                    # update location content
+                    if layer.pc > 1:
+                        var = layer.expr.var_expr_list[layer.pc - 2][0]
+                        last_location = lookup_env(var.name, layer.env)
+                        if last_location is None:
+                            runtime_error(var.sl, 'undefined variable')
+                        self.store[last_location] = self.value
+                    self.stack.append(Layer(layer.env, layer.expr.expr))
+                    layer.pc += 1
+                # finish letrec
+                else:
+                    # this is necessary because letrec layer's env is shared with its previous frame
+                    for i in range(len(layer.expr.var_expr_list)):
+                        layer.env.pop()
+                    self.stack.pop()
+            elif type(layer.expr) == IfNode:
+                # evaluate the condition
+                if layer.pc == 0:
+                    self.stack.append(Layer(layer.env, layer.expr.cond))
+                    layer.pc += 1
+                # choose the branch to evaluate
+                elif layer.pc == 1:
+                    if type(self.value) != Number:
+                        runtime_error(layer.expr.cond.sl, 'wrong condition type')
+                    if self.value.n != 0:
+                        self.stack.append(Layer(layer.env, layer.expr.branch1))
+                    else:
+                        self.stack.append(Layer(layer.env, layer.expr.branch2))
+                    layer.pc += 1
+                # finish if
+                else:
+                    self.stack.pop()
+            elif type(layer.expr) == VariableNode:
+                # two types of variables
+                if is_lexical_name(layer.expr.name):
+                    location = lookup_env(layer.expr.name, layer.env)
+                    if location is None:
+                        runtime_error(layer.expr.sl, 'undefined variable')
+                    self.value = self.store[location]
+                else:
+                    location = lookup_stack(layer.expr.name, self.stack)
+                    if location is None:
+                        runtime_error(layer.expr.sl, 'undefined variable')
+                    self.value = self.store[location]
+                self.stack.pop()
+            elif type(layer.expr) == CallNode:
+                # intrinsic call
+                if type(layer.expr.callee) == IntrinsicNode:
+                    # initialize args
+                    if layer.pc == 0:
+                        layer.local['args'] = []
+                        layer.pc += 1
+                    # evaluate arguments
+                    elif layer.pc <= len(layer.expr.arg_list):
+                        if layer.pc > 1:
+                            layer.local['args'].append(self.value)
+                        self.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 1]))
+                        layer.pc += 1
+                    # intrinsic call doesn't need to grow the stack, so this is the final step for this call
+                    else:
+                        if layer.pc > 1:
+                            layer.local['args'].append(self.value)
+                        intrinsic = layer.expr.callee.name
+                        args = layer.local['args']
+                        # a gigantic series of if conditions, one for each intrinsic function
+                        if intrinsic == '.void':
+                            check_args_error_exit(layer.expr.callee, args, [])
+                            self.value = Void()
+                        elif intrinsic == '.+':
+                            check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
+                            self.value = Number(0)
+                            for a in args:
+                                self.value = self.value.add(a)
+                        elif intrinsic == '.-':
+                            check_args_error_exit(layer.expr.callee, args, [Number, Number])
+                            self.value = args[0].sub(args[1])
+                        elif intrinsic == '.*':
+                            check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
+                            self.value = Number(1)
+                            for a in args:
+                                self.value = self.value.mul(a)
+                        elif intrinsic == './':
+                            check_args_error_exit(layer.expr.callee, args, [Number, Number])
+                            self.value = args[0].div(args[1], layer.expr)
+                        elif intrinsic == '.%':
+                            check_args_error_exit(layer.expr.callee, args, [Number, Number])
+                            self.value = args[0].mod(args[1], layer.expr)
+                        elif intrinsic == '.floor':
+                            check_args_error_exit(layer.expr.callee, args, [Number])
+                            self.value = args[0].floor()
+                        elif intrinsic == '.ceil':
+                            check_args_error_exit(layer.expr.callee, args, [Number])
+                            self.value = args[0].ceil()
+                        elif intrinsic == '.<':
+                            check_args_error_exit(layer.expr.callee, args, [Number, Number])
+                            self.value = Number(args[0].lt(args[1]))
+                        elif intrinsic == '.<=':
+                            check_args_error_exit(layer.expr.callee, args, [Number, Number])
+                            self.value = Number(not args[1].lt(args[0]))
+                        elif intrinsic == '.>':
+                            check_args_error_exit(layer.expr.callee, args, [Number, Number])
+                            self.value = Number(args[1].lt(args[0]))
+                        elif intrinsic == '.>=':
+                            check_args_error_exit(layer.expr.callee, args, [Number, Number])
+                            self.value = Number(not args[0].lt(args[1]))
+                        elif intrinsic == '.==':
+                            check_args_error_exit(layer.expr.callee, args, [Number, Number])
+                            self.value = Number((not args[0].lt(args[1])) and (not args[1].lt(args[0])))
+                        elif intrinsic == '.!=':
+                            check_args_error_exit(layer.expr.callee, args, [Number, Number])
+                            self.value = Number(args[0].lt(args[1]) or args[1].lt(args[0]))
+                        elif intrinsic == '.and':
+                            check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
+                            b = True
+                            for a in args:
+                                b = b and (a.n != 0)
+                            self.value = Number(b)
+                        elif intrinsic == '.or':
+                            check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
+                            b = False
+                            for a in args:
+                                b = b or (a.n != 0)
+                            self.value = Number(b)
+                        elif intrinsic == '.not':
+                            check_args_error_exit(layer.expr.callee, args, [Number])
+                            self.value = Number(args[0].n == 0)
+                        elif intrinsic == '.strlen':
+                            check_args_error_exit(layer.expr.callee, args, [String])
+                            self.value = Number(len(args[0].value))
+                        elif intrinsic == '.strcut':
+                            check_args_error_exit(layer.expr.callee, args, [String, Number, Number])
+                            if args[1].d != 1 or args[2].d != 1:
+                                runtime_error(layer.expr.sl, '.strcut is applied to non-integer(s)')
+                            self.value = String(args[0].value[args[1].n : args[2].n])
+                        elif intrinsic == '.str+':
+                            check_args_error_exit(layer.expr.callee, args, [String] * len(args))
+                            s = ""
+                            for a in args:
+                                s += a.value
+                            self.value = String(s)
+                        elif intrinsic == '.str<':
+                            check_args_error_exit(layer.expr.callee, args, [String, String])
+                            self.value = Number(args[0].value < args[1].value)
+                        elif intrinsic == '.str<=':
+                            check_args_error_exit(layer.expr.callee, args, [String, String])
+                            self.value = Number(args[0].value <= args[1].value)
+                        elif intrinsic == '.str>':
+                            check_args_error_exit(layer.expr.callee, args, [String, String])
+                            self.value = Number(args[0].value > args[1].value)
+                        elif intrinsic == '.str>=':
+                            check_args_error_exit(layer.expr.callee, args, [String, String])
+                            self.value = Number(args[0].value >= args[1].value)
+                        elif intrinsic == '.str==':
+                            check_args_error_exit(layer.expr.callee, args, [String, String])
+                            self.value = Number(args[0].value == args[1].value)
+                        elif intrinsic == '.str!=':
+                            check_args_error_exit(layer.expr.callee, args, [String, String])
+                            self.value = Number(args[0].value != args[1].value)
+                        elif intrinsic == '.strnum':
+                            check_args_error_exit(layer.expr.callee, args, [String])
+                            node = parse(deque([Token(layer.expr.sl, args[0].value)]))
+                            if not isinstance(node, NumberNode):
+                                runtime_error(layer.expr.sl, '.strnum is applied to non-number-string')
+                            self.value = Number(node.n, node.d)
+                        elif intrinsic == '.strquote':
+                            check_args_error_exit(layer.expr.callee, args, [String])
+                            self.value = String(quote(args[0].value))
+                        elif intrinsic == '.getline':
+                            check_args_error_exit(layer.expr.callee, args, [])
+                            try:
+                                self.value = String(input())
+                            except EOFError:
+                                self.value = Void()
+                        elif intrinsic == '.put':
+                            if not (len(args) >= 1 and all(map(lambda v : isinstance(v, Value), args))):
+                                runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to .put')
+                            output = ''
+                            for v in args:
+                                output += str(v)
+                            print(output, end = '', flush = True)
+                            # the return value of put is void
+                            self.value = Void()
+                        elif intrinsic == '.call/cc':
+                            check_args_error_exit(layer.expr.callee, args, [Closure])
+                            self.stack.pop()
+                            # obtain the continuation (this deepcopy will not copy the store)
+                            cont = Continuation(deepcopy(self.stack))
+                            closure = args[0]
+                            # make a closure call layer and pass in the continuation
+                            addr = cont.location if cont.location != None else self._new(cont)
+                            self.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, frame = True))
+                            # we already popped the stack in this case, so just continue the evaluation
+                            continue
+                        elif intrinsic == '.void?':
+                            check_args_error_exit(layer.expr.callee, args, [Value])
+                            self.value = Number(isinstance(args[0], Void))
+                        elif intrinsic == '.num?':
+                            check_args_error_exit(layer.expr.callee, args, [Value])
+                            self.value = Number(isinstance(args[0], Number))
+                        elif intrinsic == '.str?':
+                            check_args_error_exit(layer.expr.callee, args, [Value])
+                            self.value = Number(isinstance(args[0], String))
+                        elif intrinsic == '.clo?':
+                            check_args_error_exit(layer.expr.callee, args, [Value])
+                            self.value = Number(isinstance(args[0], Closure))
+                        elif intrinsic == '.cont?':
+                            check_args_error_exit(layer.expr.callee, args, [Value])
+                            self.value = Number(isinstance(args[0], Continuation))
+                        elif intrinsic == '.eval':
+                            check_args_error_exit(layer.expr.callee, args, [String])
+                            arg = args[0]
+                            self.value = run_code(arg.value)
+                        elif intrinsic == '.exit':
+                            check_args_error_exit(layer.expr.callee, args, [])
+                            # the interpreter returns 0
+                            sys.exit()
+                        elif intrinsic == '.py':
+                            if not (len(args) > 0 and type(args[0]) == String):
+                                runtime_error(layer.expr.sl, '.py FFI expects a string (Python function name) as the first argument')
+                            py_args = []
+                            for i in range(1, len(args)):
+                                if type(args[i]) == Number:
+                                    py_args.append(args[i].to_int(layer.expr))
+                                elif type(args[i]) == String:
+                                    py_args.append(args[i].value)
+                                else:
+                                    runtime_error(layer.expr.sl, '.py FFI only supports Number/String arguments')
+                            if args[0].value not in self.py_functions:
+                                runtime_error(layer.expr.sl, '.py FFI encountered unregistered function')
+                            ret = self.py_functions[args[0].value](*py_args)
+                            if type(ret) == int:
+                                self.value = Number(ret)
+                            elif type(ret) == str:
+                                self.value = String(ret)
+                            else:
+                                runtime_error(layer.expr.sl, '.py FFI only supports Number/String return value')
+                        elif intrinsic == '.reg':
+                            if not (len(args) == 2 and type(args[0]) == String and type(args[1]) == Closure):
+                                runtime_error(layer.expr.sl, '.reg can only register a String name for a Closure')
+                            self.stack[0].env.insert(0, (args[0].value, args[1].location if args[1].location != None else self._new(args[1])))
+                            self.value = Void()
+                        else:
+                            runtime_error(layer.expr.sl, 'unrecognized intrinsic function call')
+                        self.stack.pop()
+                # closure or continuation call
+                else:
+                    # evaluate the callee
+                    if layer.pc == 0:
+                        self.stack.append(Layer(layer.env, layer.expr.callee))
+                        layer.pc += 1
+                    # initialize callee and args
+                    elif layer.pc == 1:
+                        layer.local['callee'] = self.value
+                        layer.local['args'] = []
+                        layer.pc += 1
+                    # evaluate arguments
+                    elif layer.pc - 1 <= len(layer.expr.arg_list):
+                        if layer.pc - 1 > 1:
+                            layer.local['args'].append(self.value)
+                        self.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 2]))
+                        layer.pc += 1
+                    # evaluate the call
+                    elif layer.pc - 1 == len(layer.expr.arg_list) + 1:
+                        if layer.pc - 1 > 1:
+                            layer.local['args'].append(self.value)
+                        callee = layer.local['callee']
+                        args = layer.local['args']
+                        if type(callee) == Closure:
+                            closure = callee
+                            # types will be checked inside the closure call
+                            if len(args) != len(closure.fun.var_list):
+                                runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to callee')
+                            new_env = closure.env[:]
+                            for i, v in enumerate(closure.fun.var_list):
+                                addr = args[i].location if args[i].location != None else self._new(args[i])
+                                new_env.append((v.name, addr))
+                            # evaluate the closure call
+                            self.stack.append(Layer(new_env, closure.fun.expr, frame = True))
+                            layer.pc += 1
+                        elif type(callee) == Continuation:
+                            cont = callee
+                            # the "value" variable already contains the last evaluation result of the args, so we just continue
+                            if len(args) != 1:
+                                runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to callee')
+                            # replace the stack
+                            self.stack = deepcopy(cont.stack)
+                            # the stack has been replaced, so we don't need to pop the previous stack's call layer
+                            # the previous stack is simply discarded
+                            continue
+                        else:
+                            runtime_error(layer.expr.callee.sl, 'calling non-callable object')
+                    # finish the call
+                    else:
+                        self.stack.pop()
+            elif type(layer.expr) == SequenceNode:
+                # evaluate the expressions, without the need of storing the results to local
+                if layer.pc < len(layer.expr.expr_list):
+                    self.stack.append(Layer(layer.env, layer.expr.expr_list[layer.pc]))
+                    layer.pc += 1
+                # finish the sequence
+                else:
+                    self.stack.pop()
+            elif type(layer.expr) == QueryNode:
+                if layer.expr.var.is_lex():
+                    # evaluate the closure
+                    if layer.pc == 0:
+                        self.stack.append(Layer(layer.env, layer.expr.expr_box[0]))
+                        layer.pc += 1
+                    else:
+                        if type(self.value) != Closure:
+                            runtime_error(layer.expr.sl, 'lexical variable query applied to non-closure type')
+                        # the closure's value is already in "state.value", so we just use it and then update it
+                        self.value = Number(not (lookup_env(layer.expr.var.name, self.value.env) is None))
+                        self.stack.pop()
+                else:
+                    self.value = Number(not (lookup_stack(layer.expr.var.name, self.stack) is None))
+                    self.stack.pop()
+            elif type(layer.expr) == AccessNode:
+                # evaluate the closure
+                if layer.pc == 0:
+                    self.stack.append(Layer(layer.env, layer.expr.expr))
+                    layer.pc += 1
+                else:
+                    if type(self.value) != Closure:
+                        runtime_error(layer.expr.sl, 'lexical variable access applied to non-closure type')
+                    # again, "state.value" already contains the closure's evaluation result
+                    location = lookup_env(layer.expr.var.name, self.value.env)
+                    if location is None:
+                        runtime_error(layer.expr.sl, 'undefined variable')
+                    self.value = self.store[location]
+                    self.stack.pop()
+            else:
+                runtime_error(layer.expr.sl, 'unrecognized AST node')
+
+    def _get_store_capacity(self) -> int:
         # capacity >= length
         return (sys.getsizeof(self.store) - self._empty_store_size) // self._ref_size
 
-    def new(self, value: Value) -> int:
+    def _new(self, value: Value) -> int:
         ''' heap space allocation '''
         if self.location < len(self.store):
             self.store[self.location] = value
@@ -686,7 +1140,7 @@ class State:
         self.location += 1
         return self.location - 1
 
-    def mark(self) -> tuple[set[int], list[Value]]:
+    def _mark(self) -> tuple[set[int], list[Value]]:
         # ids
         visited_closures = set()
         # ids
@@ -737,7 +1191,7 @@ class State:
         mark_stack(self.stack)
         return visited_locations
 
-    def sweep_and_compact(self, visited_locations: set[int]) -> tuple[int, dict[int, int]]:
+    def _sweep_and_compact(self, visited_locations: set[int]) -> tuple[int, dict[int, int]]:
         removed = 0
         # old location -> new location
         relocation = {}
@@ -756,7 +1210,7 @@ class State:
         self.location = i
         return (removed, relocation)
     
-    def relocate(self, relocation: dict[int, int]) -> None:
+    def _relocate(self, relocation: dict[int, int]) -> None:
         relocated = set()
 
         def reloc(val: Value) -> None:
@@ -788,467 +1242,12 @@ class State:
         for i in range(self.location):
             reloc(self.store[i])
 
-    def gc(self) -> int:
+    def _gc(self) -> int:
         ''' mark-and-sweep garbage collection '''
-        visited_locations = self.mark()
-        removed, relocation = self.sweep_and_compact(visited_locations)
-        self.relocate(relocation)
+        visited_locations = self._mark()
+        removed, relocation = self._sweep_and_compact(visited_locations)
+        self._relocate(relocation)
         return removed
-
-def check_args_error_exit(callee: ExprNode, args: list[Value], ts: list[type]) -> bool:
-    ''' check whether arguments conform to types '''
-    if len(args) != len(ts):
-        runtime_error(callee.sl, 'wrong number of arguments given to callee')
-    for i in range(len(args)):
-        if not isinstance(args[i], ts[i]):
-            runtime_error(callee.sl, 'wrong type of arguments given to callee')
-
-def is_lexical_name(name: str) -> bool:
-    return name[0].islower()
-
-def is_dynamic_name(name: str) -> bool:
-    return name[0].isupper()
-
-def filter_lexical(env: list[tuple[str, int]]) -> list[tuple[str, int]]:
-    ''' find out lexical variable-location pairs in an environment '''
-    lex_env = []
-    for v, l in env:
-        if is_lexical_name(v):
-            lex_env.append((v, l))
-    return lex_env
-
-def lookup_env(name: str, env: list[tuple[str, int]]) -> Union[int, None]:
-    ''' lexically scoped variable lookup '''
-    for i in range(len(env) - 1, -1, -1):
-        if env[i][0] == name:
-            return env[i][1]
-    return None
-
-def lookup_stack(name: str, stack: list[Layer]) -> Union[int, None]:
-    ''' dynamically scoped variable lookup '''
-    for i in range(len(stack) - 1, -1, -1):
-        if stack[i].frame:
-            for j in range(len(stack[i].env) - 1, -1, -1):
-                if stack[i].env[j][0] == name:
-                    return stack[i].env[j][1]
-    return None
-
-### interpreter
-
-def execute(state: State) -> None:
-    # used for GC control
-    insufficient_capacity = -1
-
-    # we just adjust "state.stack" and "value"
-    # the evaluation will automatically continue along the while loop
-    while True:
-        
-        # GC control
-        capacity = state.get_store_capacity()
-        # insufficient_capacity is the last capacity where GC failed
-        if capacity > insufficient_capacity:
-            if state.location >= 0.8 * capacity:
-                cnt = state.gc()
-                # GC failed to release enough memory, meaning that the capacity needs to grow
-                if state.location >= 0.8 * capacity:
-                    insufficient_capacity = capacity
-                # after GC the current capacity is enough so we keep the previous insufficient_capacity
-                else:
-                    pass
-        # the capacity is insufficient, so we allow it to naturally grow and don't run GC before the growing
-        else:
-            pass
-
-        # evaluating the current layer
-        layer = state.stack[-1]
-        if layer.expr is None:
-            # found the main frame, which is the end of evaluation
-            return state.value
-        elif type(layer.expr) == NumberNode:
-            state.value = Number(layer.expr.n, layer.expr.d)
-            state.stack.pop()
-        elif type(layer.expr) == StringNode:
-            state.value = String(layer.expr.value)
-            state.stack.pop()
-        elif type(layer.expr) == LambdaNode:
-            state.value = Closure(filter_lexical(layer.env), layer.expr)
-            state.stack.pop()
-        elif type(layer.expr) == LetrecNode:
-            # create locations and bind variables to them
-            if layer.pc == 0:
-                for v, e in layer.expr.var_expr_list:
-                    layer.env.append((v.name, state.new(Void())))
-                layer.pc += 1
-            # evaluate binding expressions
-            elif layer.pc <= len(layer.expr.var_expr_list):
-                # update location content
-                if layer.pc > 1:
-                    var = layer.expr.var_expr_list[layer.pc - 2][0]
-                    last_location = lookup_env(var.name, layer.env)
-                    if last_location is None:
-                        runtime_error(var.sl, 'undefined variable')
-                    state.store[last_location] = state.value
-                state.stack.append(Layer(layer.env, layer.expr.var_expr_list[layer.pc - 1][1]))
-                layer.pc += 1
-            # evaluate body expression
-            elif layer.pc == len(layer.expr.var_expr_list) + 1:
-                # update location content
-                if layer.pc > 1:
-                    var = layer.expr.var_expr_list[layer.pc - 2][0]
-                    last_location = lookup_env(var.name, layer.env)
-                    if last_location is None:
-                        runtime_error(var.sl, 'undefined variable')
-                    state.store[last_location] = state.value
-                state.stack.append(Layer(layer.env, layer.expr.expr))
-                layer.pc += 1
-            # finish letrec
-            else:
-                # this is necessary because letrec layer's env is shared with its previous frame
-                for i in range(len(layer.expr.var_expr_list)):
-                    layer.env.pop()
-                state.stack.pop()
-        elif type(layer.expr) == IfNode:
-            # evaluate the condition
-            if layer.pc == 0:
-                state.stack.append(Layer(layer.env, layer.expr.cond))
-                layer.pc += 1
-            # choose the branch to evaluate
-            elif layer.pc == 1:
-                if type(state.value) != Number:
-                    runtime_error(layer.expr.cond.sl, 'wrong condition type')
-                if state.value.n != 0:
-                    state.stack.append(Layer(layer.env, layer.expr.branch1))
-                else:
-                    state.stack.append(Layer(layer.env, layer.expr.branch2))
-                layer.pc += 1
-            # finish if
-            else:
-                state.stack.pop()
-        elif type(layer.expr) == VariableNode:
-            # two types of variables
-            if is_lexical_name(layer.expr.name):
-                location = lookup_env(layer.expr.name, layer.env)
-                if location is None:
-                    runtime_error(layer.expr.sl, 'undefined variable')
-                state.value = state.store[location]
-            else:
-                location = lookup_stack(layer.expr.name, state.stack)
-                if location is None:
-                    runtime_error(layer.expr.sl, 'undefined variable')
-                state.value = state.store[location]
-            state.stack.pop()
-        elif type(layer.expr) == CallNode:
-            # intrinsic call
-            if type(layer.expr.callee) == IntrinsicNode:
-                # initialize args
-                if layer.pc == 0:
-                    layer.local['args'] = []
-                    layer.pc += 1
-                # evaluate arguments
-                elif layer.pc <= len(layer.expr.arg_list):
-                    if layer.pc > 1:
-                        layer.local['args'].append(state.value)
-                    state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 1]))
-                    layer.pc += 1
-                # intrinsic call doesn't need to grow the stack, so this is the final step for this call
-                else:
-                    if layer.pc > 1:
-                        layer.local['args'].append(state.value)
-                    intrinsic = layer.expr.callee.name
-                    args = layer.local['args']
-                    # a gigantic series of if conditions, one for each intrinsic function
-                    if intrinsic == '.void':
-                        check_args_error_exit(layer.expr.callee, args, [])
-                        state.value = Void()
-                    elif intrinsic == '.+':
-                        check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
-                        state.value = Number(0)
-                        for a in args:
-                            state.value = state.value.add(a)
-                    elif intrinsic == '.-':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        state.value = args[0].sub(args[1])
-                    elif intrinsic == '.*':
-                        check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
-                        state.value = Number(1)
-                        for a in args:
-                            state.value = state.value.mul(a)
-                    elif intrinsic == './':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        state.value = args[0].div(args[1], layer.expr)
-                    elif intrinsic == '.%':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        state.value = args[0].mod(args[1], layer.expr)
-                    elif intrinsic == '.floor':
-                        check_args_error_exit(layer.expr.callee, args, [Number])
-                        state.value = args[0].floor()
-                    elif intrinsic == '.ceil':
-                        check_args_error_exit(layer.expr.callee, args, [Number])
-                        state.value = args[0].ceil()
-                    elif intrinsic == '.<':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        state.value = Number(args[0].lt(args[1]))
-                    elif intrinsic == '.<=':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        state.value = Number(not args[1].lt(args[0]))
-                    elif intrinsic == '.>':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        state.value = Number(args[1].lt(args[0]))
-                    elif intrinsic == '.>=':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        state.value = Number(not args[0].lt(args[1]))
-                    elif intrinsic == '.==':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        state.value = Number((not args[0].lt(args[1])) and (not args[1].lt(args[0])))
-                    elif intrinsic == '.!=':
-                        check_args_error_exit(layer.expr.callee, args, [Number, Number])
-                        state.value = Number(args[0].lt(args[1]) or args[1].lt(args[0]))
-                    elif intrinsic == '.and':
-                        check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
-                        b = True
-                        for a in args:
-                            b = b and (a.n != 0)
-                        state.value = Number(b)
-                    elif intrinsic == '.or':
-                        check_args_error_exit(layer.expr.callee, args, [Number] * len(args))
-                        b = False
-                        for a in args:
-                            b = b or (a.n != 0)
-                        state.value = Number(b)
-                    elif intrinsic == '.not':
-                        check_args_error_exit(layer.expr.callee, args, [Number])
-                        state.value = Number(args[0].n == 0)
-                    elif intrinsic == '.strlen':
-                        check_args_error_exit(layer.expr.callee, args, [String])
-                        state.value = Number(len(args[0].value))
-                    elif intrinsic == '.strcut':
-                        check_args_error_exit(layer.expr.callee, args, [String, Number, Number])
-                        if args[1].d != 1 or args[2].d != 1:
-                            runtime_error(layer.expr.sl, '.strcut is applied to non-integer(s)')
-                        state.value = String(args[0].value[args[1].n : args[2].n])
-                    elif intrinsic == '.str+':
-                        check_args_error_exit(layer.expr.callee, args, [String] * len(args))
-                        s = ""
-                        for a in args:
-                            s += a.value
-                        state.value = String(s)
-                    elif intrinsic == '.str<':
-                        check_args_error_exit(layer.expr.callee, args, [String, String])
-                        state.value = Number(args[0].value < args[1].value)
-                    elif intrinsic == '.str<=':
-                        check_args_error_exit(layer.expr.callee, args, [String, String])
-                        state.value = Number(args[0].value <= args[1].value)
-                    elif intrinsic == '.str>':
-                        check_args_error_exit(layer.expr.callee, args, [String, String])
-                        state.value = Number(args[0].value > args[1].value)
-                    elif intrinsic == '.str>=':
-                        check_args_error_exit(layer.expr.callee, args, [String, String])
-                        state.value = Number(args[0].value >= args[1].value)
-                    elif intrinsic == '.str==':
-                        check_args_error_exit(layer.expr.callee, args, [String, String])
-                        state.value = Number(args[0].value == args[1].value)
-                    elif intrinsic == '.str!=':
-                        check_args_error_exit(layer.expr.callee, args, [String, String])
-                        state.value = Number(args[0].value != args[1].value)
-                    elif intrinsic == '.strnum':
-                        check_args_error_exit(layer.expr.callee, args, [String])
-                        node = parse(deque([Token(layer.expr.sl, args[0].value)]))
-                        if not isinstance(node, NumberNode):
-                            runtime_error(layer.expr.sl, '.strnum is applied to non-number-string')
-                        state.value = Number(node.n, node.d)
-                    elif intrinsic == '.strquote':
-                        check_args_error_exit(layer.expr.callee, args, [String])
-                        state.value = String(quote(args[0].value))
-                    elif intrinsic == '.getline':
-                        check_args_error_exit(layer.expr.callee, args, [])
-                        try:
-                            state.value = String(input())
-                        except EOFError:
-                            state.value = Void()
-                    elif intrinsic == '.put':
-                        if not (len(args) >= 1 and all(map(lambda v : isinstance(v, Value), args))):
-                            runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to .put')
-                        output = ''
-                        for v in args:
-                            output += str(v)
-                        print(output, end = '', flush = True)
-                        # the return value of put is void
-                        state.value = Void()
-                    elif intrinsic == '.call/cc':
-                        check_args_error_exit(layer.expr.callee, args, [Closure])
-                        state.stack.pop()
-                        # obtain the continuation (this deepcopy will not copy the store)
-                        cont = Continuation(deepcopy(state.stack))
-                        closure = args[0]
-                        # make a closure call layer and pass in the continuation
-                        addr = cont.location if cont.location != None else state.new(cont)
-                        state.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, frame = True))
-                        # we already popped the stack in this case, so just continue the evaluation
-                        continue
-                    elif intrinsic == '.void?':
-                        check_args_error_exit(layer.expr.callee, args, [Value])
-                        state.value = Number(isinstance(args[0], Void))
-                    elif intrinsic == '.num?':
-                        check_args_error_exit(layer.expr.callee, args, [Value])
-                        state.value = Number(isinstance(args[0], Number))
-                    elif intrinsic == '.str?':
-                        check_args_error_exit(layer.expr.callee, args, [Value])
-                        state.value = Number(isinstance(args[0], String))
-                    elif intrinsic == '.clo?':
-                        check_args_error_exit(layer.expr.callee, args, [Value])
-                        state.value = Number(isinstance(args[0], Closure))
-                    elif intrinsic == '.cont?':
-                        check_args_error_exit(layer.expr.callee, args, [Value])
-                        state.value = Number(isinstance(args[0], Continuation))
-                    elif intrinsic == '.eval':
-                        check_args_error_exit(layer.expr.callee, args, [String])
-                        arg = args[0]
-                        state.value = run_code(arg.value)
-                    elif intrinsic == '.exit':
-                        check_args_error_exit(layer.expr.callee, args, [])
-                        # the interpreter returns 0
-                        sys.exit()
-                    elif intrinsic == '.py':
-                        if not (len(args) > 0 and type(args[0]) == String):
-                            runtime_error(layer.expr.sl, '.py FFI expects a string (Python function name) as the first argument')
-                        py_args = []
-                        for i in range(1, len(args)):
-                            if type(args[i]) == Number:
-                                py_args.append(args[i].to_int(layer.expr))
-                            elif type(args[i]) == String:
-                                py_args.append(args[i].value)
-                            else:
-                                runtime_error(layer.expr.sl, '.py FFI only supports Number/String arguments')
-                        if args[0].value not in state.py_functions:
-                            runtime_error(layer.expr.sl, '.py FFI encountered unregistered function')
-                        ret = state.py_functions[args[0].value](*py_args)
-                        if type(ret) == int:
-                            state.value = Number(ret)
-                        elif type(ret) == str:
-                            state.value = String(ret)
-                        else:
-                            runtime_error(layer.expr.sl, '.py FFI only supports Number/String return value')
-                    elif intrinsic == '.reg':
-                        if not (len(args) == 2 and type(args[0]) == String and type(args[1]) == Closure):
-                            runtime_error(layer.expr.sl, '.reg can only register a String name for a Closure')
-                        state.stack[0].env.insert(0, (args[0].value, args[1].location if args[1].location != None else state.new(args[1])))
-                        state.value = Void()
-                    else:
-                        runtime_error(layer.expr.sl, 'unrecognized intrinsic function call')
-                    state.stack.pop()
-            # closure or continuation call
-            else:
-                # evaluate the callee
-                if layer.pc == 0:
-                    state.stack.append(Layer(layer.env, layer.expr.callee))
-                    layer.pc += 1
-                # initialize callee and args
-                elif layer.pc == 1:
-                    layer.local['callee'] = state.value
-                    layer.local['args'] = []
-                    layer.pc += 1
-                # evaluate arguments
-                elif layer.pc - 1 <= len(layer.expr.arg_list):
-                    if layer.pc - 1 > 1:
-                        layer.local['args'].append(state.value)
-                    state.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 2]))
-                    layer.pc += 1
-                # evaluate the call
-                elif layer.pc - 1 == len(layer.expr.arg_list) + 1:
-                    if layer.pc - 1 > 1:
-                        layer.local['args'].append(state.value)
-                    callee = layer.local['callee']
-                    args = layer.local['args']
-                    if type(callee) == Closure:
-                        closure = callee
-                        # types will be checked inside the closure call
-                        if len(args) != len(closure.fun.var_list):
-                            runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to callee')
-                        new_env = closure.env[:]
-                        for i, v in enumerate(closure.fun.var_list):
-                            addr = args[i].location if args[i].location != None else state.new(args[i])
-                            new_env.append((v.name, addr))
-                        # evaluate the closure call
-                        state.stack.append(Layer(new_env, closure.fun.expr, frame = True))
-                        layer.pc += 1
-                    elif type(callee) == Continuation:
-                        cont = callee
-                        # the "value" variable already contains the last evaluation result of the args, so we just continue
-                        if len(args) != 1:
-                            runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to callee')
-                        # replace the stack
-                        state.stack = deepcopy(cont.stack)
-                        # the stack has been replaced, so we don't need to pop the previous stack's call layer
-                        # the previous stack is simply discarded
-                        continue
-                    else:
-                        runtime_error(layer.expr.callee.sl, 'calling non-callable object')
-                # finish the call
-                else:
-                    state.stack.pop()
-        elif type(layer.expr) == SequenceNode:
-            # evaluate the expressions, without the need of storing the results to local
-            if layer.pc < len(layer.expr.expr_list):
-                state.stack.append(Layer(layer.env, layer.expr.expr_list[layer.pc]))
-                layer.pc += 1
-            # finish the sequence
-            else:
-                state.stack.pop()
-        elif type(layer.expr) == QueryNode:
-            if layer.expr.var.is_lex():
-                # evaluate the closure
-                if layer.pc == 0:
-                    state.stack.append(Layer(layer.env, layer.expr.expr_box[0]))
-                    layer.pc += 1
-                else:
-                    if type(state.value) != Closure:
-                        runtime_error(layer.expr.sl, 'lexical variable query applied to non-closure type')
-                    # the closure's value is already in "state.value", so we just use it and then update it
-                    state.value = Number(not (lookup_env(layer.expr.var.name, state.value.env) is None))
-                    state.stack.pop()
-            else:
-                state.value = Number(not (lookup_stack(layer.expr.var.name, state.stack) is None))
-                state.stack.pop()
-        elif type(layer.expr) == AccessNode:
-            # evaluate the closure
-            if layer.pc == 0:
-                state.stack.append(Layer(layer.env, layer.expr.expr))
-                layer.pc += 1
-            else:
-                if type(state.value) != Closure:
-                    runtime_error(layer.expr.sl, 'lexical variable access applied to non-closure type')
-                # again, "state.value" already contains the closure's evaluation result
-                location = lookup_env(layer.expr.var.name, state.value.env)
-                if location is None:
-                    runtime_error(layer.expr.sl, 'undefined variable')
-                state.value = state.store[location]
-                state.stack.pop()
-        else:
-            runtime_error(layer.expr.sl, 'unrecognized AST node')
-
-def call_expr_function(state: State, name: str, args: list[Union[str, int]]) -> Union[str, int]:
-    sl = SourceLocation(-1, -1)
-    callee = VariableNode(sl, name)
-    arg_list = []
-    for a in args:
-        if type(a) == str:
-            arg_list.append(StringNode(sl, a))
-        elif type(a) == int:
-            arg_list.append(NumberNode(sl, a, 1))
-        else:
-            runtime_error(sl, 'Python can only use str/int as arguments when calling ExprScript functions')
-    call = CallNode(sl, callee, arg_list)
-    state.stack.append(Layer(state.stack[0].env, call))
-    execute(state)
-    if type(state.value) == String:
-        return state.value.value
-    elif type(state.value) == Number:
-        if state.value.d != 1:
-            runtime_error(sl, 'ExprScript returned a non-integer Number')
-        else:
-            return state.value.n
-    else:
-        runtime_error(sl, 'ExprScript returned a non-String non-Number result')
         
 ### main
 
@@ -1256,8 +1255,7 @@ def run_code(source: str) -> Value:
     tokens = lex(source)
     tree = parse(tokens)
     state = State(tree)
-    execute(state)
-    return state.value
+    return state.execute().value
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:

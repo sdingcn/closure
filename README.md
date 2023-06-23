@@ -31,9 +31,23 @@ $ python3 src/exprscript.py test/average.expr
 
 + Natural interactions with Python
 
-[src/call-python-from-exprscript.py](src/call-python-from-exprscript.py)
+```
+import exprscript as es
 
-[src/call-exprscript-from-python.py](src/call-exprscript-from-python.py)
+if __name__ == '__main__':
+
+    # call ExprScript function from Python
+    code = '(.reg "plus1" lambda (x) { (.+ x 1) })'
+    state = es.State(es.parse(es.lex(code)))
+    result = state.execute().call_expr_function("plus1", [-6])
+    print(result) # -5
+
+    # call Python function from ExprScript
+    code = '(.py "rev" (.str+ "na" "me"))'
+    state = es.State(es.parse(es.lex(code)))
+    result = state.register_py_function("rev", lambda s: s[::-1]).execute().value.value
+    print(result) # "eman"
+```
 
 ## dependencies
 
