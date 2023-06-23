@@ -31,7 +31,7 @@ $ python3 src/exprscript.py test/average.expr
 
 + Natural interactions with Python
 
-```
+```python
 import exprscript as es
 
 if __name__ == '__main__':

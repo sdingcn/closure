@@ -29,7 +29,7 @@ $ python3 src/exprscript.py test/average.expr
 
 + 与 Python 自然交互
 
-```
+```python
 import exprscript as es
 
 if __name__ == '__main__':
