@@ -650,7 +650,7 @@ class Continuation(Value):
         return '<continuation>'
 
 class State:
-    '''The class for the complete state during interpretation'''
+    '''The class for the complete state during execution'''
 
     def __init__(self, expr: ExprNode):
         # stack
@@ -835,7 +835,7 @@ def lookup_stack(name: str, stack: list[Layer]) -> Union[int, None]:
 
 ### interpreter
 
-def interpret(state: State) -> None:
+def execute(state: State) -> None:
     # used for GC control
     insufficient_capacity = -1
 
@@ -1132,6 +1132,7 @@ def interpret(state: State) -> None:
                         if not (len(args) == 2 and type(args[0]) == String and type(args[1]) == Closure):
                             runtime_error(layer.expr.sl, '.reg can only register a String name for a Closure')
                         state.stack[0].env.insert(0, (args[0].value, args[1].location if args[1].location != None else state.new(args[1])))
+                        state.value = Void()
                     else:
                         runtime_error(layer.expr.sl, 'unrecognized intrinsic function call')
                     state.stack.pop()
@@ -1225,13 +1226,37 @@ def interpret(state: State) -> None:
         else:
             runtime_error(layer.expr.sl, 'unrecognized AST node')
 
+def call_expr_function(state: State, name: str, args: list[Union[str, int]]) -> Union[str, int]:
+    sl = SourceLocation(-1, -1)
+    callee = VariableNode(sl, name)
+    arg_list = []
+    for a in args:
+        if type(a) == str:
+            arg_list.append(StringNode(sl, a))
+        elif type(a) == int:
+            arg_list.append(NumberNode(sl, a, 1))
+        else:
+            runtime_error(sl, 'Python can only use str/int as arguments when calling ExprScript functions')
+    call = CallNode(sl, callee, arg_list)
+    state.stack.append(Layer(state.stack[0].env, call))
+    execute(state)
+    if type(state.value) == String:
+        return state.value.value
+    elif type(state.value) == Number:
+        if state.value.d != 1:
+            runtime_error(sl, 'ExprScript returned a non-integer Number')
+        else:
+            return state.value.n
+    else:
+        runtime_error(sl, 'ExprScript returned a non-String non-Number result')
+        
 ### main
 
 def run_code(source: str) -> Value:
     tokens = lex(source)
     tree = parse(tokens)
     state = State(tree)
-    interpret(state)
+    execute(state)
     return state.value
 
 if __name__ == '__main__':

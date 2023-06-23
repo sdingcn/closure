@@ -29,6 +29,12 @@ $ python3 src/exprscript.py test/average.expr
 500943/77000
 ```
 
++ Natural interactions with Python
+
+[src/call-python-from-exprscript.py](src/call-python-from-exprscript.py)
+
+[src/call-exprscript-from-python.py](src/call-exprscript-from-python.py)
+
 ## dependencies
 
 Python >= 3.9
