@@ -90,6 +90,8 @@ hello world
 <void>
 '''),
 
+        ('test/reg.expr', '', 'registered function\n'),
+
         ('test/y-combinator.expr', '', '1 120 3628800\n<void>\n')
     ]
     cnt = 0

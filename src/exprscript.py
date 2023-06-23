@@ -843,10 +843,6 @@ def interpret(state: State) -> None:
     # the evaluation will automatically continue along the while loop
     while True:
         
-        # end of evaluation
-        if len(state.stack) == 0:
-            return
-
         # GC control
         capacity = state.get_store_capacity()
         # insufficient_capacity is the last capacity where GC failed
@@ -866,8 +862,8 @@ def interpret(state: State) -> None:
         # evaluating the current layer
         layer = state.stack[-1]
         if layer.expr is None:
-            # end of evaluation, pop the main frame
-            state.stack.pop()
+            # found the main frame, which is the end of evaluation
+            return state.value
         elif type(layer.expr) == NumberNode:
             state.value = Number(layer.expr.n, layer.expr.d)
             state.stack.pop()
@@ -1132,6 +1128,10 @@ def interpret(state: State) -> None:
                             state.value = String(ret)
                         else:
                             runtime_error(layer.expr.sl, '.py FFI only supports Number/String return value')
+                    elif intrinsic == '.reg':
+                        if not (len(args) == 2 and type(args[0]) == String and type(args[1]) == Closure):
+                            runtime_error(layer.expr.sl, '.reg can only register a String name for a Closure')
+                        state.stack[0].env.insert(0, (args[0].value, args[1].location if args[1].location != None else state.new(args[1])))
                     else:
                         runtime_error(layer.expr.sl, 'unrecognized intrinsic function call')
                     state.stack.pop()

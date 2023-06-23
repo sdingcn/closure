@@ -1,0 +1,4 @@
+[
+  (.reg "f" lambda () { "registered function" })
+  (f)
+]
