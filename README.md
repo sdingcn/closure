@@ -6,7 +6,7 @@
 
 ExprScript is a dynamically typed functional programming language.
 
-+ Small language core, rich language features
++ Small core, rich features
 
 | Feature | Implementation |
 | --- | --- |
@@ -20,11 +20,7 @@ ExprScript is a dynamically typed functional programming language.
 
 ```
 $ cat test/average.expr
-letrec (
-  sum = (.+ 100/11 61 +15/7 1.355 -41.06)
-) {
-  (./ sum 5)
-}
+letrec (sum = (.+ 100/11 61 +15/7 1.355 -41.06)) { (./ sum 5) }
 $ python3 src/exprscript.py test/average.expr
 500943/77000
 ```
@@ -39,14 +35,12 @@ if __name__ == '__main__':
     # call ExprScript function from Python
     code = '(.reg "plus1" lambda (x) { (.+ x 1) })'
     state = es.State(es.parse(es.lex(code)))
-    result = state.execute().call_expr_function("plus1", [-6])
-    print(result) # -5
+    print(state.execute().call_expr_function("plus1", [-6])) # -5
 
     # call Python function from ExprScript
     code = '(.py "rev" (.str+ "na" "me"))'
     state = es.State(es.parse(es.lex(code)))
-    result = state.register_py_function("rev", lambda s: s[::-1]).execute().value.value
-    print(result) # "eman"
+    print(state.register_py_function("rev", lambda s: s[::-1]).execute().value.value) # "eman"
 ```
 
 ## dependencies
@@ -62,7 +56,7 @@ Python >= 3.9
 <number> := [+-]?0 | [+-]?<head-nonzero>
           | [+-]?0.<tail-nonzero> | [+-]?<head-nonzero>.<tail-nonzero>
           | [+-]?0/<head-nonzero> | [+-]?<head-nonzero>/<head-nonzero>
-<string> := "( [^"\] | \" | \\ | \t | \n )*" // charset is English keyboard
+<string> := "( [^"\] | \" | \\ | \t | \n )*"     // charset is English keyboard
 <lexical-variable> := [a-z][a-zA-Z0-9_]*         // lexically scoped variable
 <dynamic-variable> := [A-Z][a-zA-Z0-9_]*         // dynamically scoped variable
 <variable> := <lexical-variable> | <dynamic-variable>
@@ -101,4 +95,4 @@ The evaluation result of the entire program is printed to `stdout`.
 ## usage
 
 + `python3 src/exprscript.py <file>` runs code in `<file>`.
-+ `python3 test.py` runs all tests (see [test.py](test.py) for inputs/outputs for each test program).
++ `python3 test.py` runs all tests (see [test.py](test.py) for inputs/outputs for each test).
