@@ -48,8 +48,8 @@ letrec (
     # dyn query
     letrec (queryY = lambda () { (putln @Y) }) {
       [
-        (lambda (X) { (queryY) } 0)
         (lambda (Y) { (queryY) } 0)
+        (lambda (Y) { [(queryY) 1] } 0)
       ]
     }
     # var access

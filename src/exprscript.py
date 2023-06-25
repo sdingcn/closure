@@ -603,15 +603,19 @@ class Closure(Value):
 class Layer:
     '''Each layer on the stack contains the (sub-)expression currently under evaluation.'''
 
-    def __init__(self, env: list[tuple[str, int]], expr: ExprNode, frame: bool = None):
+    def __init__(self, env: list[tuple[str, int]], expr: ExprNode, frame: bool = None, tail: bool = None):
         if frame is None:
             frame = False
+        if tail is None:
+            tail = False
         # environment (shared among layers in each frame) for the evaluation of the current expression
         self.env = env 
         # the current expression under evaluation
         self.expr = expr
         # whether this layer starts a frame (a closure call or the initial layer)
         self.frame = frame
+        # whether this layer is in tail position (for tail call optimization)
+        self.tail = tail
         # program counter (the pc-th step of evaluating this expression)
         self.pc = 0
         # variables local to this evaluation layer
@@ -660,7 +664,9 @@ class State:
 
     def __init__(self, expr: ExprNode):
         # stack
+        ## tail call optimization never removes the main frame
         self.stack = [Layer([], None, frame = True)]
+        ## layer.tail == False for the first layer
         self.stack.append(Layer(self.stack[0].env, expr))
         # heap
         self.store = []
@@ -730,6 +736,8 @@ class State:
                 self.value = String(layer.expr.value)
                 self.stack.pop()
             elif type(layer.expr) == LambdaNode:
+                # closures always save all variables (no matter whether they are used in the body or not)
+                # so you can use the @ query in an intuitive way
                 self.value = Closure(filter_lexical(layer.env), layer.expr)
                 self.stack.pop()
             elif type(layer.expr) == LetrecNode:
@@ -758,13 +766,16 @@ class State:
                         if last_location is None:
                             runtime_error(var.sl, 'undefined variable')
                         self.store[last_location] = self.value
-                    self.stack.append(Layer(layer.env, layer.expr.expr))
+                    self.stack.append(Layer(layer.env, layer.expr.expr, tail = layer.frame or layer.tail))
                     layer.pc += 1
                 # finish letrec
                 else:
                     # this is necessary because letrec layer's env is shared with its previous frame
                     for i in range(len(layer.expr.var_expr_list)):
                         layer.env.pop()
+                    # we cannot pop this layer earlier,
+                    # because we need to revert the environment before popping it,
+                    # and reverting the environment will make the body expression's evaluation go wrong
                     self.stack.pop()
             elif type(layer.expr) == IfNode:
                 # evaluate the condition
@@ -776,9 +787,9 @@ class State:
                     if type(self.value) != Number:
                         runtime_error(layer.expr.cond.sl, 'wrong condition type')
                     if self.value.n != 0:
-                        self.stack.append(Layer(layer.env, layer.expr.branch1))
+                        self.stack.append(Layer(layer.env, layer.expr.branch1, tail = layer.frame or layer.tail))
                     else:
-                        self.stack.append(Layer(layer.env, layer.expr.branch2))
+                        self.stack.append(Layer(layer.env, layer.expr.branch2, tail = layer.frame or layer.tail))
                     layer.pc += 1
                 # finish if
                 else:
@@ -1024,6 +1035,12 @@ class State:
                             for i, v in enumerate(closure.fun.var_list):
                                 addr = args[i].location if args[i].location != None else self._new(args[i])
                                 new_env.append((v.name, addr))
+                            # tail call optimization
+                            if layer.frame or layer.tail:
+                                while not self.stack[-1].frame:
+                                    self.stack.pop()
+                                # pop the last frame
+                                self.stack.pop()
                             # evaluate the closure call
                             self.stack.append(Layer(new_env, closure.fun.expr, frame = True))
                             layer.pc += 1
@@ -1044,8 +1061,11 @@ class State:
                         self.stack.pop()
             elif type(layer.expr) == SequenceNode:
                 # evaluate the expressions, without the need of storing the results to local
-                if layer.pc < len(layer.expr.expr_list):
+                if layer.pc < len(layer.expr.expr_list) - 1:
                     self.stack.append(Layer(layer.env, layer.expr.expr_list[layer.pc]))
+                    layer.pc += 1
+                elif layer.pc == len(layer.expr.expr_list) - 1:
+                    self.stack.append(Layer(layer.env, layer.expr.expr_list[layer.pc], tail = layer.frame or layer.tail))
                     layer.pc += 1
                 # finish the sequence
                 else:
