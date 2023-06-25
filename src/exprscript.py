@@ -1243,8 +1243,9 @@ if __name__ == '__main__':
     if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import resource
         ru = resource.getrusage(resource.RUSAGE_SELF)
+        mem_factor = 1048576 / 1000 if sys.platform.startswith('linux') else 1048576
         sys.stderr.write(
             f'User time (seconds) = {round(ru.ru_utime, 3)}\n'
             f'System time (seconds) = {round(ru.ru_stime, 3)}\n'
-            f'Peak memory (MiB) = {round(ru.ru_maxrss / 1048576, 3)}\n'
+            f'Peak memory (MiB) = {round(ru.ru_maxrss / mem_factor, 3)}\n'
         )
