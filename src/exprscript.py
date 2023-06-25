@@ -1220,3 +1220,11 @@ if __name__ == '__main__':
         sys.exit(f'Usage:\n\tpython3 {sys.argv[0]} <source-file>')
     with open(sys.argv[1], 'r', encoding = 'utf-8') as f:
         print(run_code(f.read()))
+    if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+        import resource
+        ru = resource.getrusage(resource.RUSAGE_SELF)
+        sys.stderr.write(
+            f'User time (seconds) = {round(ru.ru_utime, 3)}\n'
+            f'System time (seconds) = {round(ru.ru_stime, 3)}\n'
+            f'Peak memory (MiB) = {round(ru.ru_maxrss / 1048576, 3)}\n'
+        )

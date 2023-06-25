@@ -1,6 +1,5 @@
 import subprocess
 import sys
-import time
 
 def run_and_read(cmd: str, inp: str) -> str:
     return subprocess.run(cmd,
@@ -105,20 +104,14 @@ hello world
         cnt += 1
         sys.stderr.write(f'====================\n')
         sys.stderr.write(f'Running on test {cnt}\n')
-        start_time = time.time()
         ok = check_io_expr(*test)
-        end_time = time.time()
-        sys.stderr.write(f'Total time (seconds): {end_time - start_time}\n')
         if not ok:
             sys.exit(f'*** Failed on test {cnt}')
     for test in py_tests:
         cnt += 1
         sys.stderr.write(f'====================\n')
         sys.stderr.write(f'Running on test {cnt}\n')
-        start_time = time.time()
         ok = check_io_py(*test)
-        end_time = time.time()
-        sys.stderr.write(f'Total time (seconds): {end_time - start_time}\n')
         if not ok:
             sys.exit(f'*** Failed on test {cnt}')
     sys.stderr.write(f'\nPassed all {cnt} tests\n')
