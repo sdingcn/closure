@@ -68,20 +68,20 @@ def lex(source: str) -> deque[Token]:
             col += 1
 
     # number format regular expressions
-    re_head_nonzero = re.compile("[1-9][0-9]*")
-    re_tail_nonzero = re.compile("[0-9]*[1-9]")
+    re_hd_non0 = re.compile("[1-9][0-9]*")
+    re_tl_non0 = re.compile("[0-9]*[1-9]")
 
     def is_number_literal(s: str) -> bool:
         if len(s) and s[0] in ('-', '+'):
             s = s[1:]
         if '/' in s:
             parts = s.split('/')
-            return len(parts) == 2 and (parts[0] == '0' or re_head_nonzero.fullmatch(parts[0])) and re_head_nonzero.fullmatch(parts[1])
+            return len(parts) == 2 and (parts[0] == '0' or re_hd_non0.fullmatch(parts[0])) and re_hd_non0.fullmatch(parts[1])
         elif '.' in s:
             parts = s.split('.')
-            return len(parts) == 2 and (parts[0] == '0' or re_head_nonzero.fullmatch(parts[0])) and re_tail_nonzero.fullmatch(parts[1])
+            return len(parts) == 2 and (parts[0] == '0' or re_hd_non0.fullmatch(parts[0])) and re_tl_non0.fullmatch(parts[1])
         else:
-            return s == '0' or re_head_nonzero.fullmatch(s)
+            return s == '0' or re_hd_non0.fullmatch(s)
 
     def count_trailing_escape(s: str) -> int:
         l = len(s)
@@ -676,7 +676,7 @@ class State:
             # GC control
             counter += 1
             if counter % 1024 == 0:
-                sys.stderr.write(f'GC collected {self._gc()} cells\n')
+                sys.stderr.write(f'[Note] GC collected {self._gc()} cells\n')
 
             # evaluating the current layer
             layer = self.stack[-1]
@@ -1166,14 +1166,14 @@ def run_code(source: str) -> Value:
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        sys.exit(f'Usage:\n\tpython3 {sys.argv[0]} <source-file>')
+        sys.exit(f'[Note] Usage:\n\tpython3 {sys.argv[0]} <source-file>')
     with open(sys.argv[1], 'r', encoding = 'utf-8') as f:
-        sys.stderr.write(f'{run_code(f.read())}\n')
+        sys.stderr.write(f'[Note] program value = {run_code(f.read())}\n')
     if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import resource
         ru = resource.getrusage(resource.RUSAGE_SELF)
         sys.stderr.write(
-            f'User time (seconds) = {round(ru.ru_utime, 3)}\n'
-            f'System time (seconds) = {round(ru.ru_stime, 3)}\n'
-            f'Peak memory (MiB) = {round(ru.ru_maxrss / 1048576, 3)}\n'
+            f'[Note] User time (seconds) = {round(ru.ru_utime, 3)}\n'
+            f'[Note] System time (seconds) = {round(ru.ru_stime, 3)}\n'
+            f'[Note] Peak memory (MiB) = {round(ru.ru_maxrss / 1048576, 3)}\n'
         )
