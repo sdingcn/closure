@@ -88,10 +88,9 @@ Supported object types: Void, Number, String, Closure, Continuation.
 Functions are not curried by default.
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
-Tail call optimization is always automatically applied.
-(Mark-and-sweep) garbage collection (GC) runs when 80% of the reserved heap space is occupied,
-and if GC cannot reduce the occupancy to be < 80%, the reserved heap space will grow.
-The evaluation result of the entire program is printed to `stdout`.
+Tail call optimization is automatically applied.
+(Mark-and-sweep) garbage collection (GC) automatically runs.
+GC information and the evaluation result of the entire program are printed to `stderr`.
 
 ## usage
 

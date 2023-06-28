@@ -4,5 +4,5 @@ letrec (
     else (sum (.- n 1) (.+ n s))
   }
 ) {
-  (sum 10000 0)
+  (.put (sum 10000 0) "\n")
 }

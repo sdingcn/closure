@@ -640,9 +640,6 @@ class State:
         self.value = None
         # Python FFI
         self.python_functions = {}
-        # private values
-        self._ref_size = 8 if sys.maxsize > 2 ** 32 else 4
-        self._empty_store_size = sys.getsizeof(self.store)
 
     def register_python_function(self, name: str, f: Callable[..., Union[str, int]]) -> 'State':
         self.python_functions[name] = f
@@ -670,24 +667,17 @@ class State:
             runtime_error(sl, 'ExprScript returned a non-String non-Number result')
 
     def execute(self) -> 'State':
-        # insufficient_capacity is the last capacity on which GC failed
-        insufficient_capacity = -1
+        # step counter
+        counter = 0
 
         # we just adjust "state.stack" and "stack.value"
         # the evaluation will automatically continue along the while loop
         while True:
 
             # GC control
-            capacity = self._get_store_capacity()
-            # the capacity has been expanded since last GC failure, so we may try GC
-            if capacity > insufficient_capacity:
-                # try GC
-                if self.end >= 0.8 * capacity:
-                    self._gc()
-                    # GC failed to release enough memory, so the capacity should grow in the next iteration
-                    # in the next iteration capacity == insufficient_capacity so GC will not run until the capacity grows
-                    if self.end >= 0.8 * capacity:
-                        insufficient_capacity = capacity
+            counter += 1
+            if counter % 1024 == 0:
+                sys.stderr.write(f'GC collected {self._gc()} cells\n')
 
             # evaluating the current layer
             layer = self.stack[-1]
@@ -1057,10 +1047,6 @@ class State:
             else:
                 runtime_error(layer.expr.sl, 'unrecognized AST node')
 
-    def _get_store_capacity(self) -> int:
-        # capacity >= length
-        return (sys.getsizeof(self.store) - self._empty_store_size) // self._ref_size
-
     def _new(self, value: Value) -> int:
         if self.end < len(self.store):
             self.store[self.end] = value
@@ -1184,7 +1170,7 @@ if __name__ == '__main__':
     if len(sys.argv) != 2:
         sys.exit(f'Usage:\n\tpython3 {sys.argv[0]} <source-file>')
     with open(sys.argv[1], 'r', encoding = 'utf-8') as f:
-        print(run_code(f.read()))
+        sys.stderr.write(f'{run_code(f.read())}\n')
     if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import resource
         ru = resource.getrusage(resource.RUSAGE_SELF)

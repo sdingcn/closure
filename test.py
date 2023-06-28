@@ -39,7 +39,6 @@ def main():
 3
 4
 5
-<void>
 '''),
         ('test/comprehensive.expr', '', '0\n1\n' * 15),
         ('test/coroutines.expr', '',
@@ -50,13 +49,12 @@ main
 task 2
 main
 task 3
-<void>
 '''),
-        ('test/gcd.expr', '100\n0\n', '100\n<void>\n'),
-        ('test/gcd.expr', '0\n100\n', '100\n<void>\n'),
-        ('test/gcd.expr', '30\n30\n', '30\n<void>\n'),
-        ('test/gcd.expr', '25\n45\n', '5\n<void>\n'),
-        ('test/gcd.expr', '7\n100\n', '1\n<void>\n'),
+        ('test/gcd.expr', '100\n0\n', '100\n'),
+        ('test/gcd.expr', '0\n100\n', '100\n'),
+        ('test/gcd.expr', '30\n30\n', '30\n'),
+        ('test/gcd.expr', '25\n45\n', '5\n'),
+        ('test/gcd.expr', '7\n100\n', '1\n'),
         ('test/intensive.expr', '', '50005000\n'),
         ('test/lazy-evaluation.expr', '',
 '''\
@@ -64,15 +62,13 @@ task 3
 2
 1
 thunk
-<void>
 '''),
-        ('test/scope.expr', '', '1\n303\n<void>\n'),
+        ('test/scope.expr', '', '1\n303\n'),
         ('test/multi-stage.expr', '',
 '''\
 EVAL
 hello world
 hello world
-<void>
 '''),
         ('test/oop.expr', '',
 '''\
@@ -80,17 +76,17 @@ hello world
 2
 100
 2
-<void>
 '''),
-        ('test/y-combinator.expr', '', '1 120 3628800\n<void>\n'),
+        ('test/y-combinator.expr', '', '1 120 3628800\n'),
         ('src/interaction-examples.py', '', '-5\neman\n')
     ]
     for i, test in enumerate(tests):
-        sys.stderr.write(f'====================\n')
+        sys.stderr.write('{{{\n')
         sys.stderr.write(f'Running on test {i + 1}\n')
         ok = check_io(test[0].split('.')[-1])(*test)
         if not ok:
             sys.exit(f'*** Failed on test {i + 1}')
+        sys.stderr.write('}}}\n')
     sys.stderr.write(f'\nPassed all {i + 1} tests\n')
 
 if __name__ == '__main__':

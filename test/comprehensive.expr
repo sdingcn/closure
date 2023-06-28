@@ -56,6 +56,6 @@ letrec (
     letrec (f = letrec (v = 0) { lambda () { (.void) } }) {
       (putln &v f)
     }
-    1
+    (putln 1)
   ]
 }
