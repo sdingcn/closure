@@ -289,10 +289,9 @@ def parse(tokens: deque[Token]) -> ExprNode:
         if not tokens:
             parser_error(SourceLocation(-1, -1), 'incomplete token stream')
         token = tokens.popleft()
-        if predicate(token):
-            return token
-        else:
+        if not predicate(token):
             parser_error(token.sl, 'unexpected token')
+        return token
 
     # parsers
 
@@ -341,8 +340,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
 
     def parse_intrinsic() -> IntrinsicNode:
         token = consume(is_intrinsic_token)
-        node = IntrinsicNode(token.sl, token.src)
-        return node
+        return IntrinsicNode(token.sl, token.src)
 
     def parse_lambda() -> LambdaNode:
         start = consume(lambda t: t.src == 'lambda')
@@ -386,10 +384,11 @@ def parse(tokens: deque[Token]) -> ExprNode:
 
     def parse_call() -> CallNode:
         start = consume(lambda t: t.src == '(')
-        if tokens and is_intrinsic_token(tokens[0]):
+        if not tokens:
+            parser_error(start.sl, 'incomplete token stream')
+        if is_intrinsic_token(tokens[0]):
             callee = parse_intrinsic()
         else:
-            # if len(tokens) == 0 then delegate parse_expr() to handle the error
             callee = parse_expr()
         arg_list = []
         while tokens and tokens[0].src != ')':
@@ -565,7 +564,7 @@ class Closure(Value):
         self.fun = fun
 
     def __str__(self) -> str:
-        return '<closure>'
+        return f'<closure at {self.fun.sl}>'
 
 class Layer:
     '''Each layer on the stack contains the (sub-)expression currently under evaluation.'''
@@ -641,8 +640,8 @@ class State:
         # Python FFI
         self.python_functions = {}
 
-    def register_python_function(self, name: str, f: Callable[..., Union[str, int]]) -> 'State':
-        self.python_functions[name] = f
+    def register_python_function(self, name: str, fun: Callable[..., Union[str, int]]) -> 'State':
+        self.python_functions[name] = fun
         return self
     
     def call_expr_function(self, name: str, args: list[Union[str, int]]) -> Union[str, int]:
@@ -1051,7 +1050,6 @@ class State:
         if self.end < len(self.store):
             self.store[self.end] = value
         else:
-            # the self.store array is managed by Python and will automatically grow
             self.store.append(value)
         value.location = self.end
         self.end += 1
