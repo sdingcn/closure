@@ -564,7 +564,7 @@ class Closure(Value):
         self.fun = fun
 
     def __str__(self) -> str:
-        return f'<closure at {self.fun.sl}>'
+        return f'<closure evaluated at {self.fun.sl}>'
 
 class Layer:
     '''Each layer on the stack contains the (sub-)expression currently under evaluation.'''
@@ -589,13 +589,14 @@ class Layer:
 
 class Continuation(Value):
 
-    def __init__(self, stack: list[Layer]):
+    def __init__(self, sl: SourceLocation, stack: list[Layer]):
         self.location = None
+        self.sl = sl
         # we only need to store the stack, because objects in the heap are immutable
         self.stack = stack
 
     def __str__(self) -> str:
-        return '<continuation>'
+        return f'<continuation evaluated at {self.sl}>'
 
 def check_or_exit(sl: SourceLocation, args: list[Value], ts: list[type]) -> bool:
     ''' check whether arguments conform to types '''
@@ -891,7 +892,7 @@ class State:
                             check_or_exit(layer.expr.sl, args, [Closure])
                             self.stack.pop()
                             # obtain the continuation (this deepcopy will not copy the store)
-                            cont = Continuation(deepcopy(self.stack))
+                            cont = Continuation(layer.expr.sl, deepcopy(self.stack))
                             closure = args[0]
                             # make a closure call layer and pass in the continuation
                             addr = cont.location if cont.location != None else self._new(cont)
@@ -1149,7 +1150,7 @@ class State:
                                     reloc(value)
 
         reloc(self.value)
-        reloc(Continuation(self.stack))
+        reloc(Continuation(SourceLocation(-1, -1), self.stack))
         for i in range(self.end):
             reloc(self.store[i])
 

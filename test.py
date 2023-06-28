@@ -77,6 +77,14 @@ hello world
 100
 2
 '''),
+        ('test/values.expr', '',
+'''\
+<void>
+1/2
+str
+<closure evaluated at (SourceLocation 5 7)>
+<continuation evaluated at (SourceLocation 6 7)>
+'''),
         ('test/y-combinator.expr', '', '1 120 3628800\n'),
         ('src/interaction-examples.py', '', '-5\neman\n')
     ]
