@@ -1056,55 +1056,44 @@ class State:
         self.end += 1
         return self.end - 1
 
-    def _mark(self) -> tuple[set[int], list[Value]]:
+    def _traverse(self, value_callback: Callable, location_callback: Callable) -> None:
         # ids
-        visited_closures = set()
-        # ids
-        visited_stacks = set()
-        # integer locations
+        visited_values = set()
+        # locations
         visited_locations = set()
 
-        def mark_closure(closure: Closure) -> None:
-            if id(closure) not in visited_closures:
-                visited_closures.add(id(closure))
-                for v, l in closure.env:
-                    mark_location(l)
-        
-        def mark_stack(stack: list[Layer]) -> None:
-            if id(stack) not in visited_stacks:
-                visited_stacks.add(id(stack))
-                for layer in stack:
-                    if layer.frame:
-                        for v, l in layer.env:
-                            mark_location(l)
-                    if layer.local:
-                        for name, value in layer.local.items():
-                            if type(value) == Closure:
-                                mark_closure(value)
-                            elif type(value) == Continuation:
-                                mark_stack(value.stack)
-                            elif type(value) == list:
-                                for elem in value:
-                                    if type(elem) == Closure:
-                                        mark_closure(elem)
-                                    elif type(elem) == Continuation:
-                                        mark_stack(elem.stack)
+        def traverse_value(value: Value) -> None:
+            if id(value) not in visited_values:
+                value_callback(value)
+                visited_values.add(id(value))
+                if type(value) == Closure:
+                    for _, loc in value.env:
+                        traverse_location(loc)
+                elif type(value) == Continuation:
+                    for layer in value.stack:
+                        if layer.frame:
+                            for _, loc in layer.env:
+                                traverse_location(loc)
+                        if layer.local:
+                            for _, v in layer.local.items():
+                                traverse_value(v)
 
-        def mark_location(location: int) -> None:
+        def traverse_location(location: int) -> None:
             if location not in visited_locations:
+                location_callback(location)
                 visited_locations.add(location)
-                val = self.store[location]
-                if type(val) == Closure:
-                    mark_closure(val)
-                elif type(val) == Continuation:
-                    mark_stack(val.stack)
-        
-        # mark both the value and the stack
-        if type(self.value) == Closure:
-            mark_closure(self.value)
-        elif type(self.value) == Continuation:
-            mark_stack(self.value.stack)
-        mark_stack(self.stack)
+                traverse_value(self.store[location])
+
+        traverse_value(Continuation(SourceLocation(-1, -1), self.stack))
+        traverse_value(self.value)
+
+    def _mark(self) -> set[int]:
+        visited_locations = set()
+
+        def location_callback(location: int) -> None:
+            visited_locations.add(location)
+
+        self._traverse(lambda _: None, location_callback)
         return visited_locations
 
     def _sweep_and_compact(self, visited_locations: set[int]) -> tuple[int, dict[int, int]]:
@@ -1127,32 +1116,18 @@ class State:
         return (removed, relocation)
     
     def _relocate(self, relocation: dict[int, int]) -> None:
-        relocated = set()
+        
+        def value_callback(value: Value) -> None:
+            if type(value) == Closure:
+                for i in range(len(value.env)):
+                    value.env[i] = (value.env[i][0], relocation[value.env[i][1]])
+            elif type(value) == Continuation:
+                for layer in value.stack:
+                    if layer.frame:
+                        for i in range(len(layer.env)):
+                            layer.env[i] = (layer.env[i][0], relocation[layer.env[i][1]])
 
-        def reloc(val: Value) -> None:
-            if id(val) not in relocated:
-                relocated.add(id(val))
-                if type(val) == Closure:
-                    for i in range(len(val.env)):
-                        val.env[i] = (val.env[i][0], relocation[val.env[i][1]])
-                elif type(val) == Continuation:
-                    for layer in val.stack:
-                        if layer.frame:
-                            for i in range(len(layer.env)):
-                                layer.env[i] = (layer.env[i][0], relocation[layer.env[i][1]])
-                        if layer.local:
-                            for name, value in layer.local.items():
-                                if type(value) == list:
-                                    for elem in value:
-                                        if type(elem) in (Closure, Continuation):
-                                            reloc(elem)
-                                elif type(value) in (Closure, Continuation):
-                                    reloc(value)
-
-        reloc(self.value)
-        reloc(Continuation(SourceLocation(-1, -1), self.stack))
-        for i in range(self.end):
-            reloc(self.store[i])
+        self._traverse(value_callback, lambda _: None)
 
     def _gc(self) -> int:
         visited_locations = self._mark()

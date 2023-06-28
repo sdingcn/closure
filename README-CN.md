@@ -64,7 +64,7 @@ Python >= 3.9
              | .and | .or | .not             // for simplicity use numbers as Booleans
              | .strlen | .strcut | .str+ | .strnum | .strquote
              | .str< | .str<= | .str> | .str>= | .str== | .str!= 
-             | .getline | .put
+             | .getline | .put               // stdin and stdout supports
              | .void? | .num? | .str? | .clo? | .cont?
              | .call/cc | .eval | .exit
              | .py | .reg                    // Python interaction
@@ -88,7 +88,7 @@ Python >= 3.9
 变量是指向对象的引用且一旦绑定就不可变.
 尾调用优化自动应用.
 (标记-扫描) 垃圾回收自动运行.
-垃圾回收信息和整个程序的求值结果会被写到标准错误.
+一些运行时信息会被写到标准错误.
 
 ## 用法
 
