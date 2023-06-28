@@ -9,12 +9,9 @@ from copy import deepcopy
 def quote(literal: str) -> str:
     ret = '"'
     for char in literal:
-        if char == '\\':
-            ret += '\\\\'
-        elif char == '"':
-            ret += '\\"'
-        else:
-            ret += char
+        if char in ('\\', '"'):
+            ret += '\\'
+        ret += char
     ret += '"'
     return ret
 
@@ -71,24 +68,20 @@ def lex(source: str) -> deque[Token]:
             col += 1
 
     # number format regular expressions
-    regex_head_nonzero = re.compile("[1-9][0-9]*")
-    regex_tail_nonzero = re.compile("[0-9]*[1-9]")
+    re_head_nonzero = re.compile("[1-9][0-9]*")
+    re_tail_nonzero = re.compile("[0-9]*[1-9]")
 
     def is_number_literal(s: str) -> bool:
         if len(s) and s[0] in ('-', '+'):
             s = s[1:]
         if '/' in s:
             parts = s.split('/')
-            if not len(parts) == 2:
-                return False
-            return (parts[0] == '0' or regex_head_nonzero.fullmatch(parts[0])) and regex_head_nonzero.fullmatch(parts[1])
+            return len(parts) == 2 and (parts[0] == '0' or re_head_nonzero.fullmatch(parts[0])) and re_head_nonzero.fullmatch(parts[1])
         elif '.' in s:
             parts = s.split('.')
-            if not len(parts) == 2:
-                return False
-            return (parts[0] == '0' or regex_head_nonzero.fullmatch(parts[0])) and regex_tail_nonzero.fullmatch(parts[1])
+            return len(parts) == 2 and (parts[0] == '0' or re_head_nonzero.fullmatch(parts[0])) and re_tail_nonzero.fullmatch(parts[1])
         else:
-            return s == '0' or regex_head_nonzero.fullmatch(s)
+            return s == '0' or re_head_nonzero.fullmatch(s)
 
     def count_trailing_escape(s: str) -> int:
         l = len(s)
@@ -292,11 +285,11 @@ def parse(tokens: deque[Token]) -> ExprNode:
 
     # token consumer
 
-    def consume(expected: str) -> Token:
+    def consume(predicate: Callable) -> Token:
         if not tokens:
             parser_error(SourceLocation(-1, -1), 'incomplete token stream')
         token = tokens.popleft()
-        if token.src == expected:
+        if predicate(token):
             return token
         else:
             parser_error(token.sl, 'unexpected token')
@@ -304,11 +297,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
     # parsers
 
     def parse_number() -> NumberNode:
-        if not tokens:
-            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
-        token = tokens.popleft()
-        if not is_number_token(token):
-            parser_error(token.sl, 'unexpected token')
+        token = consume(is_number_token)
         s = token.src
         sign = 1
         if len(s) and s[0] in ('-', '+'):
@@ -327,11 +316,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         return node
 
     def parse_string() -> StringNode:
-        if not tokens:
-            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
-        token = tokens.popleft()
-        if not is_string_token(token):
-            parser_error(token.sl, 'unexpected token')
+        token = consume(is_string_token)
         content = deque(token.src[1:-1])
         s = ''
         while content:
@@ -357,64 +342,56 @@ def parse(tokens: deque[Token]) -> ExprNode:
         return node
 
     def parse_intrinsic() -> IntrinsicNode:
-        if not tokens:
-            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
-        token = tokens.popleft()
-        if not is_intrinsic_token(token):
-            parser_error(token.sl, 'unexpected token')
+        token = consume(is_intrinsic_token)
         node = IntrinsicNode(token.sl, token.src)
         return node
 
     def parse_lambda() -> LambdaNode:
-        start = consume('lambda')
-        consume('(')
+        start = consume(lambda t: t.src == 'lambda')
+        consume(lambda t: t.src == '(')
         var_list = []
         while tokens and is_variable_token(tokens[0]):
             var_list.append(parse_variable())
-        consume(')')
-        consume('{')
+        consume(lambda t: t.src == ')')
+        consume(lambda t: t.src == '{')
         expr = parse_expr()
-        consume('}')
+        consume(lambda t: t.src == '}')
         node = LambdaNode(start.sl, var_list, expr)
         return node
 
     def parse_letrec() -> LetrecNode:
-        start = consume('letrec')
-        consume('(')
+        start = consume(lambda t: t.src == 'letrec')
+        consume(lambda t: t.src == '(')
         var_expr_list = []
         while tokens and is_variable_token(tokens[0]):
             v = parse_variable()
-            consume('=')
+            consume(lambda t: t.src == '=')
             e = parse_expr()
             var_expr_list.append((v, e))
-        consume(')')
-        consume('{')
+        consume(lambda t: t.src == ')')
+        consume(lambda t: t.src == '{')
         expr = parse_expr()
-        consume('}')
+        consume(lambda t: t.src == '}')
         node = LetrecNode(start.sl, var_expr_list, expr)
         return node
 
     def parse_if() -> IfNode:
-        start = consume('if')
+        start = consume(lambda t: t.src == 'if')
         cond = parse_expr()
-        consume('then')
+        consume(lambda t: t.src == 'then')
         branch1 = parse_expr()
-        consume('else')
+        consume(lambda t: t.src == 'else')
         branch2 = parse_expr()
         node = IfNode(start.sl, cond, branch1, branch2)
         return node
 
     def parse_variable() -> VariableNode:
-        if not tokens:
-            parser_error(SourceLocation(-1, -1), 'incomplete token stream')
-        token = tokens.popleft()
-        if not is_variable_token(token):
-            parser_error(token.sl, 'unexpected token')
+        token = consume(is_variable_token)
         node = VariableNode(token.sl, token.src)
         return node
 
     def parse_call() -> CallNode:
-        start = consume('(')
+        start = consume(lambda t: t.src == '(')
         if tokens and is_intrinsic_token(tokens[0]):
             callee = parse_intrinsic()
         else:
@@ -423,23 +400,23 @@ def parse(tokens: deque[Token]) -> ExprNode:
         arg_list = []
         while tokens and tokens[0].src != ')':
             arg_list.append(parse_expr())
-        consume(')')
+        consume(lambda t: t.src == ')')
         node = CallNode(start.sl, callee, arg_list)
         return node
 
     def parse_sequence() -> SequenceNode:
-        start = consume('[')
+        start = consume(lambda t: t.src == '[')
         expr_list = []
         while tokens and tokens[0].src != ']':
             expr_list.append(parse_expr())
         if len(expr_list) == 0:
             parser_error(start.sl, 'zero-length sequence')
-        consume(']')
+        consume(lambda t: t.src == ']')
         node = SequenceNode(start.sl, expr_list)
         return node
 
     def parse_query() -> QueryNode:
-        start = consume('@')
+        start = consume(lambda t: t.src == '@')
         var = parse_variable()
         if var.is_lex():
             expr = parse_expr()
@@ -449,7 +426,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         return node
 
     def parse_access() -> AccessNode:
-        start = consume('&')
+        start = consume(lambda t: t.src == '&')
         var = parse_variable()
         expr = parse_expr()
         node = AccessNode(start.sl, var, expr)
@@ -458,7 +435,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
     def parse_expr() -> ExprNode:
         if not tokens:
             parser_error(SourceLocation(-1, -1), 'incomplete token stream')
-        if is_number_token(tokens[0]):
+        elif is_number_token(tokens[0]):
             return parse_number()
         elif is_string_token(tokens[0]):
             return parse_string()
@@ -618,7 +595,7 @@ class Layer:
         self.tail = tail
         # program counter (the pc-th step of evaluating this expression)
         self.pc = 0
-        # variables local to this evaluation layer
+        # temporary variables for this layer, which can only hold Values of lists of Values
         self.local = {}
 
 class Continuation(Value):
@@ -631,13 +608,13 @@ class Continuation(Value):
     def __str__(self) -> str:
         return '<continuation>'
 
-def check_or_exit(callee: ExprNode, args: list[Value], ts: list[type]) -> bool:
+def check_or_exit(sl: SourceLocation, args: list[Value], ts: list[type]) -> bool:
     ''' check whether arguments conform to types '''
     if len(args) != len(ts):
-        runtime_error(callee.sl, 'wrong number of arguments given to callee')
+        runtime_error(sl, 'wrong number of arguments given to callee')
     for i in range(len(args)):
         if not isinstance(args[i], ts[i]):
-            runtime_error(callee.sl, 'wrong type of arguments given to callee')
+            runtime_error(sl, 'wrong type of arguments given to callee')
 
 def filter_lexical(env: list[tuple[str, int]]) -> list[tuple[str, int]]:
     ''' find out lexical variable-location pairs in an environment '''
@@ -741,6 +718,13 @@ class State:
                 self.value = Closure(filter_lexical(layer.env), layer.expr)
                 self.stack.pop()
             elif type(layer.expr) == LetrecNode:
+                # evaluation result for each binding expression
+                if 1 < layer.pc <= len(layer.expr.var_expr_list) + 1:
+                    var = layer.expr.var_expr_list[layer.pc - 2][0]
+                    last_location = lookup_env(var.name, layer.env)
+                    if last_location is None:
+                        runtime_error(var.sl, 'undefined variable')
+                    self.store[last_location] = self.value
                 # letrec always create new locations
                 if layer.pc == 0:
                     for v, _ in layer.expr.var_expr_list:
@@ -748,24 +732,10 @@ class State:
                     layer.pc += 1
                 # evaluate binding expressions
                 elif layer.pc <= len(layer.expr.var_expr_list):
-                    # update location content
-                    if layer.pc > 1:
-                        var = layer.expr.var_expr_list[layer.pc - 2][0]
-                        last_location = lookup_env(var.name, layer.env)
-                        if last_location is None:
-                            runtime_error(var.sl, 'undefined variable')
-                        self.store[last_location] = self.value
                     self.stack.append(Layer(layer.env, layer.expr.var_expr_list[layer.pc - 1][1]))
                     layer.pc += 1
                 # evaluate body expression
                 elif layer.pc == len(layer.expr.var_expr_list) + 1:
-                    # update location content
-                    if layer.pc > 1:
-                        var = layer.expr.var_expr_list[layer.pc - 2][0]
-                        last_location = lookup_env(var.name, layer.env)
-                        if last_location is None:
-                            runtime_error(var.sl, 'undefined variable')
-                        self.store[last_location] = self.value
                     self.stack.append(Layer(layer.env, layer.expr.expr, tail = layer.frame or layer.tail))
                     layer.pc += 1
                 # finish letrec
@@ -807,134 +777,133 @@ class State:
             elif type(layer.expr) == CallNode:
                 # intrinsic call
                 if type(layer.expr.callee) == IntrinsicNode:
+                    # evaluation result for each argument
+                    if 1 < layer.pc <= len(layer.expr.arg_list) + 1:
+                        layer.local['args'].append(self.value)
                     # initialize args
                     if layer.pc == 0:
                         layer.local['args'] = []
                         layer.pc += 1
                     # evaluate arguments
                     elif layer.pc <= len(layer.expr.arg_list):
-                        if layer.pc > 1:
-                            layer.local['args'].append(self.value)
                         self.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 1]))
                         layer.pc += 1
                     # intrinsic call doesn't need to grow the stack, so this is the final step for this call
                     else:
-                        if layer.pc > 1:
-                            layer.local['args'].append(self.value)
                         intrinsic = layer.expr.callee.name
                         args = layer.local['args']
                         # a gigantic series of if conditions, one for each intrinsic function
                         if intrinsic == '.void':
-                            check_or_exit(layer.expr.callee, args, [])
+                            check_or_exit(layer.expr.sl, args, [])
                             self.value = Void()
                         elif intrinsic == '.+':
-                            check_or_exit(layer.expr.callee, args, [Number] * len(args))
+                            check_or_exit(layer.expr.sl, args, [Number] * len(args))
                             self.value = Number(0)
                             for a in args:
                                 self.value = self.value.add(a)
                         elif intrinsic == '.-':
-                            check_or_exit(layer.expr.callee, args, [Number, Number])
+                            check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = args[0].sub(args[1])
                         elif intrinsic == '.*':
-                            check_or_exit(layer.expr.callee, args, [Number] * len(args))
+                            check_or_exit(layer.expr.sl, args, [Number] * len(args))
                             self.value = Number(1)
                             for a in args:
                                 self.value = self.value.mul(a)
                         elif intrinsic == './':
-                            check_or_exit(layer.expr.callee, args, [Number, Number])
+                            check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = args[0].div(args[1], layer.expr.sl)
                         elif intrinsic == '.%':
-                            check_or_exit(layer.expr.callee, args, [Number, Number])
+                            check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = args[0].mod(args[1], layer.expr.sl)
                         elif intrinsic == '.floor':
-                            check_or_exit(layer.expr.callee, args, [Number])
+                            check_or_exit(layer.expr.sl, args, [Number])
                             self.value = args[0].floor()
                         elif intrinsic == '.ceil':
-                            check_or_exit(layer.expr.callee, args, [Number])
+                            check_or_exit(layer.expr.sl, args, [Number])
                             self.value = args[0].ceil()
                         elif intrinsic == '.<':
-                            check_or_exit(layer.expr.callee, args, [Number, Number])
+                            check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = Number(args[0].lt(args[1]))
                         elif intrinsic == '.<=':
-                            check_or_exit(layer.expr.callee, args, [Number, Number])
+                            check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = Number(not args[1].lt(args[0]))
                         elif intrinsic == '.>':
-                            check_or_exit(layer.expr.callee, args, [Number, Number])
+                            check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = Number(args[1].lt(args[0]))
                         elif intrinsic == '.>=':
-                            check_or_exit(layer.expr.callee, args, [Number, Number])
+                            check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = Number(not args[0].lt(args[1]))
                         elif intrinsic == '.==':
-                            check_or_exit(layer.expr.callee, args, [Number, Number])
+                            check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = Number((not args[0].lt(args[1])) and (not args[1].lt(args[0])))
                         elif intrinsic == '.!=':
-                            check_or_exit(layer.expr.callee, args, [Number, Number])
+                            check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = Number(args[0].lt(args[1]) or args[1].lt(args[0]))
                         elif intrinsic == '.and':
-                            check_or_exit(layer.expr.callee, args, [Number] * len(args))
+                            check_or_exit(layer.expr.sl, args, [Number] * len(args))
                             b = True
                             for a in args:
                                 b = b and (a.n != 0)
                             self.value = Number(b)
                         elif intrinsic == '.or':
-                            check_or_exit(layer.expr.callee, args, [Number] * len(args))
+                            check_or_exit(layer.expr.sl, args, [Number] * len(args))
                             b = False
                             for a in args:
                                 b = b or (a.n != 0)
                             self.value = Number(b)
                         elif intrinsic == '.not':
-                            check_or_exit(layer.expr.callee, args, [Number])
+                            check_or_exit(layer.expr.sl, args, [Number])
                             self.value = Number(args[0].n == 0)
                         elif intrinsic == '.strlen':
-                            check_or_exit(layer.expr.callee, args, [String])
+                            check_or_exit(layer.expr.sl, args, [String])
                             self.value = Number(len(args[0].value))
                         elif intrinsic == '.strcut':
-                            check_or_exit(layer.expr.callee, args, [String, Number, Number])
+                            check_or_exit(layer.expr.sl, args, [String, Number, Number])
                             if args[1].d != 1 or args[2].d != 1:
                                 runtime_error(layer.expr.sl, '.strcut is applied to non-integer(s)')
                             self.value = String(args[0].value[args[1].n : args[2].n])
                         elif intrinsic == '.str+':
-                            check_or_exit(layer.expr.callee, args, [String] * len(args))
+                            check_or_exit(layer.expr.sl, args, [String] * len(args))
                             s = ""
                             for a in args:
                                 s += a.value
                             self.value = String(s)
                         elif intrinsic == '.str<':
-                            check_or_exit(layer.expr.callee, args, [String, String])
+                            check_or_exit(layer.expr.sl, args, [String, String])
                             self.value = Number(args[0].value < args[1].value)
                         elif intrinsic == '.str<=':
-                            check_or_exit(layer.expr.callee, args, [String, String])
+                            check_or_exit(layer.expr.sl, args, [String, String])
                             self.value = Number(args[0].value <= args[1].value)
                         elif intrinsic == '.str>':
-                            check_or_exit(layer.expr.callee, args, [String, String])
+                            check_or_exit(layer.expr.sl, args, [String, String])
                             self.value = Number(args[0].value > args[1].value)
                         elif intrinsic == '.str>=':
-                            check_or_exit(layer.expr.callee, args, [String, String])
+                            check_or_exit(layer.expr.sl, args, [String, String])
                             self.value = Number(args[0].value >= args[1].value)
                         elif intrinsic == '.str==':
-                            check_or_exit(layer.expr.callee, args, [String, String])
+                            check_or_exit(layer.expr.sl, args, [String, String])
                             self.value = Number(args[0].value == args[1].value)
                         elif intrinsic == '.str!=':
-                            check_or_exit(layer.expr.callee, args, [String, String])
+                            check_or_exit(layer.expr.sl, args, [String, String])
                             self.value = Number(args[0].value != args[1].value)
                         elif intrinsic == '.strnum':
-                            check_or_exit(layer.expr.callee, args, [String])
+                            check_or_exit(layer.expr.sl, args, [String])
                             node = parse(deque([Token(layer.expr.sl, args[0].value)]))
                             if not isinstance(node, NumberNode):
                                 runtime_error(layer.expr.sl, '.strnum is applied to non-number-string')
                             self.value = Number(node.n, node.d)
                         elif intrinsic == '.strquote':
-                            check_or_exit(layer.expr.callee, args, [String])
+                            check_or_exit(layer.expr.sl, args, [String])
                             self.value = String(quote(args[0].value))
                         elif intrinsic == '.getline':
-                            check_or_exit(layer.expr.callee, args, [])
+                            check_or_exit(layer.expr.sl, args, [])
                             try:
                                 self.value = String(input())
                             except EOFError:
                                 self.value = Void()
                         elif intrinsic == '.put':
                             if not (len(args) >= 1 and all(map(lambda v : isinstance(v, Value), args))):
-                                runtime_error(layer.expr.callee.sl, 'wrong number/type of arguments given to .put')
+                                runtime_error(layer.expr.sl, 'wrong number/type of arguments given to .put')
                             output = ''
                             for v in args:
                                 output += str(v)
@@ -942,7 +911,7 @@ class State:
                             # the return value of put is void
                             self.value = Void()
                         elif intrinsic == '.call/cc':
-                            check_or_exit(layer.expr.callee, args, [Closure])
+                            check_or_exit(layer.expr.sl, args, [Closure])
                             self.stack.pop()
                             # obtain the continuation (this deepcopy will not copy the store)
                             cont = Continuation(deepcopy(self.stack))
@@ -953,26 +922,26 @@ class State:
                             # we already popped the stack in this case, so just continue the evaluation
                             continue
                         elif intrinsic == '.void?':
-                            check_or_exit(layer.expr.callee, args, [Value])
+                            check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], Void))
                         elif intrinsic == '.num?':
-                            check_or_exit(layer.expr.callee, args, [Value])
+                            check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], Number))
                         elif intrinsic == '.str?':
-                            check_or_exit(layer.expr.callee, args, [Value])
+                            check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], String))
                         elif intrinsic == '.clo?':
-                            check_or_exit(layer.expr.callee, args, [Value])
+                            check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], Closure))
                         elif intrinsic == '.cont?':
-                            check_or_exit(layer.expr.callee, args, [Value])
+                            check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], Continuation))
                         elif intrinsic == '.eval':
-                            check_or_exit(layer.expr.callee, args, [String])
+                            check_or_exit(layer.expr.sl, args, [String])
                             arg = args[0]
                             self.value = run_code(arg.value)
                         elif intrinsic == '.exit':
-                            check_or_exit(layer.expr.callee, args, [])
+                            check_or_exit(layer.expr.sl, args, [])
                             # the interpreter returns 0
                             sys.exit()
                         elif intrinsic == '.py':
@@ -1005,6 +974,9 @@ class State:
                         self.stack.pop()
                 # closure or continuation call
                 else:
+                    # evaluation result for each argument
+                    if 2 < layer.pc <= len(layer.expr.arg_list) + 2:
+                        layer.local['args'].append(self.value)
                     # evaluate the callee
                     if layer.pc == 0:
                         self.stack.append(Layer(layer.env, layer.expr.callee))
@@ -1015,22 +987,18 @@ class State:
                         layer.local['args'] = []
                         layer.pc += 1
                     # evaluate arguments
-                    elif layer.pc - 1 <= len(layer.expr.arg_list):
-                        if layer.pc - 1 > 1:
-                            layer.local['args'].append(self.value)
+                    elif layer.pc <= len(layer.expr.arg_list) + 1:
                         self.stack.append(Layer(layer.env, layer.expr.arg_list[layer.pc - 2]))
                         layer.pc += 1
                     # evaluate the call
-                    elif layer.pc - 1 == len(layer.expr.arg_list) + 1:
-                        if layer.pc - 1 > 1:
-                            layer.local['args'].append(self.value)
+                    elif layer.pc == len(layer.expr.arg_list) + 2:
                         callee = layer.local['callee']
                         args = layer.local['args']
                         if type(callee) == Closure:
                             closure = callee
                             # types will be checked inside the closure call
                             if len(args) != len(closure.fun.var_list):
-                                runtime_error(layer.expr.callee.sl, 'wrong number of arguments given to callee')
+                                runtime_error(layer.expr.sl, 'wrong number of arguments given to callee')
                             new_env = closure.env[:]
                             for i, v in enumerate(closure.fun.var_list):
                                 addr = args[i].location if args[i].location != None else self._new(args[i])
@@ -1047,7 +1015,7 @@ class State:
                         elif type(callee) == Continuation:
                             cont = callee
                             if len(args) != 1:
-                                runtime_error(layer.expr.callee.sl, 'wrong number of arguments given to callee')
+                                runtime_error(layer.expr.sl, 'wrong number of arguments given to callee')
                             # "self.value" already contains the last evaluation result of the args, so we just continue
                             # replace the stack
                             self.stack = deepcopy(cont.stack)
@@ -1055,7 +1023,7 @@ class State:
                             # the previous stack is simply discarded
                             continue
                         else:
-                            runtime_error(layer.expr.callee.sl, 'calling non-callable object')
+                            runtime_error(layer.expr.sl, 'calling non-callable object')
                     # finish the (closure) call
                     else:
                         self.stack.pop()
@@ -1107,14 +1075,12 @@ class State:
         return (sys.getsizeof(self.store) - self._empty_store_size) // self._ref_size
 
     def _new(self, value: Value) -> int:
-        ''' heap space allocation '''
         if self.end < len(self.store):
             self.store[self.end] = value
-            value.location = self.end
         else:
             # the self.store array is managed by Python and will automatically grow
             self.store.append(value)
-            value.location = self.end
+        value.location = self.end
         self.end += 1
         return self.end - 1
 
@@ -1204,16 +1170,12 @@ class State:
                                 layer.env[i] = (layer.env[i][0], relocation[layer.env[i][1]])
                         if layer.local:
                             for name, value in layer.local.items():
-                                if type(value) == Closure:
-                                    reloc(value)
-                                elif type(value) == Continuation:
-                                    reloc(value)
-                                elif type(value) == list:
+                                if type(value) == list:
                                     for elem in value:
-                                        if type(elem) == Closure:
+                                        if type(elem) in (Closure, Continuation):
                                             reloc(elem)
-                                        elif type(elem) == Continuation:
-                                            reloc(elem)
+                                elif type(value) in (Closure, Continuation):
+                                    reloc(value)
 
         reloc(self.value)
         reloc(Continuation(self.stack))
@@ -1221,7 +1183,6 @@ class State:
             reloc(self.store[i])
 
     def _gc(self) -> int:
-        ''' mark-and-sweep garbage collection '''
         visited_locations = self._mark()
         removed, relocation = self._sweep_and_compact(visited_locations)
         self._relocate(relocation)
@@ -1230,10 +1191,7 @@ class State:
 ### main
 
 def run_code(source: str) -> Value:
-    tokens = lex(source)
-    tree = parse(tokens)
-    state = State(tree)
-    return state.execute().value
+    return State(parse(lex(source))).execute().value
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
