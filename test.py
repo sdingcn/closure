@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from typing import Callable
 
 def run_and_read(cmd: str, inp: str) -> str:
     return subprocess.run(cmd,
@@ -9,32 +10,28 @@ def run_and_read(cmd: str, inp: str) -> str:
         timeout = 60
     ).stdout
 
-def check_io_expr(path: str, i: str, o: str) -> bool:
-    try:
-        raw_o = run_and_read(['python3', 'src/exprscript.py', path], i)
-    except subprocess.TimeoutExpired:
-        sys.stderr.write('*** Timeout expired\n')
-        return False
-    if raw_o != o:
-        sys.stderr.write(f'*** Expected: [{o}], Got: [{raw_o}]\n')
-        return False
-    return True
-
-def check_io_py(path: str, i: str, o: str) -> bool:
-    try:
-        raw_o = run_and_read(['python3', path], i)
-    except subprocess.TimeoutExpired:
-        sys.stderr.write('*** Timeout expired\n')
-        return False
-    if raw_o != o:
-        sys.stderr.write(f'*** Expected: [{o}], Got: [{raw_o}]\n')
-        return False
-    return True
+def check_io(batch: str) -> Callable:
+    if batch == 'expr':
+        prefix = ['python3', 'src/exprscript.py']
+    elif batch == 'py':
+        prefix = ['python3']
+    else:
+        sys.exit(f'*** Unknown batch {batch}')
+    def checker(path: str, i: str, o: str) -> bool:
+        try:
+            raw_o = run_and_read(prefix + [path], i)
+        except subprocess.TimeoutExpired:
+            sys.stderr.write('*** Timeout expired\n')
+            return False
+        if raw_o != o:
+            sys.stderr.write(f'*** Expected: [{o}], Got: [{raw_o}]\n')
+            return False
+        return True
+    return checker
 
 def main():
-    expr_tests = [
+    tests = [
         ('test/average.expr', '', '500943/77000\n'),
-
         ('test/binary-tree.expr', '',
 '''\
 1
@@ -44,9 +41,7 @@ def main():
 5
 <void>
 '''),
-
         ('test/comprehensive.expr', '', '0\n1\n' * 15),
-        
         ('test/coroutines.expr', '',
 '''\
 main
@@ -57,15 +52,12 @@ main
 task 3
 <void>
 '''),
-
         ('test/gcd.expr', '100\n0\n', '100\n<void>\n'),
         ('test/gcd.expr', '0\n100\n', '100\n<void>\n'),
         ('test/gcd.expr', '30\n30\n', '30\n<void>\n'),
         ('test/gcd.expr', '25\n45\n', '5\n<void>\n'),
         ('test/gcd.expr', '7\n100\n', '1\n<void>\n'),
-
         ('test/intensive.expr', '', '50005000\n'),
-
         ('test/lazy-evaluation.expr', '',
 '''\
 3
@@ -74,9 +66,7 @@ task 3
 thunk
 <void>
 '''),
-
         ('test/scope.expr', '', '1\n303\n<void>\n'),
-
         ('test/multi-stage.expr', '',
 '''\
 EVAL
@@ -84,7 +74,6 @@ hello world
 hello world
 <void>
 '''),
-
         ('test/oop.expr', '',
 '''\
 1
@@ -93,28 +82,16 @@ hello world
 2
 <void>
 '''),
-
-        ('test/y-combinator.expr', '', '1 120 3628800\n<void>\n')
+        ('test/y-combinator.expr', '', '1 120 3628800\n<void>\n'),
+        ('src/interaction-examples.py', '', '-5\neman\n')
     ]
-    py_tests = [
-        ('src/interaction.py', '', '-5\neman\n')
-    ]
-    cnt = 0
-    for test in expr_tests:
-        cnt += 1
+    for i, test in enumerate(tests):
         sys.stderr.write(f'====================\n')
-        sys.stderr.write(f'Running on test {cnt}\n')
-        ok = check_io_expr(*test)
+        sys.stderr.write(f'Running on test {i + 1}\n')
+        ok = check_io(test[0].split('.')[-1])(*test)
         if not ok:
-            sys.exit(f'*** Failed on test {cnt}')
-    for test in py_tests:
-        cnt += 1
-        sys.stderr.write(f'====================\n')
-        sys.stderr.write(f'Running on test {cnt}\n')
-        ok = check_io_py(*test)
-        if not ok:
-            sys.exit(f'*** Failed on test {cnt}')
-    sys.stderr.write(f'\nPassed all {cnt} tests\n')
+            sys.exit(f'*** Failed on test {i + 1}')
+    sys.stderr.write(f'\nPassed all {i + 1} tests\n')
 
 if __name__ == '__main__':
     main()

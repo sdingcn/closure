@@ -306,14 +306,13 @@ def parse(tokens: deque[Token]) -> ExprNode:
             s = s[1:]
         if '/' in s:
             parts = s.split('/')
-            node = NumberNode(token.sl, sign * int(parts[0]), int(parts[1]))
+            return NumberNode(token.sl, sign * int(parts[0]), int(parts[1]))
         elif '.' in s:
             parts = s.split('.')
             depth = len(parts[1])
-            node = NumberNode(token.sl, sign * (int(parts[0]) * (10 ** depth) + int(parts[1])), 10 ** depth)
+            return NumberNode(token.sl, sign * (int(parts[0]) * (10 ** depth) + int(parts[1])), 10 ** depth)
         else:
-            node = NumberNode(token.sl, sign * int(s), 1)
-        return node
+            return NumberNode(token.sl, sign * int(s), 1)
 
     def parse_string() -> StringNode:
         token = consume(is_string_token)
@@ -338,8 +337,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
                     parser_error(token.sl, 'incomplete escape sequence')
             else:
                 s += char
-        node = StringNode(token.sl, s)
-        return node
+        return StringNode(token.sl, s)
 
     def parse_intrinsic() -> IntrinsicNode:
         token = consume(is_intrinsic_token)
@@ -356,8 +354,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         consume(lambda t: t.src == '{')
         expr = parse_expr()
         consume(lambda t: t.src == '}')
-        node = LambdaNode(start.sl, var_list, expr)
-        return node
+        return LambdaNode(start.sl, var_list, expr)
 
     def parse_letrec() -> LetrecNode:
         start = consume(lambda t: t.src == 'letrec')
@@ -372,8 +369,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         consume(lambda t: t.src == '{')
         expr = parse_expr()
         consume(lambda t: t.src == '}')
-        node = LetrecNode(start.sl, var_expr_list, expr)
-        return node
+        return LetrecNode(start.sl, var_expr_list, expr)
 
     def parse_if() -> IfNode:
         start = consume(lambda t: t.src == 'if')
@@ -382,13 +378,11 @@ def parse(tokens: deque[Token]) -> ExprNode:
         branch1 = parse_expr()
         consume(lambda t: t.src == 'else')
         branch2 = parse_expr()
-        node = IfNode(start.sl, cond, branch1, branch2)
-        return node
+        return IfNode(start.sl, cond, branch1, branch2)
 
     def parse_variable() -> VariableNode:
         token = consume(is_variable_token)
-        node = VariableNode(token.sl, token.src)
-        return node
+        return VariableNode(token.sl, token.src)
 
     def parse_call() -> CallNode:
         start = consume(lambda t: t.src == '(')
@@ -401,8 +395,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         while tokens and tokens[0].src != ')':
             arg_list.append(parse_expr())
         consume(lambda t: t.src == ')')
-        node = CallNode(start.sl, callee, arg_list)
-        return node
+        return CallNode(start.sl, callee, arg_list)
 
     def parse_sequence() -> SequenceNode:
         start = consume(lambda t: t.src == '[')
@@ -412,25 +405,22 @@ def parse(tokens: deque[Token]) -> ExprNode:
         if len(expr_list) == 0:
             parser_error(start.sl, 'zero-length sequence')
         consume(lambda t: t.src == ']')
-        node = SequenceNode(start.sl, expr_list)
-        return node
+        return SequenceNode(start.sl, expr_list)
 
     def parse_query() -> QueryNode:
         start = consume(lambda t: t.src == '@')
         var = parse_variable()
         if var.is_lex():
             expr = parse_expr()
-            node = QueryNode(start.sl, var, [expr])
+            return QueryNode(start.sl, var, [expr])
         else:
-            node = QueryNode(start.sl, var, [])
-        return node
+            return QueryNode(start.sl, var, [])
 
     def parse_access() -> AccessNode:
         start = consume(lambda t: t.src == '&')
         var = parse_variable()
         expr = parse_expr()
-        node = AccessNode(start.sl, var, expr)
-        return node
+        return AccessNode(start.sl, var, expr)
 
     def parse_expr() -> ExprNode:
         if not tokens:
@@ -595,7 +585,7 @@ class Layer:
         self.tail = tail
         # program counter (the pc-th step of evaluating this expression)
         self.pc = 0
-        # temporary variables for this layer, which can only hold Values of lists of Values
+        # temporary variables for this layer, which can only hold Values or lists of Values
         self.local = {}
 
 class Continuation(Value):
@@ -640,11 +630,9 @@ class State:
     '''The class for the complete execution state'''
 
     def __init__(self, expr: ExprNode):
-        # stack
-        ## tail call optimization never removes the main frame
-        self.stack = [Layer([], None, frame = True)]
-        ## layer.tail == False for the first layer
-        self.stack.append(Layer(self.stack[0].env, expr))
+        # stack (tail call optimization never removes the main frame)
+        main_env = []
+        self.stack = [Layer(main_env, None, frame = True), Layer(main_env, expr)]
         # heap
         self.store = []
         self.end = 0
@@ -938,8 +926,7 @@ class State:
                             self.value = Number(isinstance(args[0], Continuation))
                         elif intrinsic == '.eval':
                             check_or_exit(layer.expr.sl, args, [String])
-                            arg = args[0]
-                            self.value = run_code(arg.value)
+                            self.value = run_code(args[0].value)
                         elif intrinsic == '.exit':
                             check_or_exit(layer.expr.sl, args, [])
                             # the interpreter returns 0
