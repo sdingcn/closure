@@ -1,12 +1,11 @@
 # exprscript
 
-[中文 README](README-CN.md)
-
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
-ExprScript is a dynamically typed functional programming language.
+ExprScript 是一个动态类型函数式语言.
+(ExprScript is a dynamically typed functional programming language.)
 
-+ Small core, rich features
++ 小核心, 丰富的表达力 (Small core, rich expressiveness)
 
 | Feature | Implementation |
 | --- | --- |
@@ -16,38 +15,19 @@ ExprScript is a dynamically typed functional programming language.
 | Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
 | Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
-+ Native support for full-precision rational numbers
++ 原生支持全精度有理数 (Natively support full-precision rational numbers)
 
-```
-$ cat test/average.expr
-letrec (sum = (.+ 100/11 61 +15/7 1.355 -41.06)) { (./ sum 5) }
-$ python3 src/exprscript.py test/average.expr
-500943/77000
-```
+[test/average.expr](test/average.expr)
 
-+ Natural interactions with Python
++ 与 Python 的互相调用 (Mutual invocations with Python)
 
-```python
-import exprscript as es
+[src/interaction-examples.py](src/interaction-examples.py)
 
-if __name__ == '__main__':
-
-    # call ExprScript function from Python
-    code = '(.reg "plus1" lambda (x) { (.+ x 1) })'
-    state = es.State(es.parse(es.lex(code)))
-    print(state.execute().call_expr_function("plus1", [-6])) # -5
-
-    # call Python function from ExprScript
-    code = '(.py "rev" (.str+ "na" "me"))'
-    state = es.State(es.parse(es.lex(code)))
-    print(state.register_py_function("rev", lambda s: s[::-1]).execute().value.value) # "eman"
-```
-
-## dependencies
+## 依赖 (dependencies)
 
 Python >= 3.9
 
-## syntax and semantics
+## 语法和语义 (syntax and semantics)
 
 ```
 <comment> := #.*?\n
@@ -84,15 +64,22 @@ Python >= 3.9
         | & <lexical-variable> <expr>        // access a variable in a closure's env
 ```
 
-Supported object types: Void, Number, String, Closure, Continuation.
+支持的对象类型: Void, Number, String, Closure, Continuation.
+函数默认不柯里化.
+对象不可变.
+变量是指向对象的引用且一旦绑定就不可变.
+尾调用优化自动应用.
+垃圾回收自动运行.
+一些运行时信息会被写到标准错误.
+(Supported object types: Void, Number, String, Closure, Continuation.
 Functions are not curried by default.
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
-Tail call optimization is automatically applied.
-(Mark-and-sweep) garbage collection (GC) automatically runs.
-Some runtime information will be written to `stderr`.
+Tail call optimization automatically applies.
+Garbage collection automatically runs.
+Some runtime information will be written to `stderr`.)
 
-## usage
+## 用法 (usage)
 
-+ `python3 src/exprscript.py <file>` runs code in `<file>`.
-+ `python3 test.py` runs all tests (see [test.py](test.py) for inputs/outputs for each test).
++ `python3 src/exprscript.py <file>`
++ `python3 test.py`

@@ -1149,7 +1149,7 @@ if __name__ == '__main__':
         import resource
         ru = resource.getrusage(resource.RUSAGE_SELF)
         sys.stderr.write(
-            f'[Note] User time (seconds) = {round(ru.ru_utime, 3)}\n'
-            f'[Note] System time (seconds) = {round(ru.ru_stime, 3)}\n'
-            f'[Note] Peak memory (MiB) = {round(ru.ru_maxrss / 1048576, 3)}\n'
+            f'[Note] user time (seconds) = {round(ru.ru_utime, 3)}\n'
+            f'[Note] system time (seconds) = {round(ru.ru_stime, 3)}\n'
+            f'[Note] peak memory (MiB) = {round(ru.ru_maxrss / 1048576, 3)}\n'
         )
