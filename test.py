@@ -29,7 +29,7 @@ def check_io(batch: str) -> Callable:
         return True
     return checker
 
-def main():
+if __name__ == '__main__':
     tests = [
         ('test/average.expr', '', '500943/77000\n'),
         ('test/binary-tree.expr', '',
@@ -40,7 +40,7 @@ def main():
 4
 5
 '''),
-        ('test/comprehensive.expr', '', '0\n1\n' * 15),
+        ('test/comprehensive.expr', '', '01' * 17),
         ('test/coroutines.expr', '',
 '''\
 main
@@ -63,7 +63,6 @@ task 3
 1
 thunk
 '''),
-        ('test/scope.expr', '', '1\n303\n'),
         ('test/multi-stage.expr', '',
 '''\
 EVAL
@@ -89,13 +88,8 @@ str
         ('src/interaction-examples.py', '', '-5\neman\n')
     ]
     for i, test in enumerate(tests):
-        sys.stderr.write('{{{\n')
-        sys.stderr.write(f'Running on test {i + 1}\n')
-        ok = check_io(test[0].split('.')[-1])(*test)
-        if not ok:
+        sys.stderr.write(f'(\nRunning on test {i + 1}\n')
+        if not check_io(test[0].split('.')[-1])(*test):
             sys.exit(f'*** Failed on test {i + 1}')
-        sys.stderr.write('}}}\n')
+        sys.stderr.write(')\n')
     sys.stderr.write(f'\nPassed all {i + 1} tests\n')
-
-if __name__ == '__main__':
-    main()

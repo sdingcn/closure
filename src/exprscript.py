@@ -4,7 +4,7 @@ from collections import deque
 from typing import Union, Callable
 from copy import deepcopy
 
-### helper functions
+### helper functions and classes
 
 def quote(literal: str) -> str:
     ret = '"'
@@ -16,15 +16,11 @@ def quote(literal: str) -> str:
     return ret
 
 def gcd(a: int, b: int) -> int:
-    if b == 0:
-        return a
-    return gcd(b, a % b)
-
-### lexer
+    return a if b == 0 else gcd(b, a % b)
 
 class SourceLocation:
 
-    def __init__(self, line: int, col: int):
+    def __init__(self, line: int = 1, col: int = 1):
         self.line = line
         self.col = col
 
@@ -32,6 +28,17 @@ class SourceLocation:
         if self.line <= 0 or self.col <= 0:
             return f'(SourceLocation N/A)'
         return f'(SourceLocation {self.line} {self.col})'
+
+    def revert(self) -> None:
+        self.line = 1
+        self.col = 1
+
+    def update(self, char: str) -> None:
+        if char == '\n':
+            self.line += 1
+            self.col = 1
+        else:
+            self.col += 1
 
 def lexer_error(sl: SourceLocation, msg: str) -> None:
     sys.exit(f'[Lexer Error {sl}] {msg}')
@@ -42,6 +49,8 @@ def parser_error(sl: SourceLocation, msg: str) -> None:
 def runtime_error(sl: SourceLocation, msg: str) -> None:
     sys.exit(f'[Runtime Error {sl}] {msg}')
 
+### lexer
+
 class Token:
 
     def __init__(self, sl: SourceLocation, src: str):
@@ -49,7 +58,6 @@ class Token:
         self.src = src
 
 def lex(source: str) -> deque[Token]:
-    # only support these characters in source code
     charset = set(
         "abcdefghijklmnopqrstuvwxyz"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -57,36 +65,27 @@ def lex(source: str) -> deque[Token]:
         "`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?"
         " \t\n"
     )
-    line, col = 1, 1
+    number_regex = re.compile(
+        r'''
+        [+-]?
+        (
+            (0|[1-9][0-9]*) |
+            ((0|[1-9][0-9]*)\.([0-9]*[1-9])) | 
+            ((0|[1-9][0-9]*)/([1-9][0-9]*))
+        )
+        '''.replace(' ', '').replace('\n', '')
+    )
+    sl = SourceLocation()
     for char in source:
         if char not in charset:
-            lexer_error(SourceLocation(line, col), 'unsupported character')
-        if char == '\n':
-            line += 1
-            col = 1
-        else:
-            col += 1
-
-    # number format regular expressions
-    re_hd_non0 = re.compile("[1-9][0-9]*")
-    re_tl_non0 = re.compile("[0-9]*[1-9]")
-
-    def is_number_literal(s: str) -> bool:
-        if len(s) and s[0] in ('-', '+'):
-            s = s[1:]
-        if '/' in s:
-            parts = s.split('/')
-            return len(parts) == 2 and (parts[0] == '0' or re_hd_non0.fullmatch(parts[0])) and re_hd_non0.fullmatch(parts[1])
-        elif '.' in s:
-            parts = s.split('.')
-            return len(parts) == 2 and (parts[0] == '0' or re_hd_non0.fullmatch(parts[0])) and re_tl_non0.fullmatch(parts[1])
-        else:
-            return s == '0' or re_hd_non0.fullmatch(s)
+            lexer_error(sl, 'unsupported character')
+        sl.update(char)
+    sl.revert()
+    chars = deque(source)
 
     def count_trailing_escape(s: str) -> int:
-        l = len(s)
         cnt = 0
-        pos = l - 1
+        pos = len(s) - 1
         while pos >= 0:
             if s[pos] == '\\':
                 cnt += 1
@@ -95,79 +94,60 @@ def lex(source: str) -> deque[Token]:
                 break
         return cnt
 
-    # token stream
-    chars = deque(source)
-    line, col = 1, 1
-
     def next_token() -> Union[None, Token]:
-        nonlocal line, col
         # skip whitespaces
         while chars and chars[0].isspace():
-            space = chars.popleft()
-            if space == '\n':
-                line += 1
-                col = 1
-            else:
-                col += 1
+            sl.update(chars.popleft())
         # read the next token
         if chars:
-            sl = SourceLocation(line, col)
+            sl_copy = deepcopy(sl)
+            src = ''
             # number literal
             if chars[0].isdigit() or chars[0] in ('-', '+'):
-                src = ''
                 while chars and (chars[0].isdigit() or (chars[0] in ('-', '+', '.', '/'))):
                     src += chars.popleft()
-                    col += 1
-                if not is_number_literal(src):
+                    sl.update(src[-1])
+                if not number_regex.fullmatch(src):
                     lexer_error(sl, 'invalid number literal')
             # variable / keyword
             elif chars[0].isalpha():
-                src = ''
                 while chars and (chars[0].isalpha() or chars[0].isdigit() or chars[0] == '_'):
                     src += chars.popleft()
-                    col += 1
+                    sl.update(src[-1])
             # intrinsic
             elif chars[0] == '.':
-                src = ''
                 while chars and (not (chars[0].isspace() or chars[0] == ')')):
                     src += chars.popleft()
-                    col += 1
+                    sl.update(src[-1])
             # special symbol
             elif chars[0] in ('(', ')', '{', '}', '[', ']', '=', '@', '&'):
-                src = chars.popleft()
-                col += 1
+                src += chars.popleft()
+                sl.update(src[-1])
             # string literal
             elif chars[0] == '"':
-                src = chars.popleft()
-                col += 1
+                src += chars.popleft()
+                sl.update(src[-1])
                 while chars and (chars[0] != '"' or (chars[0] == '"' and count_trailing_escape(src) % 2 != 0)):
                     # All original characters are kept, including real newlines (not escape sequences like "\n").
                     src += chars.popleft()
-                    if src[-1] == '\n':
-                        line += 1
-                        col = 1
-                    else:
-                        col += 1
+                    sl.update(src[-1])
                 if chars and chars[0] == '"':
                     src += chars.popleft()
-                    col += 1
+                    sl.update(src[-1])
                 else:
                     lexer_error(sl, 'incomplete string literal')
             # comment
             elif chars[0] == '#':
-                chars.popleft()
-                col += 1
+                sl.update(chars.popleft())
                 while chars and chars[0] != '\n':
-                    chars.popleft()
-                    col += 1
+                    sl.update(chars.popleft())
                 # next_token() will consume the newline character.
                 return next_token()
             else:
                 lexer_error(sl, 'unsupported token starting character')
-            token = Token(sl, src)
-            return token
+            return Token(sl_copy, src)
+        # end of character stream
         else:
-            # end of character stream
             return None
 
     # lexer entry
@@ -269,7 +249,6 @@ class AccessNode(ExprNode):
         self.expr = expr
 
 def parse(tokens: deque[Token]) -> ExprNode:
-    # token checkers
 
     def is_number_token(token: Token) -> bool:
         return len(token.src) and (token.src[0].isdigit() or token.src[0] in ('-', '+'))
@@ -283,8 +262,6 @@ def parse(tokens: deque[Token]) -> ExprNode:
     def is_variable_token(token: Token) -> bool:
         return len(token.src) and token.src[0].isalpha()
 
-    # token consumer
-
     def consume(predicate: Callable) -> Token:
         if not tokens:
             parser_error(SourceLocation(-1, -1), 'incomplete token stream')
@@ -292,8 +269,6 @@ def parse(tokens: deque[Token]) -> ExprNode:
         if not predicate(token):
             parser_error(token.sl, 'unexpected token')
         return token
-
-    # parsers
 
     def parse_number() -> NumberNode:
         token = consume(is_number_token)
@@ -662,7 +637,7 @@ class State:
         if type(self.value) == String:
             return self.value.value
         elif type(self.value) == Number:
-            return self.value.to_int(SourceLocation(-1, -1))
+            return self.value.to_int(sl)
         else:
             runtime_error(sl, 'ExprScript returned a non-String non-Number result')
 

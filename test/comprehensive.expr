@@ -1,61 +1,81 @@
-letrec (
-  putln = lambda (value) { (.put value "\n") }
-) {
-  [
-    # integer literals
-    (putln -0)
-    (putln +1)
-    # string literals and comments
-    (putln "0") ## message 0
-    (putln "1")
-    (putln "0\n1")
-    (putln "0
-1")
-    # variables
-    letrec (x = 0 Y = 1) {
-      [
-        (putln x)
-        (putln Y)
-      ]
+[
+  # number literals
+  (.put -0)
+  (.put +101/101)
+  # string literals and comments
+  (.put "0") ## message 0
+  (.put "1")
+  (.put "01")
+  # variables and scopes
+  letrec (
+    f = letrec (lex = 0 Dyn = 0) {
+      lambda () { [(.put lex) (.put Dyn)] }
     }
-    # letrec
-    letrec (
-      f = lambda (n) {
-        if (.== n 0) then (.void)
-        else [(putln 0) (g (.- n 1))]
-      }
-      g = lambda (n) {
-        if (.== n 0) then (.void)
-        else [(putln 1) (f (.- n 1))]
-      }
-    ) {
-      (f 6)
+  ) {
+    letrec (lex = 1 Dyn = 1) { (f) }
+  }
+  # lambdas
+  (.put
+    (lambda (x) { 0 } (.void))
+  )
+  (.put
+    letrec (f = lambda () { 1 }) { (f) }
+  )
+  # letrec
+  letrec (
+    f = lambda (n) {
+      if (.== n 0) then (.void)
+      else [(.put 0) (g (.- n 1))]
     }
-    # if
-    if 0 then (putln "1") else (putln "0")
-    if -1 then (putln "1") else (putln "0")
-    # function call
-    (putln (lambda (x) { (.+ x 1 0) } -1))
-    # intrinsic call
-    (putln (.*))
-    # sequence
-    (putln [1 0])
-    (putln [0 1])
-    [(putln 0) (putln 1)]
-    # lex query
-    (putln @y letrec (x = 1) { lambda () { (.void) } })
-    (putln @x letrec (x = 1) { lambda () { (.void) } })
-    # dyn query
-    letrec (queryY = lambda () { (putln @Y) }) {
-      [
-        (lambda (Y) { (queryY) } 0)
-        (lambda (Y) { [(queryY) 1] } 0)
-      ]
+    g = lambda (n) {
+      if (.== n 0) then (.void)
+      else [(.put 1) (f (.- n 1))]
     }
-    # var access
-    letrec (f = letrec (v = 0) { lambda () { (.void) } }) {
-      (putln &v f)
+  ) {
+    (f 6)
+  }
+  # if
+  if 0 then (.put "1") else (.put "0")
+  if -1.3 then (.put "1") else (.put "0")
+  # function call
+  (.put
+    (lambda (x) { (.+ x 1 0) } -1)
+  )
+  (.put
+    ((lambda () { lambda () { 1 } }))
+  )
+  # intrinsic call
+  (.put (.+))
+  (.put (.strlen "s"))
+  (.put (.cont? ""))
+  (.put (.eval "100/100"))
+  # sequence
+  (.put [1 0])
+  (.put [0 1])
+  [(.put 0) (.put 1)]
+  # lex query
+  (.put
+    @y letrec (x = 1) {
+      lambda () { (.void) }
     }
-    (putln 1)
-  ]
-}
+  )
+  (.put
+    @x letrec (x = 1) {
+      lambda () { (.void) }
+    }
+  )
+  # dyn query
+  letrec (queryY = lambda () { (.put @Y) }) {
+    [
+      (lambda (Y) { (queryY) } 0)
+      (lambda (Y) { [(queryY) 1] } 0)
+    ]
+  }
+  # var access
+  letrec (f = letrec (v = 0) { lambda () { (.void) } }) {
+    (.put &v f)
+  }
+  (.put
+    &v (lambda (v) { lambda () { 0 } } 1)
+  )
+]

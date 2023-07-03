@@ -5,7 +5,7 @@
 ExprScript 是一个动态类型函数式语言.
 (ExprScript is a dynamically typed functional programming language.)
 
-+ 小核心, 丰富的表达力 (Small core, rich expressiveness)
+#### 小核心, 丰富表达力 (Small core, rich expressiveness)
 
 | Feature | Implementation |
 | --- | --- |
@@ -15,11 +15,11 @@ ExprScript 是一个动态类型函数式语言.
 | Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
 | Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
-+ 原生支持全精度有理数 (Natively support full-precision rational numbers)
+#### 支持全精度有理数 (Support full-precision rational numbers)
 
 [test/average.expr](test/average.expr)
 
-+ 与 Python 的互相调用 (Mutual invocations with Python)
+#### 与 Python 的交互 (Interactions with Python)
 
 [src/interaction-examples.py](src/interaction-examples.py)
 
@@ -68,18 +68,18 @@ Python >= 3.9
 函数默认不柯里化.
 对象不可变.
 变量是指向对象的引用且一旦绑定就不可变.
-尾调用优化自动应用.
-垃圾回收自动运行.
+支持尾调用优化和垃圾回收.
 一些运行时信息会被写到标准错误.
 (Supported object types: Void, Number, String, Closure, Continuation.
 Functions are not curried by default.
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
-Tail call optimization automatically applies.
-Garbage collection automatically runs.
+Tail call optimization and garbage collection are supported.
 Some runtime information will be written to `stderr`.)
 
 ## 用法 (usage)
 
-+ `python3 src/exprscript.py <file>`
-+ `python3 test.py`
+```
+python3 src/exprscript.py <file>
+python3 test.py
+```
