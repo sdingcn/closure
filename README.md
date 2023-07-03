@@ -30,12 +30,10 @@ Python >= 3.9
 ## 语法和语义 (syntax and semantics)
 
 ```
-<comment> := #.*?\n
-<head-nonzero> := [1-9][0-9]*
-<tail-nonzero> := [0-9]*[1-9]
-<number> := [+-]?0 | [+-]?<head-nonzero>
-          | [+-]?0.<tail-nonzero> | [+-]?<head-nonzero>.<tail-nonzero>
-          | [+-]?0/<head-nonzero> | [+-]?<head-nonzero>/<head-nonzero>
+<comment> := #.*\n
+<number> := [+-]?0 | [+-]?[1-9][0-9]*
+          | [+-]?0\.[0-9]*[1-9] | [+-]?[1-9][0-9]*\.[0-9]*[1-9]
+          | [+-]?0/[1-9][0-9]* | [+-]?[1-9][0-9]*/[1-9][0-9]*
 <string> := "( [^"\] | \" | \\ | \t | \n )*"     // charset is English keyboard
 <lexical-variable> := [a-z][a-zA-Z0-9_]*         // lexically scoped variable
 <dynamic-variable> := [A-Z][a-zA-Z0-9_]*         // dynamically scoped variable
@@ -46,10 +44,8 @@ Python >= 3.9
              | .and | .or | .not             // for simplicity use numbers as Booleans
              | .strlen | .strcut | .str+ | .strnum | .strquote
              | .str< | .str<= | .str> | .str>= | .str== | .str!= 
-             | .getline | .put               // stdin and stdout supports
              | .void? | .num? | .str? | .clo? | .cont?
-             | .call/cc | .eval | .exit
-             | .py | .reg                    // Python interaction
+             | .getline | .put | .call/cc | .eval | .exit | .py | .reg
 <binding> := <variable> = <expr>
 <callee> := <intrinsic> | <expr>
 <query-body> := <dynamic-variable>           // Is it defined here?

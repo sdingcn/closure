@@ -3,6 +3,7 @@ import re
 from collections import deque
 from typing import Union, Callable
 from copy import deepcopy
+from functools import reduce
 
 ### helper functions and classes
 
@@ -249,18 +250,10 @@ class AccessNode(ExprNode):
         self.expr = expr
 
 def parse(tokens: deque[Token]) -> ExprNode:
-
-    def is_number_token(token: Token) -> bool:
-        return len(token.src) and (token.src[0].isdigit() or token.src[0] in ('-', '+'))
-
-    def is_string_token(token: Token) -> bool:
-        return len(token.src) and token.src[0] == '"'
-
-    def is_intrinsic_token(token: Token) -> bool:
-        return len(token.src) and token.src[0] == '.'
-
-    def is_variable_token(token: Token) -> bool:
-        return len(token.src) and token.src[0].isalpha()
+    is_number_token = lambda token: len(token.src) and (token.src[0].isdigit() or token.src[0] in ('-', '+'))
+    is_string_token = lambda token: len(token.src) and token.src[0] == '"'
+    is_intrinsic_token = lambda token: len(token.src) and token.src[0] == '.'
+    is_variable_token = lambda token: len(token.src) and token.src[0].isalpha()
 
     def consume(predicate: Callable) -> Token:
         if not tokens:
@@ -279,12 +272,11 @@ def parse(tokens: deque[Token]) -> ExprNode:
                 sign = -1
             s = s[1:]
         if '/' in s:
-            parts = s.split('/')
-            return NumberNode(token.sl, sign * int(parts[0]), int(parts[1]))
+            n, d = s.split('/')
+            return NumberNode(token.sl, sign * int(n), int(d))
         elif '.' in s:
-            parts = s.split('.')
-            depth = len(parts[1])
-            return NumberNode(token.sl, sign * (int(parts[0]) * (10 ** depth) + int(parts[1])), 10 ** depth)
+            n, d = s.split('.')
+            return NumberNode(token.sl, sign * (int(n) * (10 ** len(d)) + int(d)), 10 ** len(d))
         else:
             return NumberNode(token.sl, sign * int(s), 1)
 
@@ -446,19 +438,14 @@ class Void(Value):
 
 class Number(Value):
 
-    def __init__(self, n: Union[int, bool], d: int = None):
+    def __init__(self, n: Union[int, bool], d: Union[int, None] = None):
         self.location = None
         if type(n) == bool:
-            if n:
-                self.n = 1
-            else:
-                self.n = 0
+            self.n = 1 if n else 0
             self.d = 1
         else:
-            if d is None:
-                d = 1
             self.n = n
-            self.d = d
+            self.d = 1 if d is None else d
 
     def __str__(self) -> str:
         s = str(self.n)
@@ -544,7 +531,7 @@ class Closure(Value):
 class Layer:
     '''Each layer on the stack contains the (sub-)expression currently under evaluation.'''
 
-    def __init__(self, env: list[tuple[str, int]], expr: ExprNode, frame: bool = None, tail: bool = None):
+    def __init__(self, env: list[tuple[str, int]], expr: ExprNode, frame: Union[bool, None] = None, tail: Union[bool, None] = None):
         if frame is None:
             frame = False
         if tail is None:
@@ -559,7 +546,7 @@ class Layer:
         self.tail = tail
         # program counter (the pc-th step of evaluating this expression)
         self.pc = 0
-        # temporary variables for this layer, which can only hold Values or lists of Values
+        # temporary variables for this layer, where variables can only hold Values or lists of Values
         self.local = {}
 
 class Continuation(Value):
@@ -631,8 +618,7 @@ class State:
                 arg_list.append(NumberNode(sl, a, 1))
             else:
                 runtime_error(sl, 'Python can only use str/int as arguments when calling ExprScript functions')
-        call = CallNode(sl, callee, arg_list)
-        self.stack.append(Layer(self.stack[0].env, call))
+        self.stack.append(Layer(self.stack[0].env, CallNode(sl, callee, arg_list)))
         self.execute()
         if type(self.value) == String:
             return self.value.value
@@ -645,7 +631,7 @@ class State:
         # step counter
         counter = 0
 
-        # we just adjust "state.stack" and "stack.value"
+        # we just update "state.stack" and "stack.value"
         # the evaluation will automatically continue along the while loop
         while True:
 
@@ -697,8 +683,7 @@ class State:
                     for i in range(len(layer.expr.var_expr_list)):
                         layer.env.pop()
                     # we cannot pop this layer earlier,
-                    # because we need to revert the environment before popping it,
-                    # and reverting the environment will make the body expression's evaluation go wrong
+                    # because we need to revert the environment before popping it
                     self.stack.pop()
             elif type(layer.expr) == IfNode:
                 # evaluate the condition
@@ -751,17 +736,13 @@ class State:
                             self.value = Void()
                         elif intrinsic == '.+':
                             check_or_exit(layer.expr.sl, args, [Number] * len(args))
-                            self.value = Number(0)
-                            for a in args:
-                                self.value = self.value.add(a)
+                            self.value = reduce(lambda x, y: x.add(y), args, Number(0))
                         elif intrinsic == '.-':
                             check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = args[0].sub(args[1])
                         elif intrinsic == '.*':
                             check_or_exit(layer.expr.sl, args, [Number] * len(args))
-                            self.value = Number(1)
-                            for a in args:
-                                self.value = self.value.mul(a)
+                            self.value = reduce(lambda x, y: x.mul(y), args, Number(1))
                         elif intrinsic == './':
                             check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = args[0].div(args[1], layer.expr.sl)
@@ -794,16 +775,10 @@ class State:
                             self.value = Number(args[0].lt(args[1]) or args[1].lt(args[0]))
                         elif intrinsic == '.and':
                             check_or_exit(layer.expr.sl, args, [Number] * len(args))
-                            b = True
-                            for a in args:
-                                b = b and (a.n != 0)
-                            self.value = Number(b)
+                            self.value = Number(reduce(lambda x, y: x and (y.n != 0), args, True))
                         elif intrinsic == '.or':
                             check_or_exit(layer.expr.sl, args, [Number] * len(args))
-                            b = False
-                            for a in args:
-                                b = b or (a.n != 0)
-                            self.value = Number(b)
+                            self.value = Number(reduce(lambda x, y: x or (y.n != 0), args, False))
                         elif intrinsic == '.not':
                             check_or_exit(layer.expr.sl, args, [Number])
                             self.value = Number(args[0].n == 0)
@@ -817,10 +792,7 @@ class State:
                             self.value = String(args[0].value[args[1].n : args[2].n])
                         elif intrinsic == '.str+':
                             check_or_exit(layer.expr.sl, args, [String] * len(args))
-                            s = ""
-                            for a in args:
-                                s += a.value
-                            self.value = String(s)
+                            self.value = String(reduce(lambda x, y: x + y.value, args, ''))
                         elif intrinsic == '.str<':
                             check_or_exit(layer.expr.sl, args, [String, String])
                             self.value = Number(args[0].value < args[1].value)
@@ -867,10 +839,9 @@ class State:
                             check_or_exit(layer.expr.sl, args, [Closure])
                             self.stack.pop()
                             # obtain the continuation (this deepcopy will not copy the store)
-                            cont = Continuation(layer.expr.sl, deepcopy(self.stack))
+                            addr = self._new(Continuation(layer.expr.sl, deepcopy(self.stack)))
                             closure = args[0]
                             # make a closure call layer and pass in the continuation
-                            addr = cont.location if cont.location != None else self._new(cont)
                             self.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, frame = True))
                             # we already popped the stack in this case, so just continue the evaluation
                             continue
@@ -968,11 +939,10 @@ class State:
                             cont = callee
                             if len(args) != 1:
                                 runtime_error(layer.expr.sl, 'wrong number of arguments given to callee')
-                            # "self.value" already contains the last evaluation result of the args, so we just continue
+                            # "self.value" already contains the last evaluation result of the args
                             # replace the stack
                             self.stack = deepcopy(cont.stack)
                             # the stack has been replaced, so we don't need to pop the previous stack's call layer
-                            # the previous stack is simply discarded
                             continue
                         else:
                             runtime_error(layer.expr.sl, 'calling non-callable object')
@@ -1064,50 +1034,45 @@ class State:
 
     def _mark(self) -> set[int]:
         visited_locations = set()
-
-        def location_callback(location: int) -> None:
-            visited_locations.add(location)
-
-        self._traverse(lambda _: None, location_callback)
+        self._traverse(lambda _: None, lambda location: visited_locations.add(location))
         return visited_locations
 
     def _sweep_and_compact(self, visited_locations: set[int]) -> tuple[int, dict[int, int]]:
         removed = 0
-        # old location -> new location
-        relocation = {}
-        i = 0
-        j = 0
+        # maps old locations to new locations
+        relocation_dict = {}
+        i, j = 0, 0
         while j < self.end:
             if j in visited_locations:
                 self.store[i] = self.store[j]
                 self.store[i].location = i
-                relocation[j] = i
+                relocation_dict[j] = i
                 i += 1
             else:
                 removed += 1
             j += 1
         # adjust the next available location
         self.end = i
-        return (removed, relocation)
+        return (removed, relocation_dict)
     
-    def _relocate(self, relocation: dict[int, int]) -> None:
+    def _relocate(self, relocation_dict: dict[int, int]) -> None:
         
         def value_callback(value: Value) -> None:
             if type(value) == Closure:
                 for i in range(len(value.env)):
-                    value.env[i] = (value.env[i][0], relocation[value.env[i][1]])
+                    value.env[i] = (value.env[i][0], relocation_dict[value.env[i][1]])
             elif type(value) == Continuation:
                 for layer in value.stack:
                     if layer.frame:
                         for i in range(len(layer.env)):
-                            layer.env[i] = (layer.env[i][0], relocation[layer.env[i][1]])
+                            layer.env[i] = (layer.env[i][0], relocation_dict[layer.env[i][1]])
 
         self._traverse(value_callback, lambda _: None)
 
     def _gc(self) -> int:
         visited_locations = self._mark()
-        removed, relocation = self._sweep_and_compact(visited_locations)
-        self._relocate(relocation)
+        removed, relocation_dict = self._sweep_and_compact(visited_locations)
+        self._relocate(relocation_dict)
         return removed
         
 ### main

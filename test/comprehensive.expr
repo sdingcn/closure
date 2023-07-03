@@ -32,7 +32,7 @@
       else [(.put 1) (f (.- n 1))]
     }
   ) {
-    (f 6)
+    letrec () { (f 6) }
   }
   # if
   if 0 then (.put "1") else (.put "0")
