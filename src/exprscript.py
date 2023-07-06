@@ -7,15 +7,6 @@ from functools import reduce
 
 ### helper functions and classes
 
-def quote(literal: str) -> str:
-    ret = '"'
-    for char in literal:
-        if char in ('\\', '"'):
-            ret += '\\'
-        ret += char
-    ret += '"'
-    return ret
-
 def gcd(a: int, b: int) -> int:
     return a if b == 0 else gcd(b, a % b)
 
@@ -819,7 +810,13 @@ class State:
                             self.value = Number(node.n, node.d)
                         elif intrinsic == '.strquote':
                             check_or_exit(layer.expr.sl, args, [String])
-                            self.value = String(quote(args[0].value))
+                            quoted = '"'
+                            for char in args[0].value:
+                                if char in ('\\', '"'):
+                                    quoted += '\\'
+                                quoted += char
+                            quoted += '"'
+                            self.value = String(quoted)
                         elif intrinsic == '.getline':
                             check_or_exit(layer.expr.sl, args, [])
                             try:
