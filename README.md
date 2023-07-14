@@ -5,7 +5,7 @@
 ExprScript 是一个动态类型函数式语言.
 (ExprScript is a dynamically typed functional programming language.)
 
-#### 小核心, 丰富表达力 (Small core, rich expressiveness)
+#### 小核心 (Small core)
 
 | Feature | Implementation |
 | --- | --- |
@@ -15,7 +15,7 @@ ExprScript 是一个动态类型函数式语言.
 | Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
 | Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
-#### 支持全精度有理数 (Support full-precision rational numbers)
+#### 全精度有理数 (Full-precision rational numbers)
 
 [test/average.expr](test/average.expr)
 
@@ -23,11 +23,7 @@ ExprScript 是一个动态类型函数式语言.
 
 [src/interaction-examples.py](src/interaction-examples.py)
 
-## 依赖 (dependencies)
-
-Python >= 3.9
-
-## 语法和语义 (syntax and semantics)
+## 语法和语义 (Syntax and semantics)
 
 ```
 <comment> := #.*\n
@@ -73,7 +69,9 @@ Variables are references to objects and are immutable once bound.
 Tail call optimization and garbage collection are supported.
 Some runtime information will be written to `stderr`.)
 
-## 用法 (usage)
+## 依赖和用法 (Dependency and usage)
+
+Python >= 3.9
 
 ```
 python3 src/exprscript.py <file>

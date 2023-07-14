@@ -112,7 +112,7 @@ def lex(source: str) -> deque[Token]:
                     src += chars.popleft()
                     sl.update(src[-1])
             # special symbol
-            elif chars[0] in ('(', ')', '{', '}', '[', ']', '=', '@', '&'):
+            elif chars[0] in '(){}[]=@&':
                 src += chars.popleft()
                 sl.update(src[-1])
             # string literal
@@ -523,18 +523,14 @@ class Layer:
     '''Each layer on the stack contains the (sub-)expression currently under evaluation.'''
 
     def __init__(self, env: list[tuple[str, int]], expr: ExprNode, frame: Union[bool, None] = None, tail: Union[bool, None] = None):
-        if frame is None:
-            frame = False
-        if tail is None:
-            tail = False
         # environment (shared among layers in each frame) for the evaluation of the current expression
         self.env = env 
         # the current expression under evaluation
         self.expr = expr
         # whether this layer starts a frame (a closure call or the initial layer)
-        self.frame = frame
+        self.frame = False if frame is None else frame
         # whether this layer is in tail position (for tail call optimization)
-        self.tail = tail
+        self.tail = False if tail is None else tail
         # program counter (the pc-th step of evaluating this expression)
         self.pc = 0
         # temporary variables for this layer, where variables can only hold Values or lists of Values
