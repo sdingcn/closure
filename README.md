@@ -13,6 +13,7 @@ ExprScript is a dynamically typed functional programming language.
 [`eval`-based multi-stage evaluation](test/multi-stage.expr)\
 [Y-combinator](exprscript/test/y-combinator.expr)\
 [Full-precision rational numbers](test/average.expr)\
+[Inputs and outputs](test/gcd.expr)\
 [Interactions with Python](src/interaction-examples.py)
 
 Many ExprScript features are very dynamic and flexible, and I don't plan to add static type systems.
