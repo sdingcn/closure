@@ -94,20 +94,21 @@ ExprScript is very dynamic and flexible,
 so I won't add a complete static type system for the entire language.
 However, as future work I might add
 [Hindley-Milner-style type-inference / type-check](https://en.wikipedia.org/wiki/Hindley–Milner_type_system)
-for a subset of the language, where certain language constructs are forbidden.
+for a subset of the language, where certain language constructs will be forbidden.
+The typed sub-language will be activated by command line arguments.
 ```
 letrec (
-  f = lambda ([x : Number]) : Number {
+  f = lambda [-> Integer Integer] (x) {
     if (.> x 0) then 1
     else if (.== x 0) then 0
     else -1
   }
-  g = lambda (y) { # inferred as Any -> Any
+  g = lambda (y) { # inferred as [-> Any Any]
     y
   }
-  h = lambda ([z : Any -> Any] [t : Any]) : Any {
+  h = lambda [-> [-> Any Any] Any Any] (z t) {
     letrec (
-      [r : Any] = (g (z t))
+      r = (g (z t))
     ) {
       r
     }
