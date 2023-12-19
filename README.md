@@ -6,18 +6,13 @@ ExprScript is a dynamically typed functional programming language.
 
 #### Examples
 
-[&lambda;-based records](test/binary-tree.expr)
-
-[&lambda;-based object-oriented programming](test/oop.expr)
-
-[call/cc-based coroutines](test/coroutines.expr)
-
-[&lambda;-based lazy evaluation](test/lazy-evaluation.expr)
-
-[`eval`-based multi-stage evaluation](test/multi-stage.expr)
-
-[Full-precision rational numbers](test/average.expr)
-
+[&lambda;-based records](test/binary-tree.expr)\
+[&lambda;-based object-oriented programming](test/oop.expr)\
+[call/cc-based coroutines](test/coroutines.expr)\
+[&lambda;-based lazy evaluation](test/lazy-evaluation.expr)\
+[`eval`-based multi-stage evaluation](test/multi-stage.expr)\
+[Y-combinator](exprscript/test/y-combinator.expr)\
+[Full-precision rational numbers](test/average.expr)\
 [Interactions with Python](src/interaction-examples.py)
 
 ## Syntax and semantics
@@ -51,7 +46,8 @@ ExprScript is a dynamically typed functional programming language.
   | .strquote                                // "abc" -> "\"abc\""
   | .str< | .str<= | .str> | .str>=
   | .str== | .str!=
-  | .void? | .num? | .str? | .clo? | .cont?  // object type query (5 types of objects; all immutable)
+  | .void? | .num? | .str? | .clo? | .cont?  // object type query
+                                             // 5 types of objects; all immutable
   | .getline | .put                          // read/write from/to stdin/stdout
                                              // some runtime info is printed to stderr
   | .call/cc                                 // call with current continuation
@@ -59,7 +55,8 @@ ExprScript is a dynamically typed functional programming language.
   | .py                                      // call a py function from es
   | .reg                                     // register an es function to be used in py
 <binding> :=
-    <variable> = <expr>                      // vars are references to objects and cannot be re-bound
+    <variable> = <expr>                      // vars are references to objects
+                                             // vars cannot be re-bound
                                              // objects are managed by garbage collection
 <callee> :=
     <intrinsic>
