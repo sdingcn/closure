@@ -4,23 +4,21 @@
 
 ExprScript is a dynamically typed functional programming language.
 
-#### Small core
+#### Examples
 
-| Language feature | Implementation |
-| --- | --- |
-| Structures / Records ([test/binary-tree.expr](test/binary-tree.expr)) | Closures |
-| Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
-| Coroutines ([test/coroutines.expr](test/coroutines.expr)) | Continuations |
-| Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
-| Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
+[&lambda;-based records](test/binary-tree.expr)
 
-#### Full-precision rational numbers
+[&lambda;-based object-oriented programming](test/oop.expr)
 
-[test/average.expr](test/average.expr)
+[call/cc-based coroutines](test/coroutines.expr)
 
-#### Interactions with Python
+[&lambda;-based lazy evaluation](test/lazy-evaluation.expr)
 
-[src/interaction-examples.py](src/interaction-examples.py)
+[`eval`-based multi-stage evaluation](test/multi-stage.expr)
+
+[Full-precision rational numbers](test/average.expr)
+
+[Interactions with Python](src/interaction-examples.py)
 
 ## Syntax and semantics
 
@@ -53,14 +51,16 @@ ExprScript is a dynamically typed functional programming language.
   | .strquote                                // "abc" -> "\"abc\""
   | .str< | .str<= | .str> | .str>=
   | .str== | .str!=
-  | .void? | .num? | .str? | .clo? | .cont?  // object type testers
-  | .getline | .put
+  | .void? | .num? | .str? | .clo? | .cont?  // object type query (5 types of objects; all immutable)
+  | .getline | .put                          // read/write from/to stdin/stdout
+                                             // some runtime info is printed to stderr
   | .call/cc                                 // call with current continuation
   | .eval | .exit
   | .py                                      // call a py function from es
   | .reg                                     // register an es function to be used in py
 <binding> :=
-    <variable> = <expr>
+    <variable> = <expr>                      // vars are references to objects and cannot be re-bound
+                                             // objects are managed by garbage collection
 <callee> :=
     <intrinsic>
   | <expr>
@@ -74,18 +74,12 @@ ExprScript is a dynamically typed functional programming language.
   | lambda ( <variable>* ) { <expr> }        // anonymous functions
   | letrec ( <binding>* ) { <expr> }         // mutually recursive bindings
   | if <expr> then <expr> else <expr>
-  | ( <callee> <expr>* )
+  | ( <callee> <expr>* )                     // calls are not curried
+                                             // tail call optimization is applied
   | [ <expr>+ ]                              // sequence evaluation
   | @ <query-body>                           // whether a var is defined
   | & <lexical-variable> <expr>              // access a lex var in a closure's env
 ```
-
-Supported object types: Void, Number, String, Closure, Continuation.
-Functions are not curried by default.
-Objects are immutable.
-Variables are references to objects and are immutable once bound.
-Tail call optimization and garbage collection are supported.
-Some runtime information will be written to `stderr`.
 
 ## Dependency and usage
 
