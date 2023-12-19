@@ -91,23 +91,22 @@ python3 test.py
 ## (TODO) Static type system
 
 ExprScript is very dynamic and flexible,
-so I won't add a complete static type system.
-However, as future work I might add partial suppport for some
-[Hindley-Milner-style type-inference / type-check](https://en.wikipedia.org/wiki/Hindley–Milner_type_system) like the following.
-Inside `typedlambda` and `typedletrec` certain language constructs are forbidden, and
-any directly or indirectly referenced names must be defined by `typedlambda` or `typedletrec` as well.
+so I won't add a complete static type system for the entire language.
+However, as future work I might add
+[Hindley-Milner-style type-inference / type-check](https://en.wikipedia.org/wiki/Hindley–Milner_type_system)
+for a subset of the language, where certain language constructs are forbidden.
 ```
 letrec (
-  f = typedlambda ([x : Number]) : Number {
+  f = lambda ([x : Number]) : Number {
     if (.> x 0) then 1
     else if (.== x 0) then 0
     else -1
   }
-  g = typedlambda (y) { # inferred as Any -> Any
+  g = lambda (y) { # inferred as Any -> Any
     y
   }
-  h = typedlambda ([z : Any -> Any] [t : Any]) : Any {
-    typedletrec (
+  h = lambda ([z : Any -> Any] [t : Any]) : Any {
+    letrec (
       [r : Any] = (g (z t))
     ) {
       r
