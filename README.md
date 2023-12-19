@@ -94,7 +94,7 @@ ExprScript is very dynamic and flexible,
 so I won't add a complete static type system.
 However, as future work I might add partial suppport for
 [Hindley-Milner-style type-inference / type-check](https://en.wikipedia.org/wiki/Hindley–Milner_type_system) like the following.
-Inside `typedlambda` and `typedletrec` certain dynamic operations are forbidden, and
+Inside `typedlambda` and `typedletrec` certain language constructs are forbidden, and
 any directly or indirectly referenced names must be defined by `typedlambda` or `typedletrec` as well.
 ```
 letrec (
