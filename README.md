@@ -2,12 +2,11 @@
 
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
-ExprScript 是一个动态类型函数式语言.
-(ExprScript is a dynamically typed functional programming language.)
+ExprScript is a dynamically typed functional programming language.
 
-#### 小核心 (Small core)
+#### Small core
 
-| Feature | Implementation |
+| Language feature | Implementation |
 | --- | --- |
 | Structures / Records ([test/binary-tree.expr](test/binary-tree.expr)) | Closures |
 | Object-oriented programming ([test/oop.expr](test/oop.expr)) | Closures and dynamically scoped variables |
@@ -15,61 +14,80 @@ ExprScript 是一个动态类型函数式语言.
 | Lazy evaluation ([test/lazy-evaluation.expr](test/lazy-evaluation.expr)) | Zero-argument functions |
 | Multi-stage evaluation ([test/multi-stage.expr](test/multi-stage.expr)) | `eval` |
 
-#### 全精度有理数 (Full-precision rational numbers)
+#### Full-precision rational numbers
 
 [test/average.expr](test/average.expr)
 
-#### 与 Python 的交互 (Interactions with Python)
+#### Interactions with Python
 
 [src/interaction-examples.py](src/interaction-examples.py)
 
-## 语法和语义 (Syntax and semantics)
+## Syntax and semantics
 
 ```
-<comment> := #.*\n
-<number> := [+-]?0 | [+-]?[1-9][0-9]*
-          | [+-]?0\.[0-9]*[1-9] | [+-]?[1-9][0-9]*\.[0-9]*[1-9]
-          | [+-]?0/[1-9][0-9]* | [+-]?[1-9][0-9]*/[1-9][0-9]*
-<string> := "( [^"\] | \" | \\ | \t | \n )*"     // charset is English keyboard
-<lexical-variable> := [a-z][a-zA-Z0-9_]*         // lexically scoped variable
-<dynamic-variable> := [A-Z][a-zA-Z0-9_]*         // dynamically scoped variable
-<variable> := <lexical-variable> | <dynamic-variable>
-<intrinsic> := .void
-             | .+ | .- | .* | ./ | .% | .floor | .ceil
-             | .< | .<= | .> | .>= | .== | .!=
-             | .and | .or | .not             // for simplicity use numbers as Booleans
-             | .strlen | .strcut | .str+ | .strnum | .strquote
-             | .str< | .str<= | .str> | .str>= | .str== | .str!= 
-             | .void? | .num? | .str? | .clo? | .cont?
-             | .getline | .put | .call/cc | .eval | .exit | .py | .reg
-<binding> := <variable> = <expr>
-<callee> := <intrinsic> | <expr>
-<query-body> := <dynamic-variable>           // Is it defined here?
-              | <lexical-variable> <expr>    // Is it defined in the closure's environment?
-<expr> := <number> | <string> | <variable>
-        | lambda ( <variable>* ) { <expr> }
-        | letrec ( <binding>* ) { <expr> }
-        | if <expr> then <expr> else <expr>
-        | ( <callee> <expr>* )
-        | [ <expr>+ ]                        // sequence evaluation
-        | @ <query-body>                     // query whether a variable is defined
-        | & <lexical-variable> <expr>        // access a variable in a closure's env
+<comment> :=
+    #.*\n
+<number> :=                                  // integers, decimals, fractions
+    [+-]?0
+  | [+-]?[1-9][0-9]*
+  | [+-]?0\.[0-9]*[1-9]
+  | [+-]?[1-9][0-9]*\.[0-9]*[1-9]
+  | [+-]?0/[1-9][0-9]*
+  | [+-]?[1-9][0-9]*/[1-9][0-9]*
+<string> :=
+    "( [^"\] | \" | \\ | \t | \n )*"         // charset is English keyboard
+<lexical-variable> :=
+    [a-z][a-zA-Z0-9_]*                       // lexically scoped var
+<dynamic-variable> :=
+    [A-Z][a-zA-Z0-9_]*                       // dynamically scoped var
+<variable> :=
+    <lexical-variable>
+  | <dynamic-variable>
+<intrinsic> :=
+    .void
+  | .+ | .- | .* | ./ | .% | .floor | .ceil
+  | .< | .<= | .> | .>=
+  | .== | .!=
+  | .and | .or | .not                        // use 0/1 as Booleans
+  | .strlen | .strcut | .str+ | .strnum
+  | .strquote                                // "abc" -> "\"abc\""
+  | .str< | .str<= | .str> | .str>=
+  | .str== | .str!=
+  | .void? | .num? | .str? | .clo? | .cont?  // object type testers
+  | .getline | .put
+  | .call/cc                                 // call with current continuation
+  | .eval | .exit
+  | .py                                      // call a py function from es
+  | .reg                                     // register an es function to be used in py
+<binding> :=
+    <variable> = <expr>
+<callee> :=
+    <intrinsic>
+  | <expr>
+<query-body> :=
+    <dynamic-variable>                       // is var defined here?
+  | <lexical-variable> <expr>                // is var defined in the closure's env?
+<expr> :=
+    <number>
+  | <string>
+  | <variable>
+  | lambda ( <variable>* ) { <expr> }        // anonymous functions
+  | letrec ( <binding>* ) { <expr> }         // mutually recursive bindings
+  | if <expr> then <expr> else <expr>
+  | ( <callee> <expr>* )
+  | [ <expr>+ ]                              // sequence evaluation
+  | @ <query-body>                           // whether a var is defined
+  | & <lexical-variable> <expr>              // access a lex var in a closure's env
 ```
 
-支持的对象类型: Void, Number, String, Closure, Continuation.
-函数默认不柯里化.
-对象不可变.
-变量是指向对象的引用且一旦绑定就不可变.
-支持尾调用优化和垃圾回收.
-一些运行时信息会被写到标准错误.
-(Supported object types: Void, Number, String, Closure, Continuation.
+Supported object types: Void, Number, String, Closure, Continuation.
 Functions are not curried by default.
 Objects are immutable.
 Variables are references to objects and are immutable once bound.
 Tail call optimization and garbage collection are supported.
-Some runtime information will be written to `stderr`.)
+Some runtime information will be written to `stderr`.
 
-## 依赖和用法 (Dependency and usage)
+## Dependency and usage
 
 Python >= 3.9
 
