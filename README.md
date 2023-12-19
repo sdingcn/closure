@@ -4,7 +4,7 @@
 
 ExprScript is a dynamically typed functional programming language.
 
-#### Examples
+#### Code examples
 
 [&lambda;-based records](test/binary-tree.expr)\
 [&lambda;-based object-oriented programming](test/oop.expr)\
@@ -14,6 +14,8 @@ ExprScript is a dynamically typed functional programming language.
 [Y-combinator](exprscript/test/y-combinator.expr)\
 [Full-precision rational numbers](test/average.expr)\
 [Interactions with Python](src/interaction-examples.py)
+
+Many ExprScript features are very dynamic and flexible, and I don't plan to add static type systems.
 
 ## Syntax and semantics
 
