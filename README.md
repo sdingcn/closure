@@ -16,8 +16,6 @@ ExprScript is a dynamically typed functional programming language.
 [Inputs and outputs](test/gcd.expr)\
 [Interactions with Python](src/interaction-examples.py)
 
-Many ExprScript features are very dynamic and flexible, and I don't plan to add static type systems.
-
 ## Syntax and semantics
 
 ```
@@ -88,4 +86,32 @@ Python >= 3.9
 ```
 python3 src/exprscript.py <file>
 python3 test.py
+```
+
+## (TODO) Static type system
+
+ExprScript is very dynamic and flexible,
+so I won't add a complete static type system.
+However, as future work I might add partial suppport for
+[Hindley-Milner-style type-inference / type-check](https://en.wikipedia.org/wiki/Hindley–Milner_type_system) like the following.
+Inside `typedlambda` and `typedletrec` certain dynamic operations are forbidden, and
+any directly or indirectly referenced names must be defined by `typedlambda` or `typedletrec` as well.
+```
+letrec (
+  f = typedlambda ([x : Number]) : Number {
+    if (.> x 0) then 1
+    else if (.== x 0) then 0
+    else -1
+  }
+  g = typedlambda ([y : Any]) : Any {
+    y
+  }
+  h = typedlambda ([z : Any -> Any] [t : Any]) : Any {
+    typedletrec (
+      [r : Any] = (g (z t))
+    ) {
+      r
+    }
+  }
+) {}
 ```
