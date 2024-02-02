@@ -1,6 +1,6 @@
 # closure
 
-![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
+![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
 
 Closure is a dynamically typed functional programming language.
 
@@ -14,7 +14,6 @@ Closure is a dynamically typed functional programming language.
 [Y-combinator](test/y-combinator.expr)\
 [Full-precision rational numbers](test/average.expr)\
 [Inputs and outputs](test/gcd.expr)\
-[Interactions with Python](src/interaction-examples.py)
 
 ## Syntax and semantics
 
@@ -53,8 +52,6 @@ Closure is a dynamically typed functional programming language.
                                              // some runtime info is printed to stderr
   | .call/cc                                 // call with current continuation
   | .eval | .exit
-  | .py                                      // call a py function from es
-  | .reg                                     // register an es function to be used in py
 <binding> :=
     <variable> = <expr>                      // vars are references to objects
                                              // vars cannot be re-bound
@@ -84,7 +81,7 @@ Closure is a dynamically typed functional programming language.
 Python >= 3.9
 
 ```
-python3 src/exprscript.py <file>
+python3 src/closure.py <file>
 python3 test.py
 ```
 
