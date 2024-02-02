@@ -1,21 +1,10 @@
-# closure
+# cvm
 
 ![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
 
-Closure is a dynamically typed functional programming language.
+Closure virtual machine, for a dynamically-typed function language closure
 
-#### Code examples
-
-[&lambda;-based records](test/binary-tree.expr)\
-[&lambda;-based object-oriented programming](test/oop.expr)\
-[call/cc-based coroutines](test/coroutines.expr)\
-[&lambda;-based lazy evaluation](test/lazy-evaluation.expr)\
-[`eval`-based multi-stage evaluation](test/multi-stage.expr)\
-[Y-combinator](test/y-combinator.expr)\
-[Full-precision rational numbers](test/average.expr)\
-[Inputs and outputs](test/gcd.expr)\
-
-## Syntax and semantics
+## Language
 
 ```
 <comment> :=
@@ -85,8 +74,6 @@ python3 src/closure.py <file>
 python3 test.py
 ```
 
-## (TODO) Static type system (cancelled)
-
 ## (TODO) Rewrite using C++
 
-## (TODO) Add multi-def support and module system
+## (TODO) Support an enhanced REPL: call/cc-based multi-tasking
