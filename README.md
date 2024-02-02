@@ -1,8 +1,8 @@
-# exprscript
+# closure
 
 ![](https://github.com/sdingcn/expr/actions/workflows/auto-test.yml/badge.svg)
 
-ExprScript is a dynamically typed functional programming language.
+Closure is a dynamically typed functional programming language.
 
 #### Code examples
 
@@ -91,3 +91,5 @@ python3 test.py
 ## (TODO) Static type system (cancelled)
 
 ## (TODO) Rewrite using C++
+
+## (TODO) Add multi-def support and module system
