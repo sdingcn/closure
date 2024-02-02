@@ -10,24 +10,16 @@ def run_and_read(cmd: str, inp: str) -> str:
         timeout = 60
     ).stdout
 
-def check_io(batch: str) -> Callable:
-    if batch == 'expr':
-        prefix = ['python3', 'src/exprscript.py']
-    elif batch == 'py':
-        prefix = ['python3']
-    else:
-        sys.exit(f'*** Unknown batch {batch}')
-    def checker(path: str, i: str, o: str) -> bool:
-        try:
-            raw_o = run_and_read(prefix + [path], i)
-        except subprocess.TimeoutExpired:
-            sys.stderr.write('*** Timeout expired\n')
-            return False
-        if raw_o != o:
-            sys.stderr.write(f'*** Expected: [{o}], Got: [{raw_o}]\n')
-            return False
-        return True
-    return checker
+def checker(path: str, i: str, o: str) -> bool:
+    try:
+        raw_o = run_and_read(['python3', 'src/closure.py', path], i)
+    except subprocess.TimeoutExpired:
+        sys.stderr.write('*** Timeout expired\n')
+        return False
+    if raw_o != o:
+        sys.stderr.write(f'*** Expected: [{o}], Got: [{raw_o}]\n')
+        return False
+    return True
 
 if __name__ == '__main__':
     tests = [
@@ -84,12 +76,11 @@ str
 <closure evaluated at (SourceLocation 5 7)>
 <continuation evaluated at (SourceLocation 6 7)>
 '''),
-        ('test/y-combinator.expr', '', '1 120 3628800\n'),
-        ('src/interaction-examples.py', '', '-5\neman\n')
+        ('test/y-combinator.expr', '', '1 120 3628800\n')
     ]
     for i, test in enumerate(tests):
         sys.stderr.write(f'(\nRunning on test {i + 1}\n')
-        if not check_io(test[0].split('.')[-1])(*test):
+        if not checker(*test):
             sys.exit(f'*** Failed on test {i + 1}')
         sys.stderr.write(')\n')
     sys.stderr.write(f'\nPassed all {i + 1} tests\n')

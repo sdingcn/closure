@@ -587,33 +587,7 @@ class State:
         self.end = 0
         # evaluation result
         self.value = None
-        # Python FFI
-        self.python_functions = {}
-
-    def register_python_function(self, name: str, fun: Callable[..., Union[str, int]]) -> 'State':
-        self.python_functions[name] = fun
-        return self
     
-    def call_expr_function(self, name: str, args: list[Union[str, int]]) -> Union[str, int]:
-        sl = SourceLocation(-1, -1)
-        callee = VariableNode(sl, name)
-        arg_list = []
-        for a in args:
-            if type(a) == str:
-                arg_list.append(StringNode(sl, a))
-            elif type(a) == int:
-                arg_list.append(NumberNode(sl, a, 1))
-            else:
-                runtime_error(sl, 'Python can only use str/int as arguments when calling ExprScript functions')
-        self.stack.append(Layer(self.stack[0].env, CallNode(sl, callee, arg_list)))
-        self.execute()
-        if type(self.value) == String:
-            return self.value.value
-        elif type(self.value) == Number:
-            return self.value.to_int(sl)
-        else:
-            runtime_error(sl, 'ExprScript returned a non-String non-Number result')
-
     def execute(self) -> 'State':
         # step counter
         counter = 0
@@ -860,31 +834,6 @@ class State:
                             check_or_exit(layer.expr.sl, args, [])
                             # the interpreter returns 0
                             sys.exit()
-                        elif intrinsic == '.py':
-                            if not (len(args) > 0 and type(args[0]) == String):
-                                runtime_error(layer.expr.sl, '.py FFI expects a string (Python function name) as the first argument')
-                            py_args = []
-                            for i in range(1, len(args)):
-                                if type(args[i]) == Number:
-                                    py_args.append(args[i].to_int(layer.expr.sl))
-                                elif type(args[i]) == String:
-                                    py_args.append(args[i].value)
-                                else:
-                                    runtime_error(layer.expr.sl, '.py FFI only supports Number/String arguments')
-                            if args[0].value not in self.python_functions:
-                                runtime_error(layer.expr.sl, '.py FFI encountered unregistered function')
-                            ret = self.python_functions[args[0].value](*py_args)
-                            if type(ret) == int:
-                                self.value = Number(ret)
-                            elif type(ret) == str:
-                                self.value = String(ret)
-                            else:
-                                runtime_error(layer.expr.sl, '.py FFI only supports Number/String return value')
-                        elif intrinsic == '.reg':
-                            if not (len(args) == 2 and type(args[0]) == String and type(args[1]) == Closure):
-                                runtime_error(layer.expr.sl, '.reg can only register a String name for a Closure')
-                            self.stack[0].env.insert(0, (args[0].value, args[1].location if args[1].location != None else self._new(args[1])))
-                            self.value = Void()
                         else:
                             runtime_error(layer.expr.sl, 'unrecognized intrinsic function call')
                         self.stack.pop()
