@@ -4,7 +4,7 @@
 
 Closure virtual machine
 
-## Language (TODO: remove call/cc?)
+## Language (TODO: allow pure letrec; add bytes? remove call/cc? simplify lang?)
 
 ```
 <comment> :=
