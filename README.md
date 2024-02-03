@@ -2,9 +2,9 @@
 
 ![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
 
-Closure virtual machine, for a dynamically-typed function language closure
+Closure virtual machine
 
-## Language
+## Language (TODO: remove call/cc?)
 
 ```
 <comment> :=
@@ -76,4 +76,18 @@ python3 test.py
 
 ## (TODO) Rewrite using C++
 
-## (TODO) Support an enhanced REPL: call/cc-based multi-tasking
+## (TODO) Shell
+
+```
+<expr>         // foreground evaluation (possibly defining new names)
+CTRL-D         // bring current task into background with pid = rand()
+/bg pid <expr> // background evaluation (in I/O blocking, pause)
+/fg pid        // bring to foreground
+/ls            // list all names defined by letrec
+/co name       // examine the value of name
+/dl name       // delete name
+/ps            // list all background processes
+/gc            // run garbage collection
+/cl            // clear screen
+/sd            // shutdown
+```
