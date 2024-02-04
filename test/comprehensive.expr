@@ -64,13 +64,6 @@
       lambda () { (.void) }
     }
   )
-  # dyn query
-  letrec (queryY = lambda () { (.put @Y) }) {
-    [
-      (lambda (Y) { (queryY) } 0)
-      (lambda (Y) { [(queryY) 1] } 0)
-    ]
-  }
   # var access
   letrec (f = letrec (v = 0) { lambda () { (.void) } }) {
     (.put &v f)

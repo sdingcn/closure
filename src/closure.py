@@ -367,11 +367,8 @@ def parse(tokens: deque[Token]) -> ExprNode:
     def parse_query() -> QueryNode:
         start = consume(lambda t: t.src == '@')
         var = parse_variable()
-        if var.is_lex():
-            expr = parse_expr()
-            return QueryNode(start.sl, var, [expr])
-        else:
-            return QueryNode(start.sl, var, [])
+        expr = parse_expr()
+        return QueryNode(start.sl, var, [expr])
 
     def parse_access() -> AccessNode:
         start = consume(lambda t: t.src == '&')
@@ -589,17 +586,9 @@ class State:
         self.value = None
     
     def execute(self) -> 'State':
-        # step counter
-        counter = 0
-
         # we just update "state.stack" and "stack.value"
         # the evaluation will automatically continue along the while loop
         while True:
-
-            # GC control
-            counter += 1
-            if counter % 1024 == 0:
-                sys.stderr.write(f'[Note] GC collected {self._gc()} cells\n')
 
             # evaluating the current layer
             layer = self.stack[-1]
@@ -915,8 +904,7 @@ class State:
                         self.value = Number(not (lookup_env(layer.expr.var.name, self.value.env) is None))
                         self.stack.pop()
                 else:
-                    self.value = Number(not (lookup_stack(layer.expr.var.name, self.stack) is None))
-                    self.stack.pop()
+                    runtime_error(layer.expr.sl, '@ query on non-lex variable')
             elif type(layer.expr) == AccessNode:
                 # evaluate the closure
                 if layer.pc == 0:

@@ -32,7 +32,7 @@ if __name__ == '__main__':
 4
 5
 '''),
-        ('test/comprehensive.expr', '', '01' * 17),
+        ('test/comprehensive.expr', '', '01' * 16),
         ('test/coroutines.expr', '',
 '''\
 main
