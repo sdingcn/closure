@@ -23,7 +23,6 @@ def checker(path: str, i: str, o: str) -> bool:
 
 if __name__ == '__main__':
     tests = [
-        ('test/average.expr', '', '500943/77000\n'),
         ('test/binary-tree.expr', '',
 '''\
 1
@@ -32,51 +31,12 @@ if __name__ == '__main__':
 4
 5
 '''),
-        ('test/comprehensive.expr', '', '01' * 16),
-        ('test/coroutines.expr', '',
-'''\
-main
-task 1
-main
-task 2
-main
-task 3
-'''),
         ('test/gcd.expr', '100\n0\n', '100\n'),
         ('test/gcd.expr', '0\n100\n', '100\n'),
         ('test/gcd.expr', '30\n30\n', '30\n'),
         ('test/gcd.expr', '25\n45\n', '5\n'),
         ('test/gcd.expr', '7\n100\n', '1\n'),
         ('test/intensive.expr', '', '50005000\n'),
-        ('test/lazy-evaluation.expr', '',
-'''\
-3
-2
-1
-thunk
-'''),
-        ('test/multi-stage.expr', '',
-'''\
-EVAL
-hello world
-hello world
-'''),
-        ('test/oop.expr', '',
-'''\
-1
-2
-100
-2
-'''),
-        ('test/values.expr', '',
-'''\
-<void>
-1/2
-str
-<closure evaluated at (SourceLocation 5 7)>
-<continuation evaluated at (SourceLocation 6 7)>
-'''),
-        ('test/y-combinator.expr', '', '1 120 3628800\n')
     ]
     for i, test in enumerate(tests):
         sys.stderr.write(f'(\nRunning on test {i + 1}\n')

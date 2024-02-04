@@ -681,10 +681,7 @@ class State:
                         intrinsic = layer.expr.callee.name
                         args = layer.local['args']
                         # a gigantic series of if conditions, one for each intrinsic function
-                        if intrinsic == '.void':
-                            check_or_exit(layer.expr.sl, args, [])
-                            self.value = Void()
-                        elif intrinsic == '.+':
+                        if intrinsic == '.+':
                             check_or_exit(layer.expr.sl, args, [Number] * len(args))
                             self.value = reduce(lambda x, y: x.add(y), args, Number(0))
                         elif intrinsic == '.-':
@@ -699,75 +696,30 @@ class State:
                         elif intrinsic == '.%':
                             check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = args[0].mod(args[1], layer.expr.sl)
-                        elif intrinsic == '.floor':
-                            check_or_exit(layer.expr.sl, args, [Number])
-                            self.value = args[0].floor()
-                        elif intrinsic == '.ceil':
-                            check_or_exit(layer.expr.sl, args, [Number])
-                            self.value = args[0].ceil()
                         elif intrinsic == '.<':
                             check_or_exit(layer.expr.sl, args, [Number, Number])
                             self.value = Number(args[0].lt(args[1]))
-                        elif intrinsic == '.<=':
-                            check_or_exit(layer.expr.sl, args, [Number, Number])
-                            self.value = Number(not args[1].lt(args[0]))
-                        elif intrinsic == '.>':
-                            check_or_exit(layer.expr.sl, args, [Number, Number])
-                            self.value = Number(args[1].lt(args[0]))
-                        elif intrinsic == '.>=':
-                            check_or_exit(layer.expr.sl, args, [Number, Number])
-                            self.value = Number(not args[0].lt(args[1]))
-                        elif intrinsic == '.==':
-                            check_or_exit(layer.expr.sl, args, [Number, Number])
-                            self.value = Number((not args[0].lt(args[1])) and (not args[1].lt(args[0])))
-                        elif intrinsic == '.!=':
-                            check_or_exit(layer.expr.sl, args, [Number, Number])
-                            self.value = Number(args[0].lt(args[1]) or args[1].lt(args[0]))
-                        elif intrinsic == '.and':
-                            check_or_exit(layer.expr.sl, args, [Number] * len(args))
-                            self.value = Number(reduce(lambda x, y: x and (y.n != 0), args, True))
-                        elif intrinsic == '.or':
-                            check_or_exit(layer.expr.sl, args, [Number] * len(args))
-                            self.value = Number(reduce(lambda x, y: x or (y.n != 0), args, False))
-                        elif intrinsic == '.not':
-                            check_or_exit(layer.expr.sl, args, [Number])
-                            self.value = Number(args[0].n == 0)
-                        elif intrinsic == '.strlen':
+                        elif intrinsic == '.slen':
                             check_or_exit(layer.expr.sl, args, [String])
                             self.value = Number(len(args[0].value))
-                        elif intrinsic == '.strcut':
+                        elif intrinsic == '.ssub':
                             check_or_exit(layer.expr.sl, args, [String, Number, Number])
                             if args[1].d != 1 or args[2].d != 1:
                                 runtime_error(layer.expr.sl, '.strcut is applied to non-integer(s)')
                             self.value = String(args[0].value[args[1].n : args[2].n])
-                        elif intrinsic == '.str+':
+                        elif intrinsic == '.s+':
                             check_or_exit(layer.expr.sl, args, [String] * len(args))
                             self.value = String(reduce(lambda x, y: x + y.value, args, ''))
-                        elif intrinsic == '.str<':
+                        elif intrinsic == '.s<':
                             check_or_exit(layer.expr.sl, args, [String, String])
                             self.value = Number(args[0].value < args[1].value)
-                        elif intrinsic == '.str<=':
-                            check_or_exit(layer.expr.sl, args, [String, String])
-                            self.value = Number(args[0].value <= args[1].value)
-                        elif intrinsic == '.str>':
-                            check_or_exit(layer.expr.sl, args, [String, String])
-                            self.value = Number(args[0].value > args[1].value)
-                        elif intrinsic == '.str>=':
-                            check_or_exit(layer.expr.sl, args, [String, String])
-                            self.value = Number(args[0].value >= args[1].value)
-                        elif intrinsic == '.str==':
-                            check_or_exit(layer.expr.sl, args, [String, String])
-                            self.value = Number(args[0].value == args[1].value)
-                        elif intrinsic == '.str!=':
-                            check_or_exit(layer.expr.sl, args, [String, String])
-                            self.value = Number(args[0].value != args[1].value)
-                        elif intrinsic == '.strnum':
+                        elif intrinsic == '.s->n':
                             check_or_exit(layer.expr.sl, args, [String])
                             node = parse(deque([Token(layer.expr.sl, args[0].value)]))
                             if not isinstance(node, NumberNode):
                                 runtime_error(layer.expr.sl, '.strnum is applied to non-number-string')
                             self.value = Number(node.n, node.d)
-                        elif intrinsic == '.strquote':
+                        elif intrinsic == '.squote':
                             check_or_exit(layer.expr.sl, args, [String])
                             quoted = '"'
                             for char in args[0].value:
@@ -801,16 +753,13 @@ class State:
                             self.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, frame = True))
                             # we already popped the stack in this case, so just continue the evaluation
                             continue
-                        elif intrinsic == '.void?':
-                            check_or_exit(layer.expr.sl, args, [Value])
-                            self.value = Number(isinstance(args[0], Void))
-                        elif intrinsic == '.num?':
+                        elif intrinsic == '.n?':
                             check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], Number))
-                        elif intrinsic == '.str?':
+                        elif intrinsic == '.s?':
                             check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], String))
-                        elif intrinsic == '.clo?':
+                        elif intrinsic == '.c?':
                             check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], Closure))
                         elif intrinsic == '.cont?':

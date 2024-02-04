@@ -6,7 +6,7 @@ letrec (
     lambda () { 1 }
   }
   dfs = lambda (tree) {
-    if (.not (tree)) then (.void)
+    if (.< (tree) 1) then 0
     else [
       (dfs &left tree)
       (.put &value tree "\n")

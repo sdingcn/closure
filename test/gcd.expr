@@ -1,8 +1,8 @@
 letrec (
   gcd = lambda (a b) {
-    if (.== b 0) then a
+    if (.< b 1) then a
     else (gcd b (.% a b))
   }
 ) {
-  (.put (gcd (.strnum (.getline)) (.strnum (.getline))) "\n")
+  (.put (gcd (.s->n (.getline)) (.s->n (.getline))) "\n")
 }
