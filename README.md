@@ -33,10 +33,11 @@ Closure virtual machine: a programming language, a shell, and a virtual machine.
 <def> :=
     letrec ( <binding>* )
 <intrinsic> :=
-    .+ | .- | .* | ./ | .% | .<
+    .void
+  | .+ | .- | .* | ./ | .% | .<
   | .slen | .ssub | .s+ | .squote | .s<
   | .n->s | .s->n
-  | .n? | .s? | .c?
+  | .v? | .n? | .s? | .c?
   | .get | .put
   | .eval
   | .exit

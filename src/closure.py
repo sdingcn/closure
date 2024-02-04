@@ -533,17 +533,6 @@ class Layer:
         # temporary variables for this layer, where variables can only hold Values or lists of Values
         self.local = {}
 
-class Continuation(Value):
-
-    def __init__(self, sl: SourceLocation, stack: list[Layer]):
-        self.location = None
-        self.sl = sl
-        # we only need to store the stack, because objects in the heap are immutable
-        self.stack = stack
-
-    def __str__(self) -> str:
-        return f'<continuation evaluated at {self.sl}>'
-
 def check_or_exit(sl: SourceLocation, args: list[Value], ts: list[type]) -> bool:
     ''' check whether arguments conform to types '''
     if len(args) != len(ts):
@@ -743,16 +732,9 @@ class State:
                             print(output, end = '', flush = True)
                             # the return value of put is void
                             self.value = Void()
-                        elif intrinsic == '.call/cc':
-                            check_or_exit(layer.expr.sl, args, [Closure])
-                            self.stack.pop()
-                            # obtain the continuation (this deepcopy will not copy the store)
-                            addr = self._new(Continuation(layer.expr.sl, deepcopy(self.stack)))
-                            closure = args[0]
-                            # make a closure call layer and pass in the continuation
-                            self.stack.append(Layer(closure.env[:] + [(closure.fun.var_list[0].name, addr)], closure.fun.expr, frame = True))
-                            # we already popped the stack in this case, so just continue the evaluation
-                            continue
+                        elif intrinsic == '.v?':
+                            check_or_exit(layer.expr.sl, args, [Value])
+                            self.value = Number(isinstance(args[0], Void))
                         elif intrinsic == '.n?':
                             check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], Number))
@@ -762,9 +744,6 @@ class State:
                         elif intrinsic == '.c?':
                             check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Number(isinstance(args[0], Closure))
-                        elif intrinsic == '.cont?':
-                            check_or_exit(layer.expr.sl, args, [Value])
-                            self.value = Number(isinstance(args[0], Continuation))
                         elif intrinsic == '.eval':
                             check_or_exit(layer.expr.sl, args, [String])
                             self.value = run_code(args[0].value)
@@ -775,7 +754,7 @@ class State:
                         else:
                             runtime_error(layer.expr.sl, 'unrecognized intrinsic function call')
                         self.stack.pop()
-                # closure or continuation call
+                # closure call
                 else:
                     # evaluation result for each argument
                     if 2 < layer.pc <= len(layer.expr.arg_list) + 2:
@@ -815,15 +794,6 @@ class State:
                             # evaluate the closure call
                             self.stack.append(Layer(new_env, closure.fun.expr, frame = True))
                             layer.pc += 1
-                        elif type(callee) == Continuation:
-                            cont = callee
-                            if len(args) != 1:
-                                runtime_error(layer.expr.sl, 'wrong number of arguments given to callee')
-                            # "self.value" already contains the last evaluation result of the args
-                            # replace the stack
-                            self.stack = deepcopy(cont.stack)
-                            # the stack has been replaced, so we don't need to pop the previous stack's call layer
-                            continue
                         else:
                             runtime_error(layer.expr.sl, 'calling non-callable object')
                     # finish the (closure) call
@@ -893,14 +863,6 @@ class State:
                 if type(value) == Closure:
                     for _, loc in value.env:
                         traverse_location(loc)
-                elif type(value) == Continuation:
-                    for layer in value.stack:
-                        if layer.frame:
-                            for _, loc in layer.env:
-                                traverse_location(loc)
-                        if layer.local:
-                            for _, v in layer.local.items():
-                                traverse_value(v)
 
         def traverse_location(location: int) -> None:
             if location not in visited_locations:
@@ -908,7 +870,13 @@ class State:
                 visited_locations.add(location)
                 traverse_value(self.store[location])
 
-        traverse_value(Continuation(SourceLocation(-1, -1), self.stack))
+        for layer in self.stack:
+            if layer.frame:
+                for _, loc in layer.env:
+                    traverse_location(loc)
+                if layer.local:
+                    for _, v in layer.local.items():
+                        traverse_value(v)
         traverse_value(self.value)
 
     def _mark(self) -> set[int]:
@@ -940,11 +908,6 @@ class State:
             if type(value) == Closure:
                 for i in range(len(value.env)):
                     value.env[i] = (value.env[i][0], relocation_dict[value.env[i][1]])
-            elif type(value) == Continuation:
-                for layer in value.stack:
-                    if layer.frame:
-                        for i in range(len(layer.env)):
-                            layer.env[i] = (layer.env[i][0], relocation_dict[layer.env[i][1]])
 
         self._traverse(value_callback, lambda _: None)
 
