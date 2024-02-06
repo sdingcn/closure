@@ -7,9 +7,6 @@ from functools import reduce
 
 ### helper functions and classes
 
-def gcd(a: int, b: int) -> int:
-    return a if b == 0 else gcd(b, a % b)
-
 class SourceLocation:
 
     def __init__(self, line: int = 1, col: int = 1):
@@ -57,16 +54,7 @@ def lex(source: str) -> deque[Token]:
         "`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?"
         " \t\n"
     )
-    number_regex = re.compile(
-        r'''
-        [+-]?
-        (
-            (0|[1-9][0-9]*) |
-            ((0|[1-9][0-9]*)\.([0-9]*[1-9])) | 
-            ((0|[1-9][0-9]*)/([1-9][0-9]*))
-        )
-        '''.replace(' ', '').replace('\n', '')
-    )
+    integer_regex = re.compile(r'[+-]?(0|[1-9][0-9]*)')
     sl = SourceLocation()
     for char in source:
         if char not in charset:
@@ -96,10 +84,10 @@ def lex(source: str) -> deque[Token]:
             src = ''
             # number literal
             if chars[0].isdigit() or chars[0] in ('-', '+'):
-                while chars and (chars[0].isdigit() or (chars[0] in ('-', '+', '.', '/'))):
+                while chars and (chars[0].isdigit() or (chars[0] in ('-', '+'))):
                     src += chars.popleft()
                     sl.update(src[-1])
-                if not number_regex.fullmatch(src):
+                if not integer_regex.fullmatch(src):
                     lexer_error(sl, 'invalid number literal')
             # variable / keyword
             elif chars[0].isalpha():
@@ -158,14 +146,11 @@ class ExprNode:
     ''' Normally we don't create instances of this base class. '''
     pass
 
-class NumberNode(ExprNode):
+class IntegerNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, n: int, d: int):
+    def __init__(self, sl: SourceLocation, i: int):
         self.sl = sl
-        # simplify it to avoid repeatedly doing this when evaluating the AST node
-        g = gcd(abs(n), d)
-        self.n = n // g
-        self.d = d // g
+        self.i = i
 
 class StringNode(ExprNode):
 
@@ -248,7 +233,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
             parser_error(token.sl, 'unexpected token')
         return token
 
-    def parse_number() -> NumberNode:
+    def parse_number() -> IntegerNode:
         token = consume(is_number_token)
         s = token.src
         sign = 1
@@ -256,14 +241,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
             if s[0] == '-':
                 sign = -1
             s = s[1:]
-        if '/' in s:
-            n, d = s.split('/')
-            return NumberNode(token.sl, sign * int(n), int(d))
-        elif '.' in s:
-            n, d = s.split('.')
-            return NumberNode(token.sl, sign * (int(n) * (10 ** len(d)) + int(d)), 10 ** len(d))
-        else:
-            return NumberNode(token.sl, sign * int(s), 1)
+        return IntegerNode(token.sl, sign * int(s))
 
     def parse_string() -> StringNode:
         token = consume(is_string_token)
@@ -418,78 +396,17 @@ class Void(Value):
     def __str__(self) -> str:
         return '<void>'
 
-class Number(Value):
+class Integer(Value):
 
-    def __init__(self, n: Union[int, bool], d: Union[int, None] = None):
+    def __init__(self, i: Union[int, bool]):
         self.location = None
-        if type(n) == bool:
-            self.n = 1 if n else 0
-            self.d = 1
+        if type(i) == bool:
+            self.i = 1 if i else 0
         else:
-            self.n = n
-            self.d = 1 if d is None else d
+            self.i = i
 
     def __str__(self) -> str:
-        s = str(self.n)
-        if self.d != 1:
-            s += '/'
-            s += str(self.d)
-        return s
-
-    def to_int(self, sl: SourceLocation) -> int:
-        if self.d != 1:
-            runtime_error(sl, 'cannot convert a non-integer Number to a Python int')
-        return self.n
-
-    def add(self, other: 'Number') -> 'Number':
-        n1 = self.n * other.d + other.n * self.d
-        d1 = self.d * other.d
-        g1 = gcd(abs(n1), d1)
-        return Number(n1 // g1, d1 // g1)
-
-    def sub(self, other: 'Number') -> 'Number':
-        n1 = self.n * other.d - other.n * self.d
-        d1 = self.d * other.d
-        g1 = gcd(abs(n1), d1)
-        return Number(n1 // g1, d1 // g1)
-
-    def mul(self, other: 'Number') -> 'Number':
-        n1 = self.n * other.n
-        d1 = self.d * other.d
-        g1 = gcd(abs(n1), d1)
-        return Number(n1 // g1, d1 // g1)
-
-    def div(self, other: 'Number', sl: SourceLocation) -> 'Number':
-        if other.n == 0:
-            runtime_error(sl, 'division by zero')
-        n1 = self.n * other.d
-        d1 = self.d * other.n
-        if d1 < 0:
-            n1 = -n1
-            d1 = -d1
-        g1 = gcd(abs(n1), d1)
-        return Number(n1 // g1, d1 // g1)
-
-    def mod(self, other: 'Number', sl: SourceLocation) -> 'Number':
-        if self.d != 1 or other.d != 1:
-            runtime_error(sl, 'non-integer mod')
-        if self.n < 0 or other.n <= 0:
-            runtime_error(sl, 'non-positive integer mod')
-        return Number(self.n % other.n, 1)
-
-    def floor(self) -> 'Number':
-        return Number(self.n // self.d, 1)
-
-    def ceil(self) -> 'Number':
-        rest = 0
-        if self.n % self.d != 0:
-            rest = 1
-        return Number(self.n // self.d + rest, 1)
-
-    def lt(self, other: 'Number') -> bool:
-        n_left = self.n * other.d
-        n_right = self.d * other.n
-        return n_left < n_right
+        return str(self.i)
 
 class String(Value):
 
@@ -569,8 +486,8 @@ class State:
             if layer.expr is None:
                 # found the main frame, which is the end of evaluation
                 return self
-            elif type(layer.expr) == NumberNode:
-                self.value = Number(layer.expr.n, layer.expr.d)
+            elif type(layer.expr) == IntegerNode:
+                self.value = Integer(layer.expr.i)
                 self.stack.pop()
             elif type(layer.expr) == StringNode:
                 self.value = String(layer.expr.value)
@@ -616,9 +533,9 @@ class State:
                     layer.pc += 1
                 # choose the branch to evaluate
                 elif layer.pc == 1:
-                    if type(self.value) != Number:
+                    if type(self.value) != Integer:
                         runtime_error(layer.expr.cond.sl, 'wrong condition type')
-                    if self.value.n != 0:
+                    if self.value.i != 0:
                         self.stack.append(Layer(layer.env, layer.expr.branch1, tail = layer.frame or layer.tail))
                     else:
                         self.stack.append(Layer(layer.env, layer.expr.branch2, tail = layer.frame or layer.tail))
@@ -653,28 +570,28 @@ class State:
                         args = layer.local['args']
                         # a gigantic series of if conditions, one for each intrinsic function
                         if intrinsic == '.+':
-                            check_or_exit(layer.expr.sl, args, [Number] * len(args))
-                            self.value = reduce(lambda x, y: x.add(y), args, Number(0))
+                            check_or_exit(layer.expr.sl, args, [Integer, Integer])
+                            self.value = Integer(args[0].i + args[1].i)
                         elif intrinsic == '.-':
-                            check_or_exit(layer.expr.sl, args, [Number, Number])
-                            self.value = args[0].sub(args[1])
+                            check_or_exit(layer.expr.sl, args, [Integer, Integer])
+                            self.value = Integer(args[0].i - args[1].i)
                         elif intrinsic == '.*':
-                            check_or_exit(layer.expr.sl, args, [Number] * len(args))
-                            self.value = reduce(lambda x, y: x.mul(y), args, Number(1))
+                            check_or_exit(layer.expr.sl, args, [Integer, Integer])
+                            self.value = Integer(args[0].i * args[1].i)
                         elif intrinsic == './':
-                            check_or_exit(layer.expr.sl, args, [Number, Number])
-                            self.value = args[0].div(args[1], layer.expr.sl)
+                            check_or_exit(layer.expr.sl, args, [Integer, Integer])
+                            self.value = Integer(args[0].i // args[1].i)
                         elif intrinsic == '.%':
-                            check_or_exit(layer.expr.sl, args, [Number, Number])
-                            self.value = args[0].mod(args[1], layer.expr.sl)
+                            check_or_exit(layer.expr.sl, args, [Integer, Integer])
+                            self.value = Integer(args[0].i % args[1].i)
                         elif intrinsic == '.<':
-                            check_or_exit(layer.expr.sl, args, [Number, Number])
-                            self.value = Number(args[0].lt(args[1]))
+                            check_or_exit(layer.expr.sl, args, [Integer, Integer])
+                            self.value = Integer(args[0].i < args[1].i)
                         elif intrinsic == '.slen':
                             check_or_exit(layer.expr.sl, args, [String])
-                            self.value = Number(len(args[0].value))
+                            self.value = Integer(len(args[0].value))
                         elif intrinsic == '.ssub':
-                            check_or_exit(layer.expr.sl, args, [String, Number, Number])
+                            check_or_exit(layer.expr.sl, args, [String, Integer, Integer])
                             if args[1].d != 1 or args[2].d != 1:
                                 runtime_error(layer.expr.sl, '.strcut is applied to non-integer(s)')
                             self.value = String(args[0].value[args[1].n : args[2].n])
@@ -683,13 +600,13 @@ class State:
                             self.value = String(reduce(lambda x, y: x + y.value, args, ''))
                         elif intrinsic == '.s<':
                             check_or_exit(layer.expr.sl, args, [String, String])
-                            self.value = Number(args[0].value < args[1].value)
-                        elif intrinsic == '.s->n':
+                            self.value = Integer(args[0].value < args[1].value)
+                        elif intrinsic == '.s->i':
                             check_or_exit(layer.expr.sl, args, [String])
                             node = parse(deque([Token(layer.expr.sl, args[0].value)]))
-                            if not isinstance(node, NumberNode):
+                            if not isinstance(node, IntegerNode):
                                 runtime_error(layer.expr.sl, '.strnum is applied to non-number-string')
-                            self.value = Number(node.n, node.d)
+                            self.value = Integer(node.i)
                         elif intrinsic == '.squote':
                             check_or_exit(layer.expr.sl, args, [String])
                             quoted = '"'
@@ -716,16 +633,16 @@ class State:
                             self.value = Void()
                         elif intrinsic == '.v?':
                             check_or_exit(layer.expr.sl, args, [Value])
-                            self.value = Number(isinstance(args[0], Void))
+                            self.value = Integer(isinstance(args[0], Void))
                         elif intrinsic == '.n?':
                             check_or_exit(layer.expr.sl, args, [Value])
-                            self.value = Number(isinstance(args[0], Number))
+                            self.value = Integer(isinstance(args[0], Integer))
                         elif intrinsic == '.s?':
                             check_or_exit(layer.expr.sl, args, [Value])
-                            self.value = Number(isinstance(args[0], String))
+                            self.value = Integer(isinstance(args[0], String))
                         elif intrinsic == '.c?':
                             check_or_exit(layer.expr.sl, args, [Value])
-                            self.value = Number(isinstance(args[0], Closure))
+                            self.value = Integer(isinstance(args[0], Closure))
                         elif intrinsic == '.eval':
                             check_or_exit(layer.expr.sl, args, [String])
                             self.value = run_code(args[0].value)
@@ -802,7 +719,7 @@ class State:
                         if type(self.value) != Closure:
                             runtime_error(layer.expr.sl, 'lexical variable query applied to non-closure type')
                         # the closure's value is already in "self.value", so we just use it and then update it
-                        self.value = Number(not (lookup_env(layer.expr.var.name, self.value.env) is None))
+                        self.value = Integer(not (lookup_env(layer.expr.var.name, self.value.env) is None))
                         self.stack.pop()
                 else:
                     runtime_error(layer.expr.sl, '@ query on non-lex variable')

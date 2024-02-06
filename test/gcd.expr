@@ -4,5 +4,5 @@ letrec (
     else (gcd b (.% a b))
   }
 ) {
-  (.put (gcd (.s->n (.getline)) (.s->n (.getline))) "\n")
+  (.put (gcd (.s->i (.getline)) (.s->i (.getline))) "\n")
 }

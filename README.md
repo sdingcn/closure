@@ -14,7 +14,7 @@ Closure virtual machine: a programming language, a shell, and a virtual machine.
     <intrinsic>
   | <expr>
 <expr> :=
-    <number>
+    <integer>
   | <string>
   | <variable>
   | lambda ( <variable>* ) { <expr> }
@@ -30,8 +30,8 @@ Closure virtual machine: a programming language, a shell, and a virtual machine.
     .void
   | .+ | .- | .* | ./ | .% | .<
   | .slen | .ssub | .s+ | .squote | .s<
-  | .n->s | .s->n
-  | .v? | .n? | .s? | .c?
+  | .i->s | .s->i
+  | .v? | .i? | .s? | .c?
   | .get | .put
   | .eval
   | .exit
