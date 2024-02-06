@@ -452,10 +452,6 @@ def check_or_exit(sl: SourceLocation, args: list[Value], ts: list[type]) -> bool
         if not isinstance(args[i], ts[i]):
             runtime_error(sl, 'wrong type of arguments given to callee')
 
-def filter_lexical(env: list[tuple[str, int]]) -> list[tuple[str, int]]:
-    ''' find out lexical variable-location pairs in an environment '''
-    return [t for t in env if len(t[0]) and t[0][0].islower()]
-
 def lookup_env(name: str, env: list[tuple[str, int]]) -> Union[int, None]:
     ''' lexically scoped variable lookup '''
     for i in range(len(env) - 1, -1, -1):
@@ -475,8 +471,10 @@ class State:
         self.end = 0
         # evaluation result
         self.value = None
+        # output message buffer
+        self.output_buffer = []
     
-    def execute(self) -> 'State':
+    def execute(self) -> None:
         # we just update "state.stack" and "stack.value"
         # the evaluation will automatically continue along the while loop
         while True:
@@ -485,7 +483,7 @@ class State:
             layer = self.stack[-1]
             if layer.expr is None:
                 # found the main frame, which is the end of evaluation
-                return self
+                return
             elif type(layer.expr) == IntegerNode:
                 self.value = Integer(layer.expr.i)
                 self.stack.pop()
@@ -495,7 +493,7 @@ class State:
             elif type(layer.expr) == LambdaNode:
                 # closures always save all variables (no matter whether they are used in the body or not)
                 # so you can use the @ query in an intuitive way
-                self.value = Closure(filter_lexical(layer.env), layer.expr)
+                self.value = Closure(layer.env[:], layer.expr)
                 self.stack.pop()
             elif type(layer.expr) == LetrecNode:
                 # evaluation result for each binding expression
@@ -616,20 +614,13 @@ class State:
                                 quoted += char
                             quoted += '"'
                             self.value = String(quoted)
-                        elif intrinsic == '.getline':
-                            check_or_exit(layer.expr.sl, args, [])
-                            try:
-                                self.value = String(input())
-                            except EOFError:
-                                self.value = Void()
-                        elif intrinsic == '.put':
-                            if not (len(args) >= 1 and all(map(lambda v : isinstance(v, Value), args))):
-                                runtime_error(layer.expr.sl, 'wrong number/type of arguments given to .put')
-                            output = ''
-                            for v in args:
-                                output += str(v)
-                            print(output, end = '', flush = True)
-                            # the return value of put is void
+                        elif intrinsic == '.send':
+                            if not (len(args) == 2 and
+                                    isinstance(args[0], Integer) and
+                                    (isinstance(args[1], Integer) or isinstance(args[1], String))):
+                                runtime_error(layer.expr.sl, 'wrong number/type of arguments given to .send')
+                            self.output_buffer.append((args[0], args[1]))
+                            # the return value of .send is void
                             self.value = Void()
                         elif intrinsic == '.v?':
                             check_or_exit(layer.expr.sl, args, [Value])
@@ -672,26 +663,25 @@ class State:
                     elif layer.pc == len(layer.expr.arg_list) + 2:
                         callee = layer.local['callee']
                         args = layer.local['args']
-                        if type(callee) == Closure:
-                            closure = callee
-                            # types will be checked inside the closure call
-                            if len(args) != len(closure.fun.var_list):
-                                runtime_error(layer.expr.sl, 'wrong number of arguments given to callee')
-                            new_env = closure.env[:]
-                            for i, v in enumerate(closure.fun.var_list):
-                                addr = args[i].location if args[i].location != None else self._new(args[i])
-                                new_env.append((v.name, addr))
-                            # tail call optimization
-                            if layer.frame or layer.tail:
-                                while not self.stack[-1].frame:
-                                    self.stack.pop()
-                                # pop the last frame
-                                self.stack.pop()
-                            # evaluate the closure call
-                            self.stack.append(Layer(new_env, closure.fun.expr, frame = True))
-                            layer.pc += 1
-                        else:
+                        if type(callee) != Closure:
                             runtime_error(layer.expr.sl, 'calling non-callable object')
+                        closure = callee
+                        # types will be checked inside the closure call
+                        if len(args) != len(closure.fun.var_list):
+                            runtime_error(layer.expr.sl, 'wrong number of arguments given to callee')
+                        new_env = closure.env[:]
+                        for i, v in enumerate(closure.fun.var_list):
+                            addr = args[i].location if args[i].location != None else self._new(args[i])
+                            new_env.append((v.name, addr))
+                        # tail call optimization
+                        if layer.frame or layer.tail:
+                            while not self.stack[-1].frame:
+                                self.stack.pop()
+                            # pop the last frame
+                            self.stack.pop()
+                        # evaluate the closure call
+                        self.stack.append(Layer(new_env, closure.fun.expr, frame = True))
+                        layer.pc += 1
                     # finish the (closure) call
                     else:
                         self.stack.pop()
@@ -815,20 +805,10 @@ class State:
         
 ### main
 
-def run_code(source: str) -> Value:
-    return State(parse(lex(source))).execute().value
-
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        sys.exit(f'[Note] Usage:\n\tpython3 {sys.argv[0]} <source-file>')
-    with open(sys.argv[1], 'r', encoding = 'utf-8') as f:
-        sys.stderr.write(f'[Note] program value = {run_code(f.read())}\n')
-    if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-        import resource
-        ru = resource.getrusage(resource.RUSAGE_SELF)
-        mem_factor = 1048576 / 1000 if sys.platform.startswith('linux') else 1048576
-        sys.stderr.write(
-            f'User time (seconds) = {round(ru.ru_utime, 3)}\n'
-            f'System time (seconds) = {round(ru.ru_stime, 3)}\n'
-            f'Peak memory (MiB) = {round(ru.ru_maxrss / mem_factor, 3)}\n'
-        )
+    state = State(parse(lex(sys.stdin.read())))
+    state.execute()
+    sys.stdout.write(f'[Note] output buffer:\n')
+    for l, v in state.output_buffer:
+        sys.stdout.write(f'({l}, {v})\n')
+    sys.stdout.write(f'[Note] evaluation value = {state.value}\n')

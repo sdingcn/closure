@@ -1,8 +1,0 @@
-letrec (
-  gcd = lambda (a b) {
-    if (.< b 1) then a
-    else (gcd b (.% a b))
-  }
-) {
-  (.put (gcd (.s->i (.getline)) (.s->i (.getline))) "\n")
-}

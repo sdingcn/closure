@@ -10,9 +10,9 @@ def run_and_read(cmd: str, inp: str) -> str:
         timeout = 60
     ).stdout
 
-def checker(path: str, i: str, o: str) -> bool:
+def checker(i: str, o: str) -> bool:
     try:
-        raw_o = run_and_read(['python3', 'src/closure.py', path], i)
+        raw_o = run_and_read(['python3', 'src/closure.py'], i)
     except subprocess.TimeoutExpired:
         sys.stderr.write('*** Timeout expired\n')
         return False
@@ -23,20 +23,62 @@ def checker(path: str, i: str, o: str) -> bool:
 
 if __name__ == '__main__':
     tests = [
-        ('test/binary-tree.expr', '',
+(
 '''\
-1
-2
-3
-4
-5
-'''),
-        ('test/gcd.expr', '100\n0\n', '100\n'),
-        ('test/gcd.expr', '0\n100\n', '100\n'),
-        ('test/gcd.expr', '30\n30\n', '30\n'),
-        ('test/gcd.expr', '25\n45\n', '5\n'),
-        ('test/gcd.expr', '7\n100\n', '1\n'),
-        ('test/intensive.expr', '', '50005000\n'),
+letrec (
+  leaf = lambda () {
+    lambda () { 0 }
+  }
+  node = lambda (value left right) {
+    lambda () { 1 }
+  }
+  dfs = lambda (tree) {
+    if (.< (tree) 1) then 0
+    else [
+      (dfs &left tree)
+      (.send 0 &value tree)
+      (dfs &right tree)
+    ]
+  }
+) {
+  # in-order traversal
+  (dfs
+    (node 4
+      (node 2
+        (node 1 (leaf) (leaf))
+        (node 3 (leaf) (leaf)))
+      (node 5 (leaf) (leaf))))
+}
+'''
+,
+'''\
+[Note] output buffer:
+(0, 1)
+(0, 2)
+(0, 3)
+(0, 4)
+(0, 5)
+[Note] evaluation value = 0
+'''
+),
+(
+'''\
+letrec (
+  sum = lambda (n s) {
+    if (.< n 1) then s
+    else (sum (.- n 1) (.+ n s))
+  }
+) {
+  (.send 0 (sum 10000 0))
+}
+'''
+,
+'''\
+[Note] output buffer:
+(0, 50005000)
+[Note] evaluation value = <void>
+'''
+)
     ]
     for i, test in enumerate(tests):
         sys.stderr.write(f'(\nRunning on test {i + 1}\n')

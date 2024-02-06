@@ -19,7 +19,7 @@ Closure virtual machine: a programming language, a scheduler, and a memory manag
              | <update>
              | lambda ( <variable>* ) { <expr> }
              | letrec ( <binding>* ) { <expr> }
-             | if <expr> then <expr> else <expr>
+             | if <expr> then { <expr> } else { <expr> }
              | while <expr> { <expr> }
              | ( <callee> <expr>* )
              | [ <expr>+ ]
@@ -37,8 +37,8 @@ Closure virtual machine: a programming language, a scheduler, and a memory manag
              | .time                        // () -> int
              | .sleep                       // (int) -> void
              | .exit                        // () -> void
-             | .send                        // (label, int | str) -> void
-             | .recv                        // (label) -> int | str | void
+             | .send                        // (int, int | str) -> void
+             | .recv                        // (int) -> int | str | void
 ```
 
 ## Commands
@@ -51,8 +51,8 @@ Closure virtual machine: a programming language, a scheduler, and a memory manag
 /sp <pid> <expr>   // start a (background) process
 /kp <pid>          // kill a process
 /lp                // list all processes (including terminated, need to be explicitly killed)
-/sm <label> <expr> // send message
-/rm <label>        // receive message
+/sm <label> <expr> // send a message
+/rm <label>        // receive a message
 /sd                // shutdown
 ```
 
