@@ -643,9 +643,6 @@ class State:
                         elif intrinsic == '.c?':
                             check_or_exit(layer.expr.sl, args, [Value])
                             self.value = Integer(isinstance(args[0], Closure))
-                        elif intrinsic == '.eval':
-                            check_or_exit(layer.expr.sl, args, [String])
-                            self.value = run_code(args[0].value)
                         elif intrinsic == '.exit':
                             check_or_exit(layer.expr.sl, args, [])
                             # the interpreter returns 0
