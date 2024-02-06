@@ -7,13 +7,7 @@ Closure virtual machine: a programming language, a shell, and a virtual machine.
 ## Programming language
 
 ```
-<lexical-variable> :=
-    [a-z][a-zA-Z0-9_]*
-<dynamic-variable> :=
-    [A-Z][a-zA-Z0-9_]*
-<variable> :=
-    <lexical-variable>
-  | <dynamic-variable>
+<variable> := [a-zA-Z][a-zA-Z0-9_]*
 <binding> :=
     <variable> = <expr>
 <callee> :=
@@ -28,8 +22,8 @@ Closure virtual machine: a programming language, a shell, and a virtual machine.
   | if <expr> then <expr> else <expr>
   | ( <callee> <expr>* )
   | [ <expr>+ ]
-  | @ <lexical-variable> <expr>
-  | & <lexical-variable> <expr>
+  | @ <variable> <expr>
+  | & <variable> <expr>
 <def> :=
     letrec ( <binding>* )
 <intrinsic> :=

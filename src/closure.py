@@ -185,12 +185,6 @@ class VariableNode(ExprNode):
         self.sl = sl
         self.name = name
 
-    def is_lex(self) -> bool:
-        return self.name[0].islower()
-
-    def is_dyn(self) -> bool:
-        return self.name[0].isupper()
-
 class LambdaNode(ExprNode):
 
     def __init__(self, sl: SourceLocation, var_list: list[VariableNode], expr: ExprNode):
@@ -552,15 +546,6 @@ def lookup_env(name: str, env: list[tuple[str, int]]) -> Union[int, None]:
             return env[i][1]
     return None
 
-def lookup_stack(name: str, stack: list[Layer]) -> Union[int, None]:
-    ''' dynamically scoped variable lookup '''
-    for i in range(len(stack) - 1, -1, -1):
-        if stack[i].frame:
-            for j in range(len(stack[i].env) - 1, -1, -1):
-                if stack[i].env[j][0] == name:
-                    return stack[i].env[j][1]
-    return None
-
 class State:
     '''The class for the complete execution state'''
 
@@ -643,10 +628,7 @@ class State:
                     self.stack.pop()
             elif type(layer.expr) == VariableNode:
                 # two types of variables
-                if layer.expr.is_lex():
-                    location = lookup_env(layer.expr.name, layer.env)
-                else:
-                    location = lookup_stack(layer.expr.name, self.stack)
+                location = lookup_env(layer.expr.name, layer.env)
                 if location is None:
                     runtime_error(layer.expr.sl, 'undefined variable')
                 self.value = self.store[location]
