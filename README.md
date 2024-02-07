@@ -8,15 +8,15 @@ Closure virtual machine: a programming language, a scheduler, and a memory manag
 
 ```
 // types: void, int, str, closure
+<comment>   := #[^\n]*
 <variable>  := [a-zA-Z][a-zA-Z0-9_]*
 <binding>   := <variable> = <expr>
-<update>    := <variable> <- <expr>
 <callee>    := <intrinsic>
              | <expr>
 <expr>      := <int>
              | <str>
              | <variable>
-             | <update>
+             | set <variable> <expr>
              | lambda ( <variable>* ) { <expr> }
              | letrec ( <binding>* ) { <expr> }
              | if <expr> then { <expr> } else { <expr> }
