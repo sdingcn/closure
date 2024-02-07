@@ -2,9 +2,9 @@
 
 ![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
 
-Closure virtual machine: a programming language, a scheduler, and a memory manager.
+Closure virtual machine: an interpreter, a scheduler, and a memory manager.
 
-## Programming language
+## Language
 
 ```
 // types: void, int, str, closure
@@ -18,10 +18,10 @@ Closure virtual machine: a programming language, a scheduler, and a memory manag
              | <variable>
              | set <variable> <expr>
              | lambda ( <variable>* ) { <expr> }
-             | letrec ( <binding>* ) { <expr> }
+             | letrec ( <binding>* ) { <expr> }           // pass by deepcopy
              | if <expr> then { <expr> } else { <expr> }
              | while <expr> { <expr> }
-             | ( <callee> <expr>* )
+             | ( <callee> <expr>* )                       // pass by reference
              | [ <expr>+ ]
              | @ <variable> <expr>
              | & <variable> <expr>
@@ -56,6 +56,6 @@ Closure virtual machine: a programming language, a scheduler, and a memory manag
 /sd                // shutdown
 ```
 
-## Dependency and usage
+## Dependency
 
 Python >= 3.9

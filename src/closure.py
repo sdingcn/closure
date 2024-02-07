@@ -468,11 +468,16 @@ class State:
         # output message buffer
         self.output_buffer = []
 
+    def clean(self) -> None:
+        self.stack = []
+        self.store = []
+        self.end = 0
+
     def step(self) -> bool:
-        # TODO: clean up stack & heap before returning False
         layer = self.stack[-1]
         if layer.expr is None:
             # found the main frame, which is the end of evaluation
+            self.clean()
             return False
         elif type(layer.expr) == IntegerNode:
             self.value = Integer(layer.expr.i)
@@ -613,6 +618,7 @@ class State:
                         self.value = Integer(isinstance(args[0], Closure))
                     elif intrinsic == '.exit':
                         check_or_exit(layer.expr.sl, args, [])
+                        self.clean()
                         return False
                     else:
                         runtime_error(layer.expr.sl, 'unrecognized intrinsic function call')
