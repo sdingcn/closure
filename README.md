@@ -60,5 +60,5 @@ sd                // shutdown
 
 ## Dependency
 
-Python >= 3.9
+Python >= 3.9  
 C++20
