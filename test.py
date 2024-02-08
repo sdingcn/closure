@@ -109,8 +109,7 @@ letrec (
 )
     ]
     for i, test in enumerate(tests):
-        sys.stderr.write(f'(\nRunning on test {i + 1}\n')
+        sys.stderr.write(f'>>> Running on test {i + 1}\n')
         if not checker(*test):
             sys.exit(f'*** Failed on test {i + 1}')
-        sys.stderr.write(')\n')
-    sys.stderr.write(f'\nPassed all {i + 1} tests\n')
+    sys.stderr.write(f'>>> Passed all {i + 1} tests\n')
