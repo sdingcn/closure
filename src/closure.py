@@ -304,9 +304,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
     def parse_if() -> IfNode:
         start = consume(is_token('if'))
         cond = parse_expr()
-        consume(is_token('then'))
         branch1 = parse_expr()
-        consume(is_token('else'))
         branch2 = parse_expr()
         return IfNode(start.sl, cond, branch1, branch2)
 
@@ -536,6 +534,7 @@ class State:
                 # this is necessary because letrec layer's env is shared with its frame
                 for i in range(len(layer.expr.var_expr_list)):
                     layer.env.pop()
+                # no need to update self.value: inherited
                 self.stack.pop()
         elif type(layer.expr) == IfNode:
             # evaluate the condition
@@ -553,6 +552,7 @@ class State:
                 layer.pc += 1
             # finish if
             else:
+                # no need to update self.value: inherited
                 self.stack.pop()
         elif type(layer.expr) == VariableNode:
             loc = lookup_env(layer.expr.name, layer.env)
@@ -679,6 +679,7 @@ class State:
                     layer.pc += 1
                 # finish the (closure) call
                 else:
+                    # no need to update self.value: inherited
                     self.stack.pop()
         elif type(layer.expr) == SequenceNode:
             # evaluate the expressions, without the need of storing the results to local
@@ -687,6 +688,7 @@ class State:
                 layer.pc += 1
             # finish the sequence
             else:
+                # no need to update self.value: inherited
                 self.stack.pop()
         elif type(layer.expr) == QueryNode:
             # evaluate the closure

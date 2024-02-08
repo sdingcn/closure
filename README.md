@@ -19,7 +19,7 @@ Closure virtual machine: an interpreter, a scheduler, and a memory manager.
              | set <variable> <expr>
              | lambda ( <variable>* ) <expr>
              | letrec ( <binding>* ) <expr>               // pass by deepcopy
-             | if <expr> then <expr> else <expr>
+             | if <expr> <expr> <expr>
              | while <expr> <expr>
              | ( <callee> <expr>* )                       // pass by reference
              | [ <expr>+ ]

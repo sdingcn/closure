@@ -31,12 +31,13 @@ letrec (
   node = lambda (value left right)
     lambda () 1
   dfs = lambda (tree)
-    if (.< (tree) 1) then 0
-    else [
-      (dfs &left tree)
-      (.send 0 &value tree)
-      (dfs &right tree)
-    ]
+    if (.< (tree) 1)
+       0
+       [
+         (dfs &left tree)
+         (.send 0 &value tree)
+         (dfs &right tree)
+       ]
 )
   # in-order traversal
   (dfs
@@ -61,8 +62,9 @@ letrec (
 '''\
 letrec (
   sum = lambda (n s)
-    if (.< n 1) then s
-    else (sum (.- n 1) (.+ n s))
+    if (.< n 1)
+       s
+       (sum (.- n 1) (.+ n s))
 )
   (.send 0 (sum 10000 0))
 '''
