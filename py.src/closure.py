@@ -197,6 +197,13 @@ class IfNode(ExprNode):
         self.branch1 = branch1
         self.branch2 = branch2
 
+class WhileNode(ExprNode):
+
+    def __init__(self, sl: SourceLocation, cond: ExprNode, body: ExprNode):
+        self.sl = sl
+        self.cond = cond
+        self.body = body
+
 class CallNode(ExprNode):
 
     def __init__(self, sl: SourceLocation, callee: ExprNode, arg_list: list[ExprNode]):
@@ -308,6 +315,12 @@ def parse(tokens: deque[Token]) -> ExprNode:
         branch2 = parse_expr()
         return IfNode(start.sl, cond, branch1, branch2)
 
+    def parse_while() -> IfNode:
+        start = consume(is_token('while'))
+        cond = parse_expr()
+        body = parse_expr()
+        return WhileNode(start.sl, cond, body)
+
     def parse_variable() -> VariableNode:
         token = consume(is_variable_token)
         return VariableNode(token.sl, token.src)
@@ -363,6 +376,8 @@ def parse(tokens: deque[Token]) -> ExprNode:
             return parse_letrec()
         elif tokens[0].src == 'if':
             return parse_if()
+        elif tokens[0].src == 'while':
+            return parse_while()
         # check keywords before var to avoid recognizing keywords as vars
         elif is_variable_token(tokens[0]):
             return parse_variable()
@@ -554,6 +569,23 @@ class State:
             else:
                 # no need to update self.value: inherited
                 self.stack.pop()
+        elif type(layer.expr) == WhileNode:
+            # evaluate the condition
+            if layer.pc == 0:
+                self.stack.append(Layer(layer.env, layer.expr.cond))
+                layer.pc += 1
+            # choose whether to continue
+            elif layer.pc == 1:
+                if type(self.value) != Integer:
+                    runtime_error(layer.expr.cond.sl, 'wrong condition type')
+                if self.value.i != 0:
+                    self.stack.append(Layer(layer.env, layer.expr.body))
+                    # loop
+                    layer.pc = 0
+                # finish while
+                else:
+                    self.value = Void()
+                    self.stack.pop()
         elif type(layer.expr) == VariableNode:
             loc = lookup_env(layer.expr.name, layer.env)
             if loc is None:

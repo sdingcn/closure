@@ -93,6 +93,8 @@ letrec (
   (.send 0 x)
   letrec (z = x) set z 6
   (.send 0 x)
+  while (.< x 10) set x (.+ 1 x)
+  (.send 0 x)
 ]
 '''
 ,
@@ -104,6 +106,7 @@ letrec (
 (0, 4)
 (0, 5)
 (0, 5)
+(0, 10)
 [Note] evaluation value = <void>
 '''
 )
