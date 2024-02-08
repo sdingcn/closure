@@ -26,21 +26,18 @@ if __name__ == '__main__':
 (
 '''\
 letrec (
-  leaf = lambda () {
-    lambda () { 0 }
-  }
-  node = lambda (value left right) {
-    lambda () { 1 }
-  }
-  dfs = lambda (tree) {
+  leaf = lambda ()
+    lambda () 0
+  node = lambda (value left right)
+    lambda () 1
+  dfs = lambda (tree)
     if (.< (tree) 1) then 0
     else [
       (dfs &left tree)
       (.send 0 &value tree)
       (dfs &right tree)
     ]
-  }
-) {
+)
   # in-order traversal
   (dfs
     (node 4
@@ -48,7 +45,6 @@ letrec (
         (node 1 (leaf) (leaf))
         (node 3 (leaf) (leaf)))
       (node 5 (leaf) (leaf))))
-}
 '''
 ,
 '''\
@@ -64,13 +60,11 @@ letrec (
 (
 '''\
 letrec (
-  sum = lambda (n s) {
+  sum = lambda (n s)
     if (.< n 1) then s
     else (sum (.- n 1) (.+ n s))
-  }
-) {
+)
   (.send 0 (sum 10000 0))
-}
 '''
 ,
 '''\

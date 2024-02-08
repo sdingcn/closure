@@ -205,10 +205,10 @@ class SequenceNode(ExprNode):
 
 class QueryNode(ExprNode):
 
-    def __init__(self, sl: SourceLocation, var: VariableNode, expr_box: list[ExprNode]):
+    def __init__(self, sl: SourceLocation, var: VariableNode, expr: ExprNode):
         self.sl = sl
         self.var = var
-        self.expr_box = expr_box
+        self.expr = expr
 
 class AccessNode(ExprNode):
 
@@ -222,6 +222,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
     is_string_token = lambda token: len(token.src) and token.src[0] == '"'
     is_intrinsic_token = lambda token: len(token.src) and token.src[0] == '.'
     is_variable_token = lambda token: len(token.src) and token.src[0].isalpha()
+    is_token = lambda s: lambda token: token.src == s
 
     def consume(predicate: Callable) -> Token:
         if not tokens:
@@ -233,13 +234,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
 
     def parse_number() -> IntegerNode:
         token = consume(is_number_token)
-        s = token.src
-        sign = 1
-        if len(s) and s[0] in ('-', '+'):
-            if s[0] == '-':
-                sign = -1
-            s = s[1:]
-        return IntegerNode(token.sl, sign * int(s))
+        return IntegerNode(token.sl, int(token.src))
 
     def parse_string() -> StringNode:
         token = consume(is_string_token)
@@ -271,38 +266,34 @@ def parse(tokens: deque[Token]) -> ExprNode:
         return IntrinsicNode(token.sl, token.src)
 
     def parse_lambda() -> LambdaNode:
-        start = consume(lambda t: t.src == 'lambda')
-        consume(lambda t: t.src == '(')
+        start = consume(is_token('lambda'))
+        consume(is_token('('))
         var_list = []
         while tokens and is_variable_token(tokens[0]):
             var_list.append(parse_variable())
-        consume(lambda t: t.src == ')')
-        consume(lambda t: t.src == '{')
+        consume(is_token(')'))
         expr = parse_expr()
-        consume(lambda t: t.src == '}')
         return LambdaNode(start.sl, var_list, expr)
 
     def parse_letrec() -> LetrecNode:
-        start = consume(lambda t: t.src == 'letrec')
-        consume(lambda t: t.src == '(')
+        start = consume(is_token('letrec'))
+        consume(is_token('('))
         var_expr_list = []
         while tokens and is_variable_token(tokens[0]):
             v = parse_variable()
-            consume(lambda t: t.src == '=')
+            consume(is_token('='))
             e = parse_expr()
             var_expr_list.append((v, e))
-        consume(lambda t: t.src == ')')
-        consume(lambda t: t.src == '{')
+        consume(is_token(')'))
         expr = parse_expr()
-        consume(lambda t: t.src == '}')
         return LetrecNode(start.sl, var_expr_list, expr)
 
     def parse_if() -> IfNode:
-        start = consume(lambda t: t.src == 'if')
+        start = consume(is_token('if'))
         cond = parse_expr()
-        consume(lambda t: t.src == 'then')
+        consume(is_token('then'))
         branch1 = parse_expr()
-        consume(lambda t: t.src == 'else')
+        consume(is_token('else'))
         branch2 = parse_expr()
         return IfNode(start.sl, cond, branch1, branch2)
 
@@ -311,7 +302,7 @@ def parse(tokens: deque[Token]) -> ExprNode:
         return VariableNode(token.sl, token.src)
 
     def parse_call() -> CallNode:
-        start = consume(lambda t: t.src == '(')
+        start = consume(is_token('('))
         if not tokens:
             parser_error(start.sl, 'incomplete token stream')
         if is_intrinsic_token(tokens[0]):
@@ -321,27 +312,27 @@ def parse(tokens: deque[Token]) -> ExprNode:
         arg_list = []
         while tokens and tokens[0].src != ')':
             arg_list.append(parse_expr())
-        consume(lambda t: t.src == ')')
+        consume(is_token(')'))
         return CallNode(start.sl, callee, arg_list)
 
     def parse_sequence() -> SequenceNode:
-        start = consume(lambda t: t.src == '[')
+        start = consume(is_token('['))
         expr_list = []
         while tokens and tokens[0].src != ']':
             expr_list.append(parse_expr())
         if len(expr_list) == 0:
             parser_error(start.sl, 'zero-length sequence')
-        consume(lambda t: t.src == ']')
+        consume(is_token(']'))
         return SequenceNode(start.sl, expr_list)
 
     def parse_query() -> QueryNode:
-        start = consume(lambda t: t.src == '@')
+        start = consume(is_token('@'))
         var = parse_variable()
         expr = parse_expr()
-        return QueryNode(start.sl, var, [expr])
+        return QueryNode(start.sl, var, expr)
 
     def parse_access() -> AccessNode:
-        start = consume(lambda t: t.src == '&')
+        start = consume(is_token('&'))
         var = parse_variable()
         expr = parse_expr()
         return AccessNode(start.sl, var, expr)
@@ -672,7 +663,7 @@ class State:
         elif type(layer.expr) == QueryNode:
             # evaluate the closure
             if layer.pc == 0:
-                self.stack.append(Layer(layer.env, layer.expr.expr_box[0]))
+                self.stack.append(Layer(layer.env, layer.expr.expr))
                 layer.pc += 1
             else:
                 if type(self.value) != Closure:

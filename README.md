@@ -17,10 +17,10 @@ Closure virtual machine: an interpreter, a scheduler, and a memory manager.
              | <str>
              | <variable>
              | set <variable> <expr>
-             | lambda ( <variable>* ) { <expr> }
-             | letrec ( <binding>* ) { <expr> }           // pass by deepcopy
-             | if <expr> then { <expr> } else { <expr> }
-             | while <expr> { <expr> }
+             | lambda ( <variable>* ) <expr>
+             | letrec ( <binding>* ) <expr>           // pass by deepcopy
+             | if <expr> then <expr> else <expr>
+             | while <expr> <expr>
              | ( <callee> <expr>* )                       // pass by reference
              | [ <expr>+ ]
              | @ <variable> <expr>
