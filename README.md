@@ -1,8 +1,10 @@
-# cvm
+# cvm.experimental
 
 ![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
 
-Closure virtual machine: an interpreter, a scheduler, and a memory manager.
+This repository is for experimenting with programming language features, interpreters and optimizations,
+multitasking and schedulers, memory managers and garbage collectors, etc.
+So everything is always "work in progress".
 
 ## Language
 
