@@ -419,7 +419,9 @@ class Closure(Value):
 class Layer:
     '''Each layer on the stack contains the (sub-)expression currently under evaluation.'''
 
-    def __init__(self, env: list[tuple[str, int]], expr: ExprNode):
+    def __init__(self, env: list[tuple[str, int]], expr: ExprNode, frame: bool = False):
+        # whether this layer starts a new call frame
+        self.frame = frame
         # environment (shared among layers in each call frame) for the evaluation of the current expression
         self.env = env 
         # the current expression under evaluation
@@ -450,13 +452,12 @@ class State:
     def __init__(self, expr: ExprNode):
         # stack (tail call optimization never removes the main frame)
         main_env = []
-        self.stack = [Layer(main_env, None), Layer(main_env, expr)]
+        self.stack = [Layer(main_env, None, True), Layer(main_env, expr)]
         # heap
         self.store = []
-        self.end = 0
         # evaluation result
         self.value = None
-        # output message buffer
+        # output message buffer (ignore the 'location' of output values)
         self.output_buffer = []
 
     def clean(self) -> None:
@@ -647,7 +648,7 @@ class State:
                         addr = args[i].location if args[i].location != None else self._new(args[i])
                         new_env.append((v.name, addr))
                     # evaluate the closure call
-                    self.stack.append(Layer(new_env, callee.fun.expr))
+                    self.stack.append(Layer(new_env, callee.fun.expr, True))
                     layer.pc += 1
                 # finish the (closure) call
                 else:
@@ -690,17 +691,17 @@ class State:
         return True
     
     def execute(self) -> None:
+        ctr = 0
         while self.step():
-            pass
+            ctr += 1
+            if ctr % 10000 == 0:
+                sys.stderr.write('GC collected: ' + str(self._gc()) + '\n')
 
     def _new(self, value: Value) -> int:
-        if self.end < len(self.store):
-            self.store[self.end] = value
-        else:
-            self.store.append(value)
-        value.location = self.end
-        self.end += 1
-        return self.end - 1
+        self.store.append(value)
+        loc = len(self.store) - 1
+        value.location = loc
+        return loc
 
     def _traverse(self, value_callback: Callable, location_callback: Callable) -> None:
         # ids
@@ -740,8 +741,9 @@ class State:
         removed = 0
         # maps old locations to new locations
         relocation_dict = {}
+        n = len(self.store)
         i, j = 0, 0
-        while j < self.end:
+        while j < n:
             if j in visited_locations:
                 self.store[i] = self.store[j]
                 self.store[i].location = i
@@ -750,8 +752,7 @@ class State:
             else:
                 removed += 1
             j += 1
-        # adjust the next available location
-        self.end = i
+        self.store = self.store[:i]
         return (removed, relocation_dict)
     
     def _relocate(self, relocation_dict: dict[int, int]) -> None:
