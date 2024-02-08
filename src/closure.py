@@ -168,6 +168,13 @@ class VariableNode(ExprNode):
         self.sl = sl
         self.name = name
 
+class SetNode(ExprNode):
+
+    def __init__(self, sl: SourceLocation, var: VariableNode, expr: ExprNode):
+        self.sl = sl
+        self.var = var
+        self.expr = expr
+
 class LambdaNode(ExprNode):
 
     def __init__(self, sl: SourceLocation, var_list: list[VariableNode], expr: ExprNode):
@@ -265,6 +272,12 @@ def parse(tokens: deque[Token]) -> ExprNode:
         token = consume(is_intrinsic_token)
         return IntrinsicNode(token.sl, token.src)
 
+    def parse_set() -> SetNode:
+        start = consume(is_token('set'))
+        var = parse_variable()
+        expr = parse_expr()
+        return SetNode(start.sl, var, expr)
+
     def parse_lambda() -> LambdaNode:
         start = consume(is_token('lambda'))
         consume(is_token('('))
@@ -344,6 +357,8 @@ def parse(tokens: deque[Token]) -> ExprNode:
             return parse_number()
         elif is_string_token(tokens[0]):
             return parse_string()
+        elif tokens[0].src == 'set':
+            return parse_set()
         elif tokens[0].src == 'lambda':
             return parse_lambda()
         elif tokens[0].src == 'letrec':
@@ -450,7 +465,7 @@ class State:
     '''The class for the complete execution state'''
 
     def __init__(self, expr: ExprNode):
-        # stack (tail call optimization never removes the main frame)
+        # stack
         main_env = []
         self.stack = [Layer(main_env, None, True), Layer(main_env, expr)]
         # heap
@@ -463,7 +478,6 @@ class State:
     def clean(self) -> None:
         self.stack = []
         self.store = []
-        self.end = 0
 
     def step(self) -> bool:
         layer = self.stack[-1]
@@ -477,6 +491,19 @@ class State:
         elif type(layer.expr) == StringNode:
             self.value = String(layer.expr.s)
             self.stack.pop()
+        elif type(layer.expr) == SetNode:
+            if layer.pc == 0:
+                self.stack.append(Layer(layer.env, layer.expr.expr))
+                layer.pc += 1
+            else:
+                loc = lookup_env(layer.expr.var.name, layer.env)
+                if loc is None:
+                    runtime_error(layer.expr.sl, 'undefined variable')
+                val = deepcopy(self.value)
+                val.location = loc
+                self.store[loc] = val
+                self.value = Void()
+                self.stack.pop()
         elif type(layer.expr) == LambdaNode:
             # closures always save all variables (no matter whether they are used in the body or not)
             # so you can use the @ query in an intuitive way

@@ -72,6 +72,38 @@ letrec (
 (0, 50005000)
 [Note] evaluation value = <void>
 '''
+),
+(
+'''\
+letrec (
+  x = 0
+  change = lambda (y v) set y v
+) [
+  set x 1
+  (.send 0 x)
+  set x 2
+  (.send 0 x)
+  set x 3
+  (.send 0 x)
+  (change x 4)
+  (.send 0 x)
+  (change x 5)
+  (.send 0 x)
+  letrec (z = x) set z 6
+  (.send 0 x)
+]
+'''
+,
+'''\
+[Note] output buffer:
+(0, 1)
+(0, 2)
+(0, 3)
+(0, 4)
+(0, 5)
+(0, 5)
+[Note] evaluation value = <void>
+'''
 )
     ]
     for i, test in enumerate(tests):
