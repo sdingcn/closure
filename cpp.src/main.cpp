@@ -74,7 +74,6 @@ std::deque<Token> lex(std::string source) {
     };
 
     std::reverse(source.begin(), source.end());
-
     std::function<std::optional<Token>()> nextToken =
     [&source, &sl, &countTrailingEscape, &nextToken]() -> std::optional<Token> {
         // skip whitespaces
@@ -285,6 +284,222 @@ struct AccessNode : public ExprNode {
     std::unique_ptr<VariableNode> var;
     std::unique_ptr<ExprNode> expr;
 };
+
+std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
+    auto isNumberToken = [](const Token &token) {
+        return token.text.size() > 0 &&
+            (std::isdigit(token.text[0]) || token.text[0] == '-' || token.text[0] == '+');
+    };
+    auto isStringToken = [](const Token &token) {
+        return token.text.size() > 0 && token.text[0] == '"';
+    };
+    auto isIntrinsicToken = [](const Token &token) {
+        return token.text.size() > 0 && token.text[0] == '.';
+    };
+    auto isVariableToken = [](const Token &token) {
+        return token.text.size() > 0 && std::isalpha(token.text[0]);
+    };
+    auto isToken = [](const std::string &s) {
+        return [s](const Token &token) {
+            return token.text == s;
+        };
+    };
+
+    auto consume = [&tokens]<typename Callable>(const Callable &predicate) -> Token {
+        if (tokens.size() == 0) {
+            throwError("parser", SourceLocation(-1, -1), "incomplete token stream");
+        }
+        auto token = tokens.front();
+        tokens.pop_front();
+        if (!predicate(token)) {
+            throwError("parser", token.sl, "unexpected token");
+        }
+        return token;
+    };
+
+    std::function<std::unique_ptr<IntegerNode>()> parseNumber;
+    std::function<std::unique_ptr<StringNode>()> parseString;
+    std::function<std::unique_ptr<IntrinsicNode>()> parseIntrinsic;
+    std::function<std::unique_ptr<SetNode>()> parseSet;
+    std::function<std::unique_ptr<LambdaNode>()> parseLambda;
+    std::function<std::unique_ptr<LetrecNode>()> parseLetrec;
+    std::function<std::unique_ptr<IfNode>()> parseIf;
+    std::function<std::unique_ptr<WhileNode>()> parseWhile;
+    std::function<std::unique_ptr<VariableNode>()> parseVariable;
+    std::function<std::unique_ptr<CallNode>()> parseCall;
+    std::function<std::unique_ptr<SequenceNode>()> parseSequence;
+    std::function<std::unique_ptr<QueryNode>()> parseQuery;
+    std::function<std::unique_ptr<AccessNode>()> parseAccess;
+    std::function<std::unique_ptr<ExprNode>()> parseExpr;
+
+    parseNumber = [&]() -> std::unique_ptr<IntegerNode> {
+        auto token = consume(isNumberToken);
+        return std::make_unique<IntegerNode>(token.sl, std::stoi(token.text));
+    };
+    parseString = [&]() -> std::unique_ptr<StringNode> {
+        auto token = consume(isStringToken);
+        auto content = token.text;
+        content.pop_back();
+        std::reverse(content.begin(), content.end());
+        content.pop_back();
+        std::string s;
+        while (content.size()) {
+            auto c = content.back();
+            content.pop_back();
+            if (c == '\\') {
+                if (content.size()) {
+                    auto next = content.back();
+                    content.pop_back();
+                    if (next == '\\') {
+                        s += '\\';
+                    } else if (next == '"') {
+                        s += '"';
+                    } else if (next == 't') {
+                        s += '\t';
+                    } else if (next == 'n') {
+                        s += '\n';
+                    } else {
+                        throwError("parser", token.sl, "unsupported escape sequence");
+                    }
+                } else {
+                    throwError("parser", token.sl, "incomplete escape sequence");
+                }
+            } else {
+                s += c;
+            }
+        }
+        return std::make_unique<StringNode>(token.sl, std::move(s));
+    };
+    parseIntrinsic = [&]() -> std::unique_ptr<IntrinsicNode> {
+        auto token = consume(isIntrinsicToken);
+        return std::make_unique<IntrinsicNode>(token.sl, token.text);
+    };
+    parseSet = [&]() -> std::unique_ptr<SetNode> {
+        auto start = consume(isToken("set"));
+        auto var = parseVariable();
+        auto expr = parseExpr();
+        return std::make_unique<SetNode>(start.sl, std::move(var), std::move(expr));
+    };
+    parseLambda = [&]() -> std::unique_ptr<LambdaNode> {
+        auto start = consume(isToken("lambda"));
+        consume(isToken("("));
+        std::vector<std::unique_ptr<VariableNode>> varList;
+        while (tokens.size() && isVariableToken(tokens[0])) {
+            varList.push_back(parseVariable());
+        }
+        consume(isToken(")"));
+        auto expr = parseExpr();
+        return std::make_unique<LambdaNode>(start.sl, std::move(varList), std::move(expr));
+    };
+    parseLetrec = [&]() -> std::unique_ptr<LetrecNode> {
+        auto start = consume(isToken("letrec"));
+        consume(isToken("("));
+        std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> varExprList;
+        while (tokens.size() && isVariableToken(tokens[0])) {
+            auto v = parseVariable();
+            consume(isToken("="));
+            auto e = parseExpr();
+            varExprList.emplace_back(std::move(v), std::move(e));
+        }
+        consume(isToken(")"));
+        auto expr = parseExpr();
+        return std::make_unique<LetrecNode>(start.sl, std::move(varExprList), std::move(expr));
+    };
+    parseIf = [&]() -> std::unique_ptr<IfNode> {
+        auto start = consume(isToken("if"));
+        auto cond = parseExpr();
+        auto branch1 = parseExpr();
+        auto branch2 = parseExpr();
+        return std::make_unique<IfNode>(start.sl, std::move(cond), std::move(branch1), std::move(branch2));
+    };
+    parseWhile = [&]() -> std::unique_ptr<WhileNode> {
+        auto start = consume(isToken("while"));
+        auto cond = parseExpr();
+        auto body = parseExpr();
+        return std::make_unique<WhileNode>(start.sl, std::move(cond), std::move(body));
+    };
+    parseVariable = [&]() -> std::unique_ptr<VariableNode> {
+        auto token = consume(isVariableToken);
+        return std::make_unique<VariableNode>(token.sl, std::move(token.text));
+    };
+    parseCall = [&]() -> std::unique_ptr<CallNode> {
+        auto start = consume(isToken("("));
+        if (!tokens.size()) {
+            throwError("parser", start.sl, "incomplete tokens stream");
+        }
+        std::unique_ptr<ExprNode> callee = isIntrinsicToken(tokens[0]) ? parseIntrinsic() : parseExpr();
+        std::vector<std::unique_ptr<ExprNode>> argList;
+        while (tokens.size() && tokens[0].text != ")") {
+            argList.push_back(parseExpr());
+        }
+        consume(isToken(")"));
+        return std::make_unique<CallNode>(start.sl, std::move(callee), std::move(argList));
+    };
+    parseSequence = [&]() -> std::unique_ptr<SequenceNode> {
+        auto start = consume(isToken("["));
+        std::vector<std::unique_ptr<ExprNode>> exprList;
+        while (tokens.size() && tokens[0].text != "]") {
+            exprList.push_back(parseExpr());
+        }
+        if (!exprList.size()) {
+            throwError("parser", start.sl, "zero-length sequence");
+        }
+        consume(isToken("]"));
+        return std::make_unique<SequenceNode>(start.sl, std::move(exprList));
+    };
+    parseQuery = [&]() -> std::unique_ptr<QueryNode> {
+        auto start = consume(isToken("@"));
+        auto var = parseVariable();
+        auto expr = parseExpr();
+        return std::make_unique<QueryNode>(start.sl, std::move(var), std::move(expr));
+    };
+    parseAccess = [&]() -> std::unique_ptr<AccessNode> {
+        auto start = consume(isToken("&"));
+        auto var = parseVariable();
+        auto expr = parseExpr();
+        return std::make_unique<AccessNode>(start.sl, std::move(var), std::move(expr));
+    };
+    parseExpr = [&]() -> std::unique_ptr<ExprNode> {
+        if (!tokens.size()) {
+            throwError("parser", SourceLocation(-1, -1), "incomplete token stream");
+            return nullptr;
+        } else if (isNumberToken(tokens[0])) {
+            return parseNumber();
+        } else if (isStringToken(tokens[0])) {
+            return parseString();
+        } else if (tokens[0].text == "set") {
+            return parseSet();
+        } else if (tokens[0].text == "lambda") {
+            return parseLambda();
+        } else if (tokens[0].text == "letrec") {
+            return parseLetrec();
+        } else if (tokens[0].text == "if") {
+            return parseIf();
+        } else if (tokens[0].text == "while") {
+            return parseWhile();
+        // check keywords before var to avoid recognizing keywords as vars
+        } else if (isVariableToken(tokens[0])) {
+            return parseVariable();
+        } else if (tokens[0].text == "(") {
+            return parseCall();
+        } else if (tokens[0].text == "[") {
+            return parseSequence();
+        } else if (tokens[0].text == "@") {
+            return parseQuery();
+        } else if (tokens[0].text == "&") {
+            return parseAccess();
+        } else {
+            throwError("parser", tokens[0].sl, "unrecognized token");
+            return nullptr;
+        }
+    };
+
+    auto expr = parseExpr();
+    if (tokens.size()) {
+        throwError("parser", tokens[0].sl, "redundant token(s)");
+    }
+    return expr;
+}
 
 int main() {
 }
