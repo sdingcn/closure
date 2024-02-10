@@ -167,30 +167,45 @@ std::deque<Token> lex(std::string source) {
 
 struct ExprNode {
     ExprNode(SourceLocation s): sl(s) {}
+    ExprNode(const ExprNode &) = delete;
+    ExprNode &operator=(const ExprNode &) = delete;
+    virtual ~ExprNode() {}
 
     SourceLocation sl;
 };
 
 struct IntegerNode : public ExprNode {
     IntegerNode(SourceLocation s, int v): ExprNode(s), val(v) {}
+    IntegerNode(const IntegerNode&) = delete;
+    IntegerNode &operator=(const IntegerNode &) = delete;
+    virtual ~IntegerNode() override {}
 
     int val;
 };
 
 struct StringNode : public ExprNode {
     StringNode(SourceLocation s, std::string v): ExprNode(s), val(std::move(v)) {}
+    StringNode(const StringNode &) = delete;
+    StringNode &operator=(const StringNode &) = delete;
+    virtual ~StringNode() override {}
 
     std::string val;
 };
 
 struct IntrinsicNode : public ExprNode {
     IntrinsicNode(SourceLocation s, std::string n): ExprNode(s), name(std::move(n)) {}
+    IntrinsicNode(const IntrinsicNode &) = delete;
+    IntrinsicNode &operator=(const IntrinsicNode &) = delete;
+    virtual ~IntrinsicNode() override {}
 
     std::string name;
 };
 
 struct VariableNode : public ExprNode {
     VariableNode(SourceLocation s, std::string n): ExprNode(s), name(std::move(n)) {}
+    VariableNode(const VariableNode &) = delete;
+    VariableNode &operator=(const VariableNode &) = delete;
+    virtual ~VariableNode() override {}
 
     std::string name;
 };
@@ -198,6 +213,9 @@ struct VariableNode : public ExprNode {
 struct SetNode : public ExprNode {
     SetNode(SourceLocation s, std::unique_ptr<VariableNode> v, std::unique_ptr<ExprNode> e):
         ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
+    SetNode(const SetNode &) = delete;
+    SetNode &operator=(const SetNode &) = delete;
+    virtual ~SetNode() override {}
 
     std::unique_ptr<VariableNode> var;
     std::unique_ptr<ExprNode> expr;
@@ -206,6 +224,9 @@ struct SetNode : public ExprNode {
 struct LambdaNode : public ExprNode {
     LambdaNode(SourceLocation s, std::vector<std::unique_ptr<VariableNode>> v, std::unique_ptr<ExprNode> e):
         ExprNode(s), varList(std::move(v)), expr(std::move(e)) {}
+    LambdaNode(const LambdaNode &) = delete;
+    LambdaNode &operator=(const LambdaNode &) = delete;
+    virtual ~LambdaNode() override {}
 
     std::vector<std::unique_ptr<VariableNode>> varList;
     std::unique_ptr<ExprNode> expr;
@@ -217,6 +238,9 @@ struct LetrecNode : public ExprNode {
         std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), varExprList(std::move(v)), expr(std::move(e)) {}
+    LetrecNode(const LetrecNode &) = delete;
+    LetrecNode &operator=(const LetrecNode &) = delete;
+    virtual ~LetrecNode() override {}
     
     std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> varExprList;
     std::unique_ptr<ExprNode> expr;
@@ -229,6 +253,9 @@ struct IfNode : public ExprNode {
         std::unique_ptr<ExprNode> b1,
         std::unique_ptr<ExprNode> b2
     ): ExprNode(s), cond(std::move(c)), branch1(std::move(b1)), branch2(std::move(b2)) {}
+    IfNode(const IfNode &) = delete;
+    IfNode &operator=(const IfNode &) = delete;
+    virtual ~IfNode() override {}
 
     std::unique_ptr<ExprNode> cond;
     std::unique_ptr<ExprNode> branch1;
@@ -238,6 +265,9 @@ struct IfNode : public ExprNode {
 struct WhileNode : public ExprNode {
     WhileNode(SourceLocation s, std::unique_ptr<ExprNode> c, std::unique_ptr<ExprNode> b):
         ExprNode(s), cond(std::move(c)), body(std::move(b)) {}
+    WhileNode(const WhileNode &) = delete;
+    WhileNode &operator=(const WhileNode &) = delete;
+    virtual ~WhileNode() override {}
 
     std::unique_ptr<ExprNode> cond;
     std::unique_ptr<ExprNode> body;
@@ -249,6 +279,9 @@ struct CallNode : public ExprNode {
         std::unique_ptr<ExprNode> c,
         std::vector<std::unique_ptr<ExprNode>> a
     ): ExprNode(s), callee(std::move(c)), argList(std::move(a)) {}
+    CallNode(const CallNode &) = delete;
+    CallNode &operator=(const CallNode &) = delete;
+    virtual ~CallNode() override {}
 
     std::unique_ptr<ExprNode> callee;
     std::vector<std::unique_ptr<ExprNode>> argList;
@@ -259,6 +292,9 @@ struct SequenceNode : public ExprNode {
         SourceLocation s,
         std::vector<std::unique_ptr<ExprNode>> e
     ): ExprNode(s), exprList(std::move(e)) {}
+    SequenceNode(const SequenceNode &) = delete;
+    SequenceNode &operator=(const SequenceNode &) = delete;
+    virtual ~SequenceNode() override {}
 
     std::vector<std::unique_ptr<ExprNode>> exprList;
 };
@@ -269,6 +305,9 @@ struct QueryNode : public ExprNode {
         std::unique_ptr<VariableNode> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
+    QueryNode(const QueryNode &) = delete;
+    QueryNode &operator=(const QueryNode &) = delete;
+    virtual ~QueryNode() override {}
 
     std::unique_ptr<VariableNode> var;
     std::unique_ptr<ExprNode> expr;
@@ -280,6 +319,9 @@ struct AccessNode : public ExprNode {
         std::unique_ptr<VariableNode> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
+    AccessNode(const AccessNode &) = delete;
+    AccessNode &operator=(const AccessNode &) = delete;
+    virtual ~AccessNode() override {}
 
     std::unique_ptr<VariableNode> var;
     std::unique_ptr<ExprNode> expr;
