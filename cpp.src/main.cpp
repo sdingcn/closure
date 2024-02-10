@@ -4,12 +4,15 @@
 #include <format>
 #include <stdexcept>
 #include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
 #include <optional>
 #include <cctype>
 #include <functional>
 #include <memory>
 #include <vector>
+#include <variant>
+#include <iostream>
 
 // helpers
 
@@ -542,6 +545,140 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
     }
     return expr;
 }
+
+struct Void {
+    Void() = default;
+    std::string toString() {
+        return "<void>";
+    }
+
+    int location = 0;
+};
+
+struct Integer {
+    Integer(int v): value(v) {}
+    std::string toString() {
+        return std::to_string(value);
+    }
+
+    int location = 0;
+    int value = 0;
+};
+
+struct String {
+    String(std::string v): value(std::move(v)) {}
+    std::string toString() {
+        return value;
+    }
+
+    int location = 0;
+    std::string value;
+};
+
+using Env = std::vector<std::pair<std::string, int>>;
+
+std::optional<int> lookup(const std::string &name, const Env &env) {
+    for (auto p = env.rbegin(); p != env.rend(); p++) {
+        if (p->first == name) {
+            return p->second;
+        }
+    }
+    return std::nullopt;
+}
+
+struct Closure {
+    Closure(Env e, const LambdaNode &f):
+        env(std::move(e)), fun(f) {}
+    std::string toString() {
+        return std::format("<closure evaluated at {}>", fun.sl.toString());
+    }
+
+    int location = 0;
+    Env env;
+    const LambdaNode &fun;
+};
+
+using Value = std::variant<Void, Integer, String, Closure>;
+
+struct Layer {
+    Layer(std::variant<Env, Env*> e, const ExprNode *x):
+      env(std::move(e)), expr(x) {}
+    bool isFrame() {
+        return std::holds_alternative<Env>(env);
+    }
+    Env *getEnvPtr() {
+        if (std::holds_alternative<Env>(env)) {
+            return &(std::get<Env>(env));
+        } else {
+            return std::get<Env*>(env);
+        }
+    }
+
+    // Env for frame, Env* for others
+    std::variant<Env, Env*> env;
+    const ExprNode *expr;
+    // program counter
+    int pc = 0;
+    std::unordered_map<std::string, std::variant<Value, std::vector<Value>>> local;
+};
+
+using Stack = std::vector<Layer>;
+using Heap = std::vector<Value>;
+
+constexpr int GC_INTERVAL = 10000;
+
+class State {
+public:
+    State(const ExprNode &e) {
+        stack.push_back(Layer(Env(), nullptr));
+        stack.push_back(Layer(stack.back().getEnvPtr(), &e));
+    }
+    void clear() {
+        stack.clear();
+        heap.clear();
+        value = Void();
+    }
+    bool step() {
+        // TODO
+        return false;
+    }
+    void execute() {
+        int ctr = 0;
+        while (step()) {
+            ctr++;
+            if (ctr && (ctr % GC_INTERVAL == 0)) {
+                std::cerr << "GC collected: " << _gc() << "\n";
+            }
+        }
+    }
+private:
+    int _new(const Value &value) {
+        // TODO
+        return 0;
+    }
+    template<typename Callable1, typename Callable2>
+    void _traverse(Callable1 valueCallBack, Callable2 locationCallBack) {
+        // TODO
+    }
+    std::unordered_set<int> _mark() {
+        // TODO
+        return std::unordered_set<int>();
+    }
+    std::pair<int, std::unordered_map<int, int>> _sweepAndCompact(const std::unordered_set<int> &visited) {
+        // TODO
+        return std::make_pair(0, std::unordered_map<int, int>());
+    }
+    void _relocate(const std::unordered_map<int, int> &relocationMap) {
+        // TODO
+    }
+    int _gc() {
+        // TODO
+        return 0;
+    }
+    Stack stack;
+    Heap heap;
+    Value value;
+};
 
 int main() {
 }
