@@ -703,7 +703,7 @@ bool holds(Variant&&... vars) {
 }
 
 struct Layer {
-    Layer(std::variant<Env, Env*> e, const ExprNode *x):
+    Layer(std::variant<Env, Env*> e, ExprNode *x):
       env(std::move(e)), expr(x) {}
     bool isFrame() const {
         return std::holds_alternative<Env>(env);
@@ -718,7 +718,7 @@ struct Layer {
 
     // Env for frame, Env* for others
     std::variant<Env, Env*> env;
-    const ExprNode *expr;
+    ExprNode *expr;
     // program counter
     int pc = 0;
     // local helpers for evaluation
@@ -734,7 +734,7 @@ constexpr int GC_INTERVAL = 10000;
 
 class State {
 public:
-    State(const ExprNode *e) {
+    State(ExprNode *e) {
         // the main frame
         stack.push_back(Layer(Env(), nullptr));
         // the first expression
@@ -746,15 +746,55 @@ public:
         result = -1;
     }
     bool step() {
-        // TODO
-        return false;
+        // careful! this reference may be invalidated after modifying stack
+        // so always keep the stack operation as the last one
+        auto &layer = stack.back();
+        if (layer.expr == nullptr) {
+            // end of evaluation
+            clear();
+            return false;
+        } else if (auto inode = dynamic_cast<IntegerNode*>(layer.expr)) {
+            result = _new<Integer>(inode->val);
+            stack.pop_back();
+        } else if (auto snode = dynamic_cast<StringNode*>(layer.expr)) {
+            result = _new<String>(snode->val);
+            stack.pop_back();
+        } else if (auto snode = dynamic_cast<SetNode*>(layer.expr)) {
+            if (layer.pc == 0) {
+                layer.pc++;
+                stack.push_back(Layer(layer.getEnvPtr(), snode->expr.get()));
+            } else {
+                auto loc = lookup(snode->var->name, *(layer.getEnvPtr()));
+                if (!loc.has_value()) {
+                    throwError("runtime", layer.expr->sl, "undefined variable");
+                } else {
+                    heap[loc.value()] = heap[result];
+                    result = _new<Void>();
+                    stack.pop_back();
+                }
+            }
+        } else if (auto lnode = dynamic_cast<LambdaNode*>(layer.expr)) {
+            result = _new<Closure>(*layer.getEnvPtr(), lnode);
+            stack.pop_back();
+        } else if (auto lnode = dynamic_cast<LetrecNode*>(layer.expr)) {
+        } else if (auto inode = dynamic_cast<IfNode*>(layer.expr)) {
+        } else if (auto wnode = dynamic_cast<WhileNode*>(layer.expr)) {
+        } else if (auto vnode = dynamic_cast<VariableNode*>(layer.expr)) {
+        } else if (auto cnode = dynamic_cast<CallNode*>(layer.expr)) {
+        } else if (auto snode = dynamic_cast<SequenceNode*>(layer.expr)) {
+        } else if (auto qnode = dynamic_cast<QueryNode*>(layer.expr)) {
+        } else if (auto anode = dynamic_cast<AccessNode*>(layer.expr)) {
+        } else {
+            throwError("runtime", layer.expr->sl, "unrecognized AST node");
+        }
+        return true;
     }
     void execute() {
         int ctr = 0;
         while (step()) {
             ctr++;
             if (ctr && (ctr % GC_INTERVAL == 0)) {
-                std::cerr << "GC collected: " << _gc() << "\n";
+                std::cerr << "[Note] GC collected: " << _gc() << "\n";
             }
         }
     }
