@@ -44,8 +44,11 @@ struct SourceLocation {
     int column;
 };
 
-void throwError(const std::string &type, const SourceLocation &sl, const std::string &msg) {
-    throw std::runtime_error(std::format("[{} error {}] {}", type, sl.toString(), msg));
+void throwError(const std::string &type, const SourceLocation &sl,
+    const std::string &msg) {
+    throw std::runtime_error(
+        std::format("[{} error {}] {}", type, sl.toString(), msg)
+    );
 }
 
 // lexer
@@ -58,7 +61,9 @@ struct Token {
 };
 
 std::deque<Token> lex(std::string source) {
-    static std::string charstr = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/? \t\n";
+    static std::string charstr =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "0123456789`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/? \t\n";
     static std::unordered_set<char> charset(charstr.begin(), charstr.end());
     SourceLocation sl;
     for (auto c : source) {
@@ -81,7 +86,8 @@ std::deque<Token> lex(std::string source) {
 
     std::reverse(source.begin(), source.end());
     std::function<std::optional<Token>()> nextToken =
-    [&source, &sl, &countTrailingEscape, &nextToken]() -> std::optional<Token> {
+        [&source, &sl, &countTrailingEscape, &nextToken]()
+            -> std::optional<Token> {
         // skip whitespaces
         while (source.size() && std::isspace(source.back())) {
             sl.update(source.back());
@@ -94,7 +100,11 @@ std::deque<Token> lex(std::string source) {
         auto start_sl = sl;
         std::string text = "";
         // integer literal
-        if (std::isdigit(source.back()) || source.back() == '-' || source.back() == '+') {
+        if (
+            std::isdigit(source.back()) ||
+            source.back() == '-' ||
+            source.back() == '+'
+        ) {
             if (source.back() == '-' || source.back() == '+') {
                 text += source.back();
                 source.pop_back();
@@ -107,20 +117,31 @@ std::deque<Token> lex(std::string source) {
             }
         // variable / keyword
         } else if (std::isalpha(source.back())) {
-            while (source.size() && (std::isalpha(source.back()) || std::isdigit(source.back()) || source.back() == '_')) {
+            while (
+                source.size() && (
+                    std::isalpha(source.back()) ||
+                    std::isdigit(source.back()) ||
+                    source.back() == '_'
+                )
+            ) {
                text += source.back();
                source.pop_back();
                sl.update(text.back()); 
             }
         // intrinsic
         } else if (source.back() == '.') {
-            while (source.size() && !(std::isspace(source.back()) || source.back() == ')')) {
+            while (
+                source.size() &&
+                !(std::isspace(source.back()) || source.back() == ')')
+            ) {
                 text += source.back();
                 source.pop_back();
                 sl.update(text.back());
             }
         // special symbol
-        } else if (std::string("()[]=@&").find(source.back()) != std::string::npos) {
+        } else if (
+            std::string("()[]=@&").find(source.back()) != std::string::npos
+        ) {
             text += source.back();
             source.pop_back();
             sl.update(text.back());
@@ -129,7 +150,12 @@ std::deque<Token> lex(std::string source) {
             text += source.back();
             source.pop_back();
             sl.update(text.back());
-            while (source.size() && (source.back() != '"' || (source.back() == '"' && countTrailingEscape(text) % 2 != 0))) {
+            while (
+                source.size() && (
+                    source.back() != '"' ||
+                    (source.back() == '"' && countTrailingEscape(text) % 2 != 0)
+                )
+            ) {
                 text += source.back();
                 source.pop_back();
                 sl.update(text.back());
@@ -190,7 +216,8 @@ struct IntegerNode : public ExprNode {
 };
 
 struct StringNode : public ExprNode {
-    StringNode(SourceLocation s, std::string v): ExprNode(s), val(std::move(v)) {}
+    StringNode(SourceLocation s, std::string v):
+        ExprNode(s), val(std::move(v)) {}
     StringNode(const StringNode &) = delete;
     StringNode &operator=(const StringNode &) = delete;
     virtual ~StringNode() override {}
@@ -199,7 +226,8 @@ struct StringNode : public ExprNode {
 };
 
 struct IntrinsicNode : public ExprNode {
-    IntrinsicNode(SourceLocation s, std::string n): ExprNode(s), name(std::move(n)) {}
+    IntrinsicNode(SourceLocation s, std::string n):
+        ExprNode(s), name(std::move(n)) {}
     IntrinsicNode(const IntrinsicNode &) = delete;
     IntrinsicNode &operator=(const IntrinsicNode &) = delete;
     virtual ~IntrinsicNode() override {}
@@ -208,7 +236,8 @@ struct IntrinsicNode : public ExprNode {
 };
 
 struct VariableNode : public ExprNode {
-    VariableNode(SourceLocation s, std::string n): ExprNode(s), name(std::move(n)) {}
+    VariableNode(SourceLocation s, std::string n):
+        ExprNode(s), name(std::move(n)) {}
     VariableNode(const VariableNode &) = delete;
     VariableNode &operator=(const VariableNode &) = delete;
     virtual ~VariableNode() override {}
@@ -217,8 +246,11 @@ struct VariableNode : public ExprNode {
 };
 
 struct SetNode : public ExprNode {
-    SetNode(SourceLocation s, std::unique_ptr<VariableNode> v, std::unique_ptr<ExprNode> e):
-        ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
+    SetNode(
+        SourceLocation s,
+        std::unique_ptr<VariableNode> v,
+        std::unique_ptr<ExprNode> e
+    ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
     SetNode(const SetNode &) = delete;
     SetNode &operator=(const SetNode &) = delete;
     virtual ~SetNode() override {}
@@ -228,8 +260,10 @@ struct SetNode : public ExprNode {
 };
 
 struct LambdaNode : public ExprNode {
-    LambdaNode(SourceLocation s, std::vector<std::unique_ptr<VariableNode>> v, std::unique_ptr<ExprNode> e):
-        ExprNode(s), varList(std::move(v)), expr(std::move(e)) {}
+    LambdaNode(SourceLocation s,
+        std::vector<std::unique_ptr<VariableNode>> v,
+        std::unique_ptr<ExprNode> e
+    ): ExprNode(s), varList(std::move(v)), expr(std::move(e)) {}
     LambdaNode(const LambdaNode &) = delete;
     LambdaNode &operator=(const LambdaNode &) = delete;
     virtual ~LambdaNode() override {}
@@ -241,14 +275,18 @@ struct LambdaNode : public ExprNode {
 struct LetrecNode : public ExprNode {
     LetrecNode(
         SourceLocation s,
-        std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> v,
+        std::vector<std::pair<
+            std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>
+        >> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), varExprList(std::move(v)), expr(std::move(e)) {}
     LetrecNode(const LetrecNode &) = delete;
     LetrecNode &operator=(const LetrecNode &) = delete;
     virtual ~LetrecNode() override {}
     
-    std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> varExprList;
+    std::vector<std::pair<
+        std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>
+    >> varExprList;
     std::unique_ptr<ExprNode> expr;
 };
 
@@ -258,7 +296,9 @@ struct IfNode : public ExprNode {
         std::unique_ptr<ExprNode> c,
         std::unique_ptr<ExprNode> b1,
         std::unique_ptr<ExprNode> b2
-    ): ExprNode(s), cond(std::move(c)), branch1(std::move(b1)), branch2(std::move(b2)) {}
+    ): 
+        ExprNode(s), cond(std::move(c)),
+        branch1(std::move(b1)), branch2(std::move(b2)) {}
     IfNode(const IfNode &) = delete;
     IfNode &operator=(const IfNode &) = delete;
     virtual ~IfNode() override {}
@@ -269,8 +309,11 @@ struct IfNode : public ExprNode {
 };
 
 struct WhileNode : public ExprNode {
-    WhileNode(SourceLocation s, std::unique_ptr<ExprNode> c, std::unique_ptr<ExprNode> b):
-        ExprNode(s), cond(std::move(c)), body(std::move(b)) {}
+    WhileNode(
+        SourceLocation s,
+        std::unique_ptr<ExprNode> c,
+        std::unique_ptr<ExprNode> b
+    ): ExprNode(s), cond(std::move(c)), body(std::move(b)) {}
     WhileNode(const WhileNode &) = delete;
     WhileNode &operator=(const WhileNode &) = delete;
     virtual ~WhileNode() override {}
@@ -335,8 +378,12 @@ struct AccessNode : public ExprNode {
 
 std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
     auto isNumberToken = [](const Token &token) {
-        return token.text.size() > 0 &&
-            (std::isdigit(token.text[0]) || token.text[0] == '-' || token.text[0] == '+');
+        return
+            token.text.size() > 0 && (
+                std::isdigit(token.text[0]) ||
+                token.text[0] == '-' ||
+                token.text[0] == '+'
+            );
     };
     auto isStringToken = [](const Token &token) {
         return token.text.size() > 0 && token.text[0] == '"';
@@ -353,9 +400,12 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
         };
     };
 
-    auto consume = [&tokens]<typename Callable>(const Callable &predicate) -> Token {
+    auto consume =
+        [&tokens]<typename Callable>(const Callable &predicate) -> Token {
         if (tokens.size() == 0) {
-            throwError("parser", SourceLocation(-1, -1), "incomplete token stream");
+            throwError(
+                "parser", SourceLocation(-1, -1), "incomplete token stream"
+            );
         }
         auto token = tokens.front();
         tokens.pop_front();
@@ -407,10 +457,14 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
                     } else if (next == 'n') {
                         s += '\n';
                     } else {
-                        throwError("parser", token.sl, "unsupported escape sequence");
+                        throwError(
+                            "parser", token.sl, "unsupported escape sequence"
+                        );
                     }
                 } else {
-                    throwError("parser", token.sl, "incomplete escape sequence");
+                    throwError(
+                        "parser", token.sl, "incomplete escape sequence"
+                    );
                 }
             } else {
                 s += c;
@@ -426,7 +480,9 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
         auto start = consume(isToken("set"));
         auto var = parseVariable();
         auto expr = parseExpr();
-        return std::make_unique<SetNode>(start.sl, std::move(var), std::move(expr));
+        return std::make_unique<SetNode>(
+            start.sl, std::move(var), std::move(expr)
+        );
     };
     parseLambda = [&]() -> std::unique_ptr<LambdaNode> {
         auto start = consume(isToken("lambda"));
@@ -437,12 +493,17 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
         }
         consume(isToken(")"));
         auto expr = parseExpr();
-        return std::make_unique<LambdaNode>(start.sl, std::move(varList), std::move(expr));
+        return std::make_unique<LambdaNode>(
+            start.sl, std::move(varList), std::move(expr)
+        );
     };
     parseLetrec = [&]() -> std::unique_ptr<LetrecNode> {
         auto start = consume(isToken("letrec"));
         consume(isToken("("));
-        std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> varExprList;
+        std::vector<std::pair<
+            std::unique_ptr<VariableNode>,
+            std::unique_ptr<ExprNode>
+        >> varExprList;
         while (tokens.size() && isVariableToken(tokens[0])) {
             auto v = parseVariable();
             consume(isToken("="));
@@ -451,20 +512,26 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
         }
         consume(isToken(")"));
         auto expr = parseExpr();
-        return std::make_unique<LetrecNode>(start.sl, std::move(varExprList), std::move(expr));
+        return std::make_unique<LetrecNode>(
+            start.sl, std::move(varExprList), std::move(expr)
+        );
     };
     parseIf = [&]() -> std::unique_ptr<IfNode> {
         auto start = consume(isToken("if"));
         auto cond = parseExpr();
         auto branch1 = parseExpr();
         auto branch2 = parseExpr();
-        return std::make_unique<IfNode>(start.sl, std::move(cond), std::move(branch1), std::move(branch2));
+        return std::make_unique<IfNode>(
+            start.sl, std::move(cond), std::move(branch1), std::move(branch2)
+        );
     };
     parseWhile = [&]() -> std::unique_ptr<WhileNode> {
         auto start = consume(isToken("while"));
         auto cond = parseExpr();
         auto body = parseExpr();
-        return std::make_unique<WhileNode>(start.sl, std::move(cond), std::move(body));
+        return std::make_unique<WhileNode>(
+            start.sl, std::move(cond), std::move(body)
+        );
     };
     parseVariable = [&]() -> std::unique_ptr<VariableNode> {
         auto token = consume(isVariableToken);
@@ -475,13 +542,16 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
         if (!tokens.size()) {
             throwError("parser", start.sl, "incomplete tokens stream");
         }
-        std::unique_ptr<ExprNode> callee = isIntrinsicToken(tokens[0]) ? parseIntrinsic() : parseExpr();
+        std::unique_ptr<ExprNode> callee =
+            isIntrinsicToken(tokens[0]) ? parseIntrinsic() : parseExpr();
         std::vector<std::unique_ptr<ExprNode>> argList;
         while (tokens.size() && tokens[0].text != ")") {
             argList.push_back(parseExpr());
         }
         consume(isToken(")"));
-        return std::make_unique<CallNode>(start.sl, std::move(callee), std::move(argList));
+        return std::make_unique<CallNode>(
+            start.sl, std::move(callee), std::move(argList)
+        );
     };
     parseSequence = [&]() -> std::unique_ptr<SequenceNode> {
         auto start = consume(isToken("["));
@@ -499,17 +569,23 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
         auto start = consume(isToken("@"));
         auto var = parseVariable();
         auto expr = parseExpr();
-        return std::make_unique<QueryNode>(start.sl, std::move(var), std::move(expr));
+        return std::make_unique<QueryNode>(
+            start.sl, std::move(var), std::move(expr)
+        );
     };
     parseAccess = [&]() -> std::unique_ptr<AccessNode> {
         auto start = consume(isToken("&"));
         auto var = parseVariable();
         auto expr = parseExpr();
-        return std::make_unique<AccessNode>(start.sl, std::move(var), std::move(expr));
+        return std::make_unique<AccessNode>(
+            start.sl, std::move(var), std::move(expr)
+        );
     };
     parseExpr = [&]() -> std::unique_ptr<ExprNode> {
         if (!tokens.size()) {
-            throwError("parser", SourceLocation(-1, -1), "incomplete token stream");
+            throwError(
+                "parser", SourceLocation(-1, -1), "incomplete token stream"
+            );
             return nullptr;
         } else if (isNumberToken(tokens[0])) {
             return parseNumber();
@@ -551,7 +627,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
 
 // runtime
 
-// every value is accessed by reference, which is essentially its location on the heap 
+// every value is accessed by reference, which is its location on the heap 
 using Location = int;
 
 struct Void {
@@ -609,21 +685,21 @@ struct isAlternativeOf {
 };
 
 template <typename Type, typename... Alternative>
-requires ((0 + ... +
-    (std::same_as<Type, Alternative> ? 1 : 0)) == 1)
+requires ((0 + ... + (std::same_as<Type, Alternative> ? 1 : 0)) == 1)
 struct isAlternativeOf<Type, std::variant<Alternative...>> {
     static constexpr bool value = true;
 };
 
 template <typename... Alternative, typename... Variant>
-requires (true && ... &&
-    isAlternativeOf<Alternative,
-        std::remove_reference_t<Variant>>::value)
+requires (
+    true && ... &&
+    isAlternativeOf<Alternative, std::remove_reference_t<Variant>>::value
+)
 bool holds(Variant&&... vars) {
-    return
-    (true && ... &&
-        std::holds_alternative<Alternative>(
-            std::forward<Variant>(vars)));
+    return (
+        true && ... &&
+        std::holds_alternative<Alternative>(std::forward<Variant>(vars))
+    );
 }
 
 struct Layer {
@@ -646,7 +722,9 @@ struct Layer {
     // program counter
     int pc = 0;
     // local helpers for evaluation
-    std::unordered_map<std::string, std::variant<Location, std::vector<Location>>> local;
+    std::unordered_map<
+        std::string, std::variant<Location, std::vector<Location>>
+    > local;
 };
 
 using Stack = std::vector<Layer>;
@@ -690,11 +768,13 @@ private:
         std::unordered_set<Location> visited;
         // for each traversed location, specifically handle the closure case
         std::function<void(Location)> traverseLocation =
-        [this, &visited, &traverseLocation](Location loc) {
+            [this, &visited, &traverseLocation](Location loc) {
             if (!(visited.contains(loc))) {
                 visited.insert(loc);
                 if (std::holds_alternative<Closure>(heap[loc])) {
-                    for (const auto &[_, l] : std::get<Closure>(heap[loc]).env) {
+                    for (
+                        const auto &[_, l] : std::get<Closure>(heap[loc]).env
+                    ) {
                         traverseLocation(l);
                     }
                 }
