@@ -474,6 +474,8 @@ def lookup_env(name: str, env: list[tuple[str, int]]) -> Union[int, None]:
             return env[i][1]
     return None
 
+GC_INTERVAL = None
+
 class State:
     '''The class for the complete execution state'''
 
@@ -752,10 +754,11 @@ class State:
         return True
     
     def execute(self) -> None:
+        global GC_INTERVAL
         ctr = 0
         while self.step():
             ctr += 1
-            if ctr % 10000 == 0:
+            if ctr > 0 and ctr % GC_INTERVAL == 0:
                 sys.stderr.write('GC collected: ' + str(self._gc()) + '\n')
 
     def _new(self, value: Value) -> int:
@@ -785,11 +788,13 @@ class State:
                 traverse_value(self.store[location])
 
         for layer in self.stack:
+            # for locals in non-frame layers: they are not on heap so not affected
             if layer.frame:
                 for _, loc in layer.env:
                     traverse_location(loc)
                 if layer.local:
                     for _, v in layer.local.items():
+                        # bug: v could be a list of values
                         traverse_value(v)
         traverse_value(self.value)
 
@@ -834,6 +839,9 @@ class State:
 ### main
 
 if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        sys.exit(f'Usage: python3 {sys.argv[0]} <GC-interval>')
+    GC_INTERVAL = int(sys.argv[1])
     state = State(parse(lex(sys.stdin.read())))
     state.execute()
     sys.stdout.write(f'[Note] output buffer:\n')

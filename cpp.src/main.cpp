@@ -12,7 +12,10 @@
 #include <memory>
 #include <vector>
 #include <variant>
+#include <concepts>
+#include <type_traits>
 #include <iostream>
+#include <array>
 
 // helpers
 
@@ -546,13 +549,16 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
     return expr;
 }
 
+// runtime
+
+// every value is accessed by reference, which is essentially its location on the heap 
+using Location = int;
+
 struct Void {
     Void() = default;
     std::string toString() {
         return "<void>";
     }
-
-    int location = 0;
 };
 
 struct Integer {
@@ -561,7 +567,6 @@ struct Integer {
         return std::to_string(value);
     }
 
-    int location = 0;
     int value = 0;
 };
 
@@ -571,13 +576,12 @@ struct String {
         return value;
     }
 
-    int location = 0;
     std::string value;
 };
 
-using Env = std::vector<std::pair<std::string, int>>;
+using Env = std::vector<std::pair<std::string, Location>>;
 
-std::optional<int> lookup(const std::string &name, const Env &env) {
+std::optional<Location> lookup(const std::string &name, const Env &env) {
     for (auto p = env.rbegin(); p != env.rend(); p++) {
         if (p->first == name) {
             return p->second;
@@ -587,23 +591,45 @@ std::optional<int> lookup(const std::string &name, const Env &env) {
 }
 
 struct Closure {
-    Closure(Env e, const LambdaNode &f):
+    Closure(Env e, LambdaNode *f):
         env(std::move(e)), fun(f) {}
     std::string toString() {
-        return std::format("<closure evaluated at {}>", fun.sl.toString());
+        return std::format("<closure evaluated at {}>", fun->sl.toString());
     }
 
-    int location = 0;
     Env env;
-    const LambdaNode &fun;
+    LambdaNode *fun;
 };
 
 using Value = std::variant<Void, Integer, String, Closure>;
 
+template <typename Type, typename Variant>
+struct isAlternativeOf {
+    static constexpr bool value = false;
+};
+
+template <typename Type, typename... Alternative>
+requires ((0 + ... +
+    (std::same_as<Type, Alternative> ? 1 : 0)) == 1)
+struct isAlternativeOf<Type, std::variant<Alternative...>> {
+    static constexpr bool value = true;
+};
+
+template <typename... Alternative, typename... Variant>
+requires (true && ... &&
+    isAlternativeOf<Alternative,
+        std::remove_reference_t<Variant>>::value)
+bool holds(Variant&&... vars) {
+    return
+    (true && ... &&
+        std::holds_alternative<Alternative>(
+            std::forward<Variant>(vars)));
+}
+
 struct Layer {
     Layer(std::variant<Env, Env*> e, const ExprNode *x):
       env(std::move(e)), expr(x) {}
-    bool isFrame() {
+    bool isFrame() const {
         return std::holds_alternative<Env>(env);
     }
     Env *getEnvPtr() {
@@ -619,7 +645,8 @@ struct Layer {
     const ExprNode *expr;
     // program counter
     int pc = 0;
-    std::unordered_map<std::string, std::variant<Value, std::vector<Value>>> local;
+    // local helpers for evaluation
+    std::unordered_map<std::string, std::variant<Location, std::vector<Location>>> local;
 };
 
 using Stack = std::vector<Layer>;
@@ -629,14 +656,16 @@ constexpr int GC_INTERVAL = 10000;
 
 class State {
 public:
-    State(const ExprNode &e) {
+    State(const ExprNode *e) {
+        // the main frame
         stack.push_back(Layer(Env(), nullptr));
-        stack.push_back(Layer(stack.back().getEnvPtr(), &e));
+        // the first expression
+        stack.push_back(Layer(stack.back().getEnvPtr(), e));
     }
     void clear() {
         stack.clear();
         heap.clear();
-        value = Void();
+        result = -1;
     }
     bool step() {
         // TODO
@@ -652,32 +681,93 @@ public:
         }
     }
 private:
-    int _new(const Value &value) {
-        // TODO
-        return 0;
+    template <typename V, typename... Args>
+    Location _new(Args&&... args) {
+        heap.push_back(V(std::forward<Args>(args)...));
+        return heap.size() - 1;
     }
-    template<typename Callable1, typename Callable2>
-    void _traverse(Callable1 valueCallBack, Callable2 locationCallBack) {
-        // TODO
+    std::unordered_set<Location> _mark() {
+        std::unordered_set<Location> visited;
+        // for each traversed location, specifically handle the closure case
+        std::function<void(Location)> traverseLocation =
+        [this, &visited, &traverseLocation](Location loc) {
+            if (!(visited.contains(loc))) {
+                visited.insert(loc);
+                if (std::holds_alternative<Closure>(heap[loc])) {
+                    for (const auto &[_, l] : std::get<Closure>(heap[loc]).env) {
+                        traverseLocation(l);
+                    }
+                }
+            }
+        };
+        // tarverse the stack
+        for (const auto &layer : stack) {
+            if (layer.isFrame()) {
+                for (const auto &[_, loc] : std::get<Env>(layer.env)) {
+                    traverseLocation(loc);
+                }
+            }
+            for (const auto &[_, v] : layer.local) {
+                if (std::holds_alternative<Location>(v)) {
+                    traverseLocation(std::get<Location>(v));
+                } else {
+                    const auto &vec = std::get<std::vector<Location>>(v);
+                    for (const auto &loc : vec) {
+                        traverseLocation(loc);
+                    }
+                }
+            }
+        }
+        // traverse the result
+        traverseLocation(result);
+        return visited;
     }
-    std::unordered_set<int> _mark() {
-        // TODO
-        return std::unordered_set<int>();
+    std::pair<int, std::unordered_map<Location, Location>>
+        _sweepAndCompact(const std::unordered_set<Location> &visited) {
+        int removed = 0;
+        std::unordered_map<Location, Location> relocation;
+        Location n = heap.size();
+        Location i{0}, j{0};
+        while (j < n) {
+            if (visited.contains(j)) {
+                if (i < j) {
+                    heap[i] = std::move(heap[j]);
+                    relocation[j] = i;
+                    i++;
+                    j++;
+                } else {
+                    i++;
+                    j++;
+                }
+            } else {
+                removed++;
+                j++;
+            }
+        }
+        heap.resize(i);
+        return std::make_pair(removed, relocation);
     }
-    std::pair<int, std::unordered_map<int, int>> _sweepAndCompact(const std::unordered_set<int> &visited) {
-        // TODO
-        return std::make_pair(0, std::unordered_map<int, int>());
-    }
-    void _relocate(const std::unordered_map<int, int> &relocationMap) {
-        // TODO
+    void _relocate(const std::unordered_map<Location, Location> &relocation) {
+        for (auto &v : heap) {
+            if (std::holds_alternative<Closure>(v)) {
+                auto &c = std::get<Closure>(v);
+                for (auto &[_, loc] : c.env) {
+                    if (relocation.contains(loc)) {
+                        loc = relocation.at(loc);
+                    }
+                }
+            }
+        }
     }
     int _gc() {
-        // TODO
-        return 0;
+        auto visited = _mark();
+        const auto &[removed, relocation] = _sweepAndCompact(visited);
+        _relocate(relocation);
+        return removed;
     }
     Stack stack;
     Heap heap;
-    Value value;
+    Location result;
 };
 
 int main() {

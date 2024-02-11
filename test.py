@@ -10,9 +10,9 @@ def run_and_read(cmd: str, inp: str) -> str:
         timeout = 60
     ).stdout
 
-def checker(i: str, o: str) -> bool:
+def checker(gci: int, i: str, o: str) -> bool:
     try:
-        raw_o = run_and_read(['python3', 'py.src/closure.py'], i)
+        raw_o = run_and_read(['python3', 'py.src/closure.py', str(gci)], i)
     except subprocess.TimeoutExpired:
         sys.stderr.write('*** Timeout expired\n')
         return False
@@ -24,6 +24,8 @@ def checker(i: str, o: str) -> bool:
 if __name__ == '__main__':
     tests = [
 (
+10000
+,
 '''\
 letrec (
   leaf = lambda ()
@@ -59,6 +61,8 @@ letrec (
 '''
 ),
 (
+10000
+,
 '''\
 letrec (
   sum = lambda (n s)
@@ -76,6 +80,8 @@ letrec (
 '''
 ),
 (
+10000
+,
 '''\
 letrec (
   x = 0
@@ -108,6 +114,17 @@ letrec (
 (0, 5)
 (0, 10)
 [Note] evaluation value = <void>
+'''
+),
+(
+1,
+'''\
+(.+ 1 2)
+'''
+,
+'''\
+[Note] output buffer:
+[Note] evaluation value = 3
 '''
 )
     ]
