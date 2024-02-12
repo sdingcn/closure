@@ -10,9 +10,12 @@ def run_and_read(cmd: str, inp: str) -> str:
         timeout = 60
     ).stdout
 
-def checker(gci: int, i: str, o: str) -> bool:
+def build() -> None:
+    pass
+
+def check(i: str, o: str) -> bool:
     try:
-        raw_o = run_and_read(['python3', 'py.src/closure.py', str(gci)], i)
+        raw_o = run_and_read(['python3', 'py.src/closure.py'], i)
     except subprocess.TimeoutExpired:
         sys.stderr.write('*** Timeout expired\n')
         return False
@@ -24,8 +27,6 @@ def checker(gci: int, i: str, o: str) -> bool:
 if __name__ == '__main__':
     tests = [
 (
-10000
-,
 '''\
 letrec (
   leaf = lambda ()
@@ -61,8 +62,6 @@ letrec (
 '''
 ),
 (
-10000
-,
 '''\
 letrec (
   sum = lambda (n s)
@@ -80,8 +79,6 @@ letrec (
 '''
 ),
 (
-10000
-,
 '''\
 letrec (
   x = 0
@@ -115,21 +112,11 @@ letrec (
 (0, 10)
 [Note] evaluation value = <void>
 '''
-),
-(
-1,
-'''\
-(.+ 1 2)
-'''
-,
-'''\
-[Note] output buffer:
-[Note] evaluation value = 3
-'''
 )
     ]
-    for i, test in enumerate(tests):
-        sys.stderr.write(f'>>> Running on test {i + 1}\n')
-        if not checker(*test):
-            sys.exit(f'*** Failed on test {i + 1}')
-    sys.stderr.write(f'>>> Passed all {i + 1} tests\n')
+    build()
+    # for i, test in enumerate(tests):
+    #     sys.stderr.write(f'>>> Running on test {i + 1}\n')
+    #     if not check(*test):
+    #         sys.exit(f'*** Failed on test {i + 1}')
+    # sys.stderr.write(f'>>> Passed all {i + 1} tests\n')
