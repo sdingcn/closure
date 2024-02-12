@@ -44,7 +44,7 @@ struct SourceLocation {
     int column;
 };
 
-void throwError(const std::string &type, const SourceLocation &sl,
+void panic(const std::string &type, const SourceLocation &sl,
     const std::string &msg) {
     throw std::runtime_error(
         std::format("[{} error {}] {}", type, sl.toString(), msg)
@@ -68,7 +68,7 @@ std::deque<Token> lex(std::string source) {
     SourceLocation sl;
     for (auto c : source) {
         if (!charset.contains(c)) {
-            throwError("lexer", sl, "unsupported character");
+            panic("lexer", sl, "unsupported character");
         }
         sl.update(c);
     }
@@ -165,7 +165,7 @@ std::deque<Token> lex(std::string source) {
                 source.pop_back();
                 sl.update(text.back());
             } else {
-                throwError("lexer", sl, "incomplete string literal");
+                panic("lexer", sl, "incomplete string literal");
             }
         // comment
         } else if (source.back() == '#') {
@@ -178,7 +178,7 @@ std::deque<Token> lex(std::string source) {
             // nextToken() will consume the \n and recursively continue
             return nextToken();
         } else {
-            throwError("lexer", sl, "unsupported starting character");
+            panic("lexer", sl, "unsupported starting character");
         }
         return Token(start_sl, std::move(text));
     };
@@ -403,14 +403,14 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
     auto consume =
         [&tokens]<typename Callable>(const Callable &predicate) -> Token {
         if (tokens.size() == 0) {
-            throwError(
+            panic(
                 "parser", SourceLocation(-1, -1), "incomplete token stream"
             );
         }
         auto token = tokens.front();
         tokens.pop_front();
         if (!predicate(token)) {
-            throwError("parser", token.sl, "unexpected token");
+            panic("parser", token.sl, "unexpected token");
         }
         return token;
     };
@@ -457,12 +457,12 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
                     } else if (next == 'n') {
                         s += '\n';
                     } else {
-                        throwError(
+                        panic(
                             "parser", token.sl, "unsupported escape sequence"
                         );
                     }
                 } else {
-                    throwError(
+                    panic(
                         "parser", token.sl, "incomplete escape sequence"
                     );
                 }
@@ -540,7 +540,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
     parseCall = [&]() -> std::unique_ptr<CallNode> {
         auto start = consume(isToken("("));
         if (!tokens.size()) {
-            throwError("parser", start.sl, "incomplete tokens stream");
+            panic("parser", start.sl, "incomplete tokens stream");
         }
         std::unique_ptr<ExprNode> callee =
             isIntrinsicToken(tokens[0]) ? parseIntrinsic() : parseExpr();
@@ -560,7 +560,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
             exprList.push_back(parseExpr());
         }
         if (!exprList.size()) {
-            throwError("parser", start.sl, "zero-length sequence");
+            panic("parser", start.sl, "zero-length sequence");
         }
         consume(isToken("]"));
         return std::make_unique<SequenceNode>(start.sl, std::move(exprList));
@@ -583,7 +583,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
     };
     parseExpr = [&]() -> std::unique_ptr<ExprNode> {
         if (!tokens.size()) {
-            throwError(
+            panic(
                 "parser", SourceLocation(-1, -1), "incomplete token stream"
             );
             return nullptr;
@@ -613,14 +613,14 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
         } else if (tokens[0].text == "&") {
             return parseAccess();
         } else {
-            throwError("parser", tokens[0].sl, "unrecognized token");
+            panic("parser", tokens[0].sl, "unrecognized token");
             return nullptr;
         }
     };
 
     auto expr = parseExpr();
     if (tokens.size()) {
-        throwError("parser", tokens[0].sl, "redundant token(s)");
+        panic("parser", tokens[0].sl, "redundant token(s)");
     }
     return expr;
 }
@@ -743,7 +743,7 @@ public:
     void clear() {
         stack.clear();
         heap.clear();
-        result = -1;
+        resultLoc = -1;
     }
     bool step() {
         // careful! this reference may be invalidated after modifying stack
@@ -754,10 +754,10 @@ public:
             clear();
             return false;
         } else if (auto inode = dynamic_cast<IntegerNode*>(layer.expr)) {
-            result = _new<Integer>(inode->val);
+            resultLoc = _new<Integer>(inode->val);
             stack.pop_back();
         } else if (auto snode = dynamic_cast<StringNode*>(layer.expr)) {
-            result = _new<String>(snode->val);
+            resultLoc = _new<String>(snode->val);
             stack.pop_back();
         } else if (auto snode = dynamic_cast<SetNode*>(layer.expr)) {
             if (layer.pc == 0) {
@@ -766,24 +766,63 @@ public:
             } else {
                 auto loc = lookup(snode->var->name, *(layer.getEnvPtr()));
                 if (!loc.has_value()) {
-                    throwError("runtime", layer.expr->sl, "undefined variable");
+                    panic("runtime", layer.expr->sl, "undefined variable");
                 }
-                heap[loc.value()] = heap[result];
-                result = _new<Void>();
+                heap[loc.value()] = heap[resultLoc];
+                resultLoc = _new<Void>();
                 stack.pop_back();
             }
         } else if (auto lnode = dynamic_cast<LambdaNode*>(layer.expr)) {
-            result = _new<Closure>(*layer.getEnvPtr(), lnode);
+            resultLoc = _new<Closure>(*layer.getEnvPtr(), lnode);
             stack.pop_back();
         } else if (auto lnode = dynamic_cast<LetrecNode*>(layer.expr)) {
         } else if (auto inode = dynamic_cast<IfNode*>(layer.expr)) {
+            if (layer.pc == 0) {
+                layer.pc++;
+                stack.push_back(Layer(layer.getEnvPtr(), inode->cond.get()));
+            } else if (layer.pc == 1) {
+                layer.pc++;
+                if (!holds<Integer>(heap[resultLoc])) {
+                    panic("runtime", layer.expr->sl, "wrong cond type");
+                }
+                if (std::get<Integer>(heap[resultLoc]).value) {
+                    stack.push_back(
+                        Layer(layer.getEnvPtr(), inode->branch1.get())
+                    );
+                } else {
+                    stack.push_back(
+                        Layer(layer.getEnvPtr(), inode->branch2.get())
+                    );
+                }
+            } else {
+                // no need to update resultLoc: inherited
+                stack.pop_back();
+            }
         } else if (auto wnode = dynamic_cast<WhileNode*>(layer.expr)) {
+            if (layer.pc == 0) {
+                layer.pc++;
+                stack.push_back(Layer(layer.getEnvPtr(), wnode->cond.get()));
+            } else if (layer.pc == 1) {
+                if (!holds<Integer>(heap[resultLoc])) {
+                    panic("runtime", layer.expr->sl, "wrong cond type");
+                }
+                if (std::get<Integer>(heap[resultLoc]).value) {
+                    // loop
+                    layer.pc = 0;
+                    stack.push_back(
+                        Layer(layer.getEnvPtr(), wnode->body.get())
+                    );
+                } else {
+                    resultLoc = _new<Void>();
+                    stack.pop_back();
+                }
+            }
         } else if (auto vnode = dynamic_cast<VariableNode*>(layer.expr)) {
             auto loc = lookup(vnode->name, *(layer.getEnvPtr()));
             if (!loc.has_value()) {
-                throwError("runtime", layer.expr->sl, "undefined variable");
+                panic("runtime", layer.expr->sl, "undefined variable");
             }
-            result = loc.value();
+            resultLoc = loc.value();
             stack.pop_back();
         } else if (auto cnode = dynamic_cast<CallNode*>(layer.expr)) {
         } else if (auto snode = dynamic_cast<SequenceNode*>(layer.expr)) {
@@ -794,7 +833,7 @@ public:
                     snode->exprList[layer.pc - 1].get()
                 ));
             } else {
-                // no need to update result: inherited
+                // no need to update resultLoc: inherited
                 stack.pop_back();
             }
         } else if (auto qnode = dynamic_cast<QueryNode*>(layer.expr)) {
@@ -802,13 +841,13 @@ public:
                 layer.pc++;
                 stack.push_back(Layer(layer.getEnvPtr(), qnode->expr.get()));
             } else {
-                if (!holds<Closure>(heap[result])) {
-                    throwError("runtime", layer.expr->sl, "@ wrong type");
+                if (!holds<Closure>(heap[resultLoc])) {
+                    panic("runtime", layer.expr->sl, "@ wrong type");
                 }
-                result = _new<Integer>(
+                resultLoc = _new<Integer>(
                     lookup(
                         qnode->var->name,
-                        std::get<Closure>(heap[result]).env
+                        std::get<Closure>(heap[resultLoc]).env
                     ).has_value() ? 1 : 0
                 );
                 stack.pop_back();
@@ -818,21 +857,21 @@ public:
                 layer.pc++;
                 stack.push_back(Layer(layer.getEnvPtr(), anode->expr.get()));
             } else {
-                if (!holds<Closure>(heap[result])) {
-                    throwError("runtime", layer.expr->sl, "& wrong type");
+                if (!holds<Closure>(heap[resultLoc])) {
+                    panic("runtime", layer.expr->sl, "& wrong type");
                 }
                 auto loc = lookup(
                     anode->var->name,
-                    std::get<Closure>(heap[result]).env
+                    std::get<Closure>(heap[resultLoc]).env
                 );
                 if (!loc.has_value()) {
-                    throwError("runtime", layer.expr->sl, "undefined variable");
+                    panic("runtime", layer.expr->sl, "undefined variable");
                 }
-                result = loc.value();
+                resultLoc = loc.value();
                 stack.pop_back();
             }
         } else {
-            throwError("runtime", layer.expr->sl, "unrecognized AST node");
+            panic("runtime", layer.expr->sl, "unrecognized AST node");
         }
         return true;
     }
@@ -885,8 +924,8 @@ private:
                 }
             }
         }
-        // traverse the result
-        traverseLocation(result);
+        // traverse the resultLoc
+        traverseLocation(resultLoc);
         return visited;
     }
     std::pair<int, std::unordered_map<Location, Location>>
@@ -934,7 +973,7 @@ private:
     }
     Stack stack;
     Heap heap;
-    Location result;
+    Location resultLoc;
 };
 
 int main() {
