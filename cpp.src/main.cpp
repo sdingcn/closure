@@ -693,7 +693,7 @@ struct isAlternativeOf<Type, std::variant<Alternative...>> {
 template <typename... Alternative, typename... Variant>
 requires (
     true && ... &&
-    isAlternativeOf<Alternative, std::remove_reference_t<Variant>>::value
+    isAlternativeOf<Alternative, std::remove_cvref_t<Variant>>::value
 )
 bool holds(Variant&&... vars) {
     return (
@@ -776,6 +776,54 @@ public:
             resultLoc = _new<Closure>(*layer.getEnvPtr(), lnode);
             stack.pop_back();
         } else if (auto lnode = dynamic_cast<LetrecNode*>(layer.expr)) {
+            // unified argument copy
+            if (layer.pc > 1 && layer.pc <= lnode->varExprList.size() + 1) {
+                auto loc = lookup(
+                    lnode->varExprList[layer.pc - 2].first->name,
+                    *(layer.getEnvPtr())
+                );
+                if (!loc.has_value()) {
+                    panic("runtime", layer.expr->sl, "undefined variable");
+                }
+                // copy
+                heap[loc.value()] = heap[resultLoc];
+            }
+            // create new locations
+            if (layer.pc == 0) {
+                layer.pc++;
+                for (const auto &[var, _] : lnode->varExprList) {
+                    layer.getEnvPtr()->push_back(std::make_pair(
+                        var->name,
+                        _new<Void>()
+                    ));
+                }
+            // evaluate bindings
+            } else if (layer.pc <= lnode->varExprList.size()) {
+                layer.pc++;
+                stack.push_back(
+                    Layer(
+                        layer.getEnvPtr(),
+                        lnode->varExprList[layer.pc - 1].second.get()
+                    )
+                );
+            // evaluate body
+            } else if (layer.pc == lnode->varExprList.size() + 1) {
+                layer.pc++;
+                stack.push_back(
+                    Layer(
+                        layer.getEnvPtr(),
+                        lnode->expr.get()
+                    )
+                );
+            // finish letrec
+            } else {
+                int nParams = lnode->varExprList.size();
+                for (int i = 0; i < nParams; i++) {
+                    layer.getEnvPtr()->pop_back();
+                }
+                // no need to update resultLoc: inherited
+                stack.pop_back();
+            }
         } else if (auto inode = dynamic_cast<IfNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
@@ -885,7 +933,30 @@ public:
         }
     }
 private:
+    // intrinsic dispatch
+    template <typename R>
+    requires isAlternativeOf<R, Value>::value
+    R _callIntrinsic(
+        SourceLocation sl,
+        const std::string &name,
+        const std::vector<Value> &args
+    ) {
+        if (name == ".+") {
+            if (!holds<Integer, Integer>(args[0], args[1])) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                std::get<Integer>(args[0]).value +
+                std::get<Integer>(args[1]).value
+            );
+        } else {
+            panic("runtime", sl, "unrecognized intrinsic call");
+        }
+    }
+    // memory management
     template <typename V, typename... Args>
+    // I feel it's unnecessary to specify V(...) requirements here.
+    requires isAlternativeOf<V, Value>::value
     Location _new(Args&&... args) {
         heap.push_back(V(std::forward<Args>(args)...));
         return heap.size() - 1;
@@ -971,6 +1042,7 @@ private:
         _relocate(relocation);
         return removed;
     }
+    // fields
     Stack stack;
     Heap heap;
     Location resultLoc;
