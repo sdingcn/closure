@@ -767,11 +767,10 @@ public:
                 auto loc = lookup(snode->var->name, *(layer.getEnvPtr()));
                 if (!loc.has_value()) {
                     throwError("runtime", layer.expr->sl, "undefined variable");
-                } else {
-                    heap[loc.value()] = heap[result];
-                    result = _new<Void>();
-                    stack.pop_back();
                 }
+                heap[loc.value()] = heap[result];
+                result = _new<Void>();
+                stack.pop_back();
             }
         } else if (auto lnode = dynamic_cast<LambdaNode*>(layer.expr)) {
             result = _new<Closure>(*layer.getEnvPtr(), lnode);
@@ -780,10 +779,58 @@ public:
         } else if (auto inode = dynamic_cast<IfNode*>(layer.expr)) {
         } else if (auto wnode = dynamic_cast<WhileNode*>(layer.expr)) {
         } else if (auto vnode = dynamic_cast<VariableNode*>(layer.expr)) {
+            auto loc = lookup(vnode->name, *(layer.getEnvPtr()));
+            if (!loc.has_value()) {
+                throwError("runtime", layer.expr->sl, "undefined variable");
+            }
+            result = loc.value();
+            stack.pop_back();
         } else if (auto cnode = dynamic_cast<CallNode*>(layer.expr)) {
         } else if (auto snode = dynamic_cast<SequenceNode*>(layer.expr)) {
+            if (layer.pc < snode->exprList.size()) {
+                layer.pc++;
+                stack.push_back(Layer(
+                    layer.getEnvPtr(),
+                    snode->exprList[layer.pc - 1].get()
+                ));
+            } else {
+                // no need to update result: inherited
+                stack.pop_back();
+            }
         } else if (auto qnode = dynamic_cast<QueryNode*>(layer.expr)) {
+            if (layer.pc == 0) {
+                layer.pc++;
+                stack.push_back(Layer(layer.getEnvPtr(), qnode->expr.get()));
+            } else {
+                if (!holds<Closure>(heap[result])) {
+                    throwError("runtime", layer.expr->sl, "@ wrong type");
+                }
+                result = _new<Integer>(
+                    lookup(
+                        qnode->var->name,
+                        std::get<Closure>(heap[result]).env
+                    ).has_value() ? 1 : 0
+                );
+                stack.pop_back();
+            }
         } else if (auto anode = dynamic_cast<AccessNode*>(layer.expr)) {
+            if (layer.pc == 0) {
+                layer.pc++;
+                stack.push_back(Layer(layer.getEnvPtr(), anode->expr.get()));
+            } else {
+                if (!holds<Closure>(heap[result])) {
+                    throwError("runtime", layer.expr->sl, "& wrong type");
+                }
+                auto loc = lookup(
+                    anode->var->name,
+                    std::get<Closure>(heap[result]).env
+                );
+                if (!loc.has_value()) {
+                    throwError("runtime", layer.expr->sl, "undefined variable");
+                }
+                result = loc.value();
+                stack.pop_back();
+            }
         } else {
             throwError("runtime", layer.expr->sl, "unrecognized AST node");
         }
