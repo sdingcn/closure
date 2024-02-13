@@ -941,13 +941,159 @@ private:
         const std::string &name,
         const std::vector<Value> &args
     ) {
-        if (name == ".+") {
-            if (!holds<Integer, Integer>(args[0], args[1])) {
+        if (name == ".void") {
+            if (!(args.size() == 0)) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Void();
+        } else if (name == ".+") {
+            if (
+                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+            ) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
                 std::get<Integer>(args[0]).value +
                 std::get<Integer>(args[1]).value
+            );
+        } else if (name == ".-") {
+            if (
+                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+            ) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                std::get<Integer>(args[0]).value -
+                std::get<Integer>(args[1]).value
+            );
+        } else if (name == ".*") {
+            if (
+                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+            ) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                std::get<Integer>(args[0]).value *
+                std::get<Integer>(args[1]).value
+            );
+        } else if (name == "./") {
+            if (
+                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+            ) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                std::get<Integer>(args[0]).value /
+                std::get<Integer>(args[1]).value
+            );
+        } else if (name == ".%") {
+            if (
+                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+            ) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                std::get<Integer>(args[0]).value %
+                std::get<Integer>(args[1]).value
+            );
+        } else if (name == ".<") {
+            if (
+                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+            ) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                std::get<Integer>(args[0]).value <
+                std::get<Integer>(args[1]).value ? 1 : 0
+            );
+        } else if (name == ".slen") {
+            if (!(args.size() == 1 && holds<String>(args[0]))) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                std::get<String>(args[0]).value.size()
+            );
+        } else if (name == ".ssub") {
+            if (!(
+                args.size() == 3 &&
+                holds<String, Integer, Integer>(args[0], args[1], args[2])
+            )) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return String(
+                std::get<String>(args[0]).value.substr(
+                    std::get<Integer>(args[1]).value,
+                    std::get<Integer>(args[2]).value - 
+                    std::get<Integer>(args[1]).value
+                )
+            );
+        } else if (name == ".s+") {
+            if (!(
+                args.size() == 2 &&
+                holds<String, String>(args[0], args[1])
+            )) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return String(
+                std::get<String>(args[0]).value +
+                std::get<String>(args[1]).value
+            );
+        } else if (name == ".s<") {
+            if (!(
+                args.size() == 2 &&
+                holds<String, String>(args[0], args[1])
+            )) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                std::get<String>(args[0]).value <
+                std::get<String>(args[1]).value ? 1 : 0
+            );
+        } else if (name == ".i->s") {
+            if (!(
+                args.size() == 1 && holds<Integer>(args[0])
+            )) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return String(
+                std::to_string(std::get<Integer>(args[0]).value)
+            );
+        } else if (name == ".s->i") {
+            if (!(
+                args.size() == 1 && holds<String>(args[0])
+            )) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                std::stoi(std::get<String>(args[0]).value)
+            );
+        } else if (name == ".v?") {
+            if (!(args.size() == 1)) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                holds<Void>(args[0]) ? 1 : 0
+            );
+        } else if (name == ".i?") {
+            if (!(args.size() == 1)) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                holds<Integer>(args[0]) ? 1 : 0
+            );
+        } else if (name == ".s?") {
+            if (!(args.size() == 1)) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                holds<String>(args[0]) ? 1 : 0
+            );
+        } else if (name == ".c?") {
+            if (!(args.size() == 1)) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            return Integer(
+                holds<Closure>(args[0]) ? 1 : 0
             );
         } else {
             panic("runtime", sl, "unrecognized intrinsic call");
