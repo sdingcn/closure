@@ -803,7 +803,7 @@ public:
                 stack.push_back(
                     Layer(
                         layer.getEnvPtr(),
-                        lnode->varExprList[layer.pc - 1].second.get()
+                        lnode->varExprList[layer.pc - 2].second.get()
                     )
                 );
             // evaluate body
@@ -873,6 +873,94 @@ public:
             resultLoc = loc.value();
             stack.pop_back();
         } else if (auto cnode = dynamic_cast<CallNode*>(layer.expr)) {
+            if (
+                auto callee = dynamic_cast<IntrinsicNode*>(cnode->callee.get())
+            ) {
+                // unified argument recording
+                if (layer.pc > 1 && layer.pc <= cnode->argList.size() + 1) {
+                    std::get<std::vector<Location>>(layer.local["args"])
+                        .push_back(resultLoc);
+                }
+                // initialization
+                if (layer.pc == 0) {
+                    layer.pc++;
+                    layer.local["args"] = std::vector<Location>();
+                // evaluate arguments
+                } else if (layer.pc <= cnode->argList.size()) {
+                    layer.pc++;
+                    stack.push_back(Layer(
+                        layer.getEnvPtr(),
+                        cnode->argList[layer.pc - 2].get()
+                    ));
+                // intrinsic call doesn't grow the stack
+                } else {
+                    auto value = _callIntrinsic(
+                        layer.expr->sl,
+                        callee->name,
+                        std::get<std::vector<Location>>(layer.local["args"])
+                    );
+                    resultLoc = _moveNew(value);
+                    stack.pop_back();
+                }
+            } else {
+                // unified argument recording
+                if (layer.pc > 2 && layer.pc <= cnode->argList.size() + 2) {
+                    std::get<std::vector<Location>>(layer.local["args"])
+                        .push_back(resultLoc);
+                }
+                // evaluate the callee
+                if (layer.pc == 0) {
+                    layer.pc++;
+                    stack.push_back(Layer(
+                        layer.getEnvPtr(),
+                        cnode->callee.get()
+                    ));
+                // initialization
+                } else if (layer.pc == 1) {
+                    layer.pc++;
+                    layer.local["callee"] = resultLoc;
+                    layer.local["args"] = std::vector<Location>();
+                // evaluate arguments
+                } else if (layer.pc <= cnode->argList.size() + 1) {
+                    layer.pc++;
+                    stack.push_back(Layer(
+                        layer.getEnvPtr(),
+                        cnode->argList[layer.pc - 3].get()
+                    ));
+                // call
+                } else if (layer.pc == cnode->argList.size() + 2) {
+                    layer.pc++;
+                    auto calleeLoc = std::get<Location>(layer.local["callee"]);
+                    auto argsLoc = std::get<std::vector<Location>>(
+                        layer.local["args"]
+                    );
+                    if (!std::holds_alternative<Closure>(heap[calleeLoc])) {
+                        panic("runtime", layer.expr->sl, "non-callable");
+                    }
+                    auto &callee = std::get<Closure>(heap[calleeLoc]);
+                    // types will be checked inside the closure call
+                    if (argsLoc.size() != callee.fun->varList.size()) {
+                        panic("runtime", layer.expr->sl, "wrong N of args");
+                    }
+                    int nArgs = argsLoc.size();
+                    auto newEnv = callee.env;
+                    for (int i = 0; i < nArgs; i++) {
+                        // pass by reference
+                        newEnv.push_back(std::make_pair(
+                            callee.fun->varList[i]->name,
+                            argsLoc[i]
+                        ));
+                    }
+                    // evaluation of the closure body
+                    stack.push_back(Layer(
+                        newEnv, callee.fun->expr.get()
+                    ));
+                // finish
+                } else {
+                    // no need to update resultLoc: inherited
+                    stack.pop_back();
+                }
+            }
         } else if (auto snode = dynamic_cast<SequenceNode*>(layer.expr)) {
             if (layer.pc < snode->exprList.size()) {
                 layer.pc++;
@@ -934,12 +1022,10 @@ public:
     }
 private:
     // intrinsic dispatch
-    template <typename R>
-    requires isAlternativeOf<R, Value>::value
-    R _callIntrinsic(
+    Value _callIntrinsic(
         SourceLocation sl,
         const std::string &name,
-        const std::vector<Value> &args
+        const std::vector<Location> &args
     ) {
         if (name == ".void") {
             if (!(args.size() == 0)) {
@@ -948,152 +1034,160 @@ private:
             return Void();
         } else if (name == ".+") {
             if (
-                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+                !(args.size() == 2 &&
+                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
             ) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                std::get<Integer>(args[0]).value +
-                std::get<Integer>(args[1]).value
+                std::get<Integer>(heap[args[0]]).value +
+                std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == ".-") {
             if (
-                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+                !(args.size() == 2 &&
+                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
             ) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                std::get<Integer>(args[0]).value -
-                std::get<Integer>(args[1]).value
+                std::get<Integer>(heap[args[0]]).value -
+                std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == ".*") {
             if (
-                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+                !(args.size() == 2 &&
+                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
             ) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                std::get<Integer>(args[0]).value *
-                std::get<Integer>(args[1]).value
+                std::get<Integer>(heap[args[0]]).value *
+                std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == "./") {
             if (
-                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+                !(args.size() == 2 &&
+                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
             ) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                std::get<Integer>(args[0]).value /
-                std::get<Integer>(args[1]).value
+                std::get<Integer>(heap[args[0]]).value /
+                std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == ".%") {
             if (
-                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+                !(args.size() == 2 &&
+                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
             ) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                std::get<Integer>(args[0]).value %
-                std::get<Integer>(args[1]).value
+                std::get<Integer>(heap[args[0]]).value %
+                std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == ".<") {
             if (
-                !(args.size() == 2 && holds<Integer, Integer>(args[0], args[1]))
+                !(args.size() == 2 &&
+                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
             ) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                std::get<Integer>(args[0]).value <
-                std::get<Integer>(args[1]).value ? 1 : 0
+                std::get<Integer>(heap[args[0]]).value <
+                std::get<Integer>(heap[args[1]]).value ? 1 : 0
             );
         } else if (name == ".slen") {
-            if (!(args.size() == 1 && holds<String>(args[0]))) {
+            if (!(args.size() == 1 && holds<String>(heap[args[0]]))) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                std::get<String>(args[0]).value.size()
+                std::get<String>(heap[args[0]]).value.size()
             );
         } else if (name == ".ssub") {
             if (!(
                 args.size() == 3 &&
-                holds<String, Integer, Integer>(args[0], args[1], args[2])
+                holds<String, Integer, Integer>(
+                    heap[args[0]], heap[args[1]], heap[args[2]]
+                )
             )) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return String(
-                std::get<String>(args[0]).value.substr(
-                    std::get<Integer>(args[1]).value,
-                    std::get<Integer>(args[2]).value - 
-                    std::get<Integer>(args[1]).value
+                std::get<String>(heap[args[0]]).value.substr(
+                    std::get<Integer>(heap[args[1]]).value,
+                    std::get<Integer>(heap[args[2]]).value - 
+                    std::get<Integer>(heap[args[1]]).value
                 )
             );
         } else if (name == ".s+") {
             if (!(
                 args.size() == 2 &&
-                holds<String, String>(args[0], args[1])
+                holds<String, String>(heap[args[0]], heap[args[1]])
             )) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return String(
-                std::get<String>(args[0]).value +
-                std::get<String>(args[1]).value
+                std::get<String>(heap[args[0]]).value +
+                std::get<String>(heap[args[1]]).value
             );
         } else if (name == ".s<") {
             if (!(
                 args.size() == 2 &&
-                holds<String, String>(args[0], args[1])
+                holds<String, String>(heap[args[0]], heap[args[1]])
             )) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                std::get<String>(args[0]).value <
-                std::get<String>(args[1]).value ? 1 : 0
+                std::get<String>(heap[args[0]]).value <
+                std::get<String>(heap[args[1]]).value ? 1 : 0
             );
         } else if (name == ".i->s") {
             if (!(
-                args.size() == 1 && holds<Integer>(args[0])
+                args.size() == 1 && holds<Integer>(heap[args[0]])
             )) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return String(
-                std::to_string(std::get<Integer>(args[0]).value)
+                std::to_string(std::get<Integer>(heap[args[0]]).value)
             );
         } else if (name == ".s->i") {
             if (!(
-                args.size() == 1 && holds<String>(args[0])
+                args.size() == 1 && holds<String>(heap[args[0]])
             )) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                std::stoi(std::get<String>(args[0]).value)
+                std::stoi(std::get<String>(heap[args[0]]).value)
             );
         } else if (name == ".v?") {
             if (!(args.size() == 1)) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                holds<Void>(args[0]) ? 1 : 0
+                holds<Void>(heap[args[0]]) ? 1 : 0
             );
         } else if (name == ".i?") {
             if (!(args.size() == 1)) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                holds<Integer>(args[0]) ? 1 : 0
+                holds<Integer>(heap[args[0]]) ? 1 : 0
             );
         } else if (name == ".s?") {
             if (!(args.size() == 1)) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                holds<String>(args[0]) ? 1 : 0
+                holds<String>(heap[args[0]]) ? 1 : 0
             );
         } else if (name == ".c?") {
             if (!(args.size() == 1)) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
             return Integer(
-                holds<Closure>(args[0]) ? 1 : 0
+                holds<Closure>(heap[args[0]]) ? 1 : 0
             );
         } else {
             panic("runtime", sl, "unrecognized intrinsic call");
@@ -1101,10 +1195,13 @@ private:
     }
     // memory management
     template <typename V, typename... Args>
-    // I feel it's unnecessary to specify V(...) requirements here.
     requires isAlternativeOf<V, Value>::value
     Location _new(Args&&... args) {
         heap.push_back(V(std::forward<Args>(args)...));
+        return heap.size() - 1;
+    }
+    Location _moveNew(Value v) {
+        heap.push_back(std::move(v));
         return heap.size() - 1;
     }
     std::unordered_set<Location> _mark() {
