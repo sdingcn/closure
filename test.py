@@ -15,7 +15,7 @@ def build() -> None:
 
 def check(i: str, o: str) -> bool:
     try:
-        raw_o = run_and_read(['python3', 'py.src/closure.py'], i)
+        raw_o = run_and_read(['src/build/cvm'], i)
     except subprocess.TimeoutExpired:
         sys.stderr.write('*** Timeout expired\n')
         return False
