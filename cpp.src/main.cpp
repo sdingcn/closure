@@ -1,7 +1,6 @@
 #include <deque>
 #include <utility>
 #include <string>
-#include <format>
 #include <stdexcept>
 #include <unordered_set>
 #include <unordered_map>
@@ -17,7 +16,7 @@
 #include <iostream>
 #include <array>
 
-// helpers
+// helper(s)
 
 struct SourceLocation {
     SourceLocation(int l = 1, int c = 1): line(l), column(c) {}
@@ -25,7 +24,8 @@ struct SourceLocation {
         if (line <= 0 || column <= 0) {
             return "(SourceLocation N/A)";
         }
-        return std::format("(SourceLocation {} {})", line, column);
+        return "(SourceLocation " +
+            std::to_string(line) + " " + std::to_string(column) + ")";
     }
     void revert() {
         line = 1;
@@ -47,11 +47,46 @@ struct SourceLocation {
 void panic(const std::string &type, const SourceLocation &sl,
     const std::string &msg) {
     throw std::runtime_error(
-        std::format("[{} error {}] {}", type, sl.toString(), msg)
+        "[" + type + " error " + sl.toString() + "] " + msg
     );
 }
 
 // lexer
+
+struct SourceStream {
+    SourceStream(std::string s): source(std::move(s)) {
+        std::string charstr =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "0123456789`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/? \t\n";
+        std::unordered_set<char> charset(charstr.begin(), charstr.end());
+        for (auto c : source) {
+            if (!charset.contains(c)) {
+                panic("lexer", sl, "unsupported character");
+            }
+            sl.update(c);
+        }
+        sl.revert();
+        std::reverse(source.begin(), source.end());
+    }
+    bool hasNext() const {
+        return source.size() > 0;
+    }
+    char peekNext() const {
+        return source.back();
+    }
+    char popNext() {
+        char c = source.back();
+        source.pop_back();
+        sl.update(c);
+        return c;
+    }
+    SourceLocation getNextSourceLocation() const {
+        return sl;
+    }
+
+    std::string source;
+    SourceLocation sl;
+};
 
 struct Token {
     Token(SourceLocation s, std::string t) : sl(s), text(std::move(t)) {}
@@ -61,18 +96,7 @@ struct Token {
 };
 
 std::deque<Token> lex(std::string source) {
-    static std::string charstr =
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "0123456789`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/? \t\n";
-    static std::unordered_set<char> charset(charstr.begin(), charstr.end());
-    SourceLocation sl;
-    for (auto c : source) {
-        if (!charset.contains(c)) {
-            panic("lexer", sl, "unsupported character");
-        }
-        sl.update(c);
-    }
-    sl.revert();
+    SourceStream ss(std::move(source));
 
     auto countTrailingEscape = [](const std::string &s) -> int {
         int cnt = 0;
@@ -84,101 +108,80 @@ std::deque<Token> lex(std::string source) {
         return cnt;
     };
 
-    std::reverse(source.begin(), source.end());
     std::function<std::optional<Token>()> nextToken =
-        [&source, &sl, &countTrailingEscape, &nextToken]()
+        [&ss, &countTrailingEscape, &nextToken]()
             -> std::optional<Token> {
         // skip whitespaces
-        while (source.size() && std::isspace(source.back())) {
-            sl.update(source.back());
-            source.pop_back();
+        while (ss.hasNext() && std::isspace(ss.peekNext())) {
+            ss.popNext();
         }
-        if (!source.size()) {
+        if (!ss.hasNext()) {
             return std::nullopt;
         }
         // read the next token
-        auto start_sl = sl;
+        auto start_sl = ss.getNextSourceLocation();
         std::string text = "";
         // integer literal
         if (
-            std::isdigit(source.back()) ||
-            source.back() == '-' ||
-            source.back() == '+'
+            std::isdigit(ss.peekNext()) ||
+            ss.peekNext() == '-' ||
+            ss.peekNext() == '+'
         ) {
-            if (source.back() == '-' || source.back() == '+') {
-                text += source.back();
-                source.pop_back();
-                sl.update(text.back());
+            if (ss.peekNext() == '-' || ss.peekNext() == '+') {
+                text += ss.popNext();
             }
-            while (source.size() && std::isdigit(source.back())) {
-                text += source.back();
-                source.pop_back();
-                sl.update(text.back());
+            while (ss.hasNext() && std::isdigit(ss.peekNext())) {
+                text += ss.popNext();
             }
         // variable / keyword
-        } else if (std::isalpha(source.back())) {
+        } else if (std::isalpha(ss.peekNext())) {
             while (
-                source.size() && (
-                    std::isalpha(source.back()) ||
-                    std::isdigit(source.back()) ||
-                    source.back() == '_'
+                ss.hasNext() && (
+                    std::isalpha(ss.peekNext()) ||
+                    std::isdigit(ss.peekNext()) ||
+                    ss.peekNext() == '_'
                 )
             ) {
-               text += source.back();
-               source.pop_back();
-               sl.update(text.back()); 
+               text += ss.popNext();
             }
         // intrinsic
-        } else if (source.back() == '.') {
+        } else if (ss.peekNext() == '.') {
             while (
-                source.size() &&
-                !(std::isspace(source.back()) || source.back() == ')')
+                ss.hasNext() &&
+                !(std::isspace(ss.peekNext()) || ss.peekNext() == ')')
             ) {
-                text += source.back();
-                source.pop_back();
-                sl.update(text.back());
+                text += ss.popNext();
             }
         // special symbol
         } else if (
-            std::string("()[]=@&").find(source.back()) != std::string::npos
+            std::string("()[]=@&").find(ss.peekNext()) != std::string::npos
         ) {
-            text += source.back();
-            source.pop_back();
-            sl.update(text.back());
+            text += ss.popNext();
         // string literal
-        } else if (source.back() == '"') {
-            text += source.back();
-            source.pop_back();
-            sl.update(text.back());
+        } else if (ss.peekNext() == '"') {
+            text += ss.popNext();
             while (
-                source.size() && (
-                    source.back() != '"' ||
-                    (source.back() == '"' && countTrailingEscape(text) % 2 != 0)
+                ss.hasNext() && (
+                    ss.peekNext() != '"' ||
+                    (ss.peekNext() == '"' && countTrailingEscape(text) % 2 != 0)
                 )
             ) {
-                text += source.back();
-                source.pop_back();
-                sl.update(text.back());
+                text += ss.popNext();
             }
-            if (source.size() && source.back() == '"') {
-                text += source.back();
-                source.pop_back();
-                sl.update(text.back());
+            if (ss.hasNext() && ss.peekNext() == '"') {
+                text += ss.popNext();
             } else {
-                panic("lexer", sl, "incomplete string literal");
+                panic("lexer", start_sl, "incomplete string literal");
             }
         // comment
-        } else if (source.back() == '#') {
-            sl.update(source.back());
-            source.pop_back();
-            while (source.size() && source.back() != '\n') {
-                sl.update(source.back());
-                source.pop_back();
+        } else if (ss.peekNext() == '#') {
+            while (ss.hasNext() && ss.peekNext() != '\n') {
+                ss.popNext();
             }
             // nextToken() will consume the \n and recursively continue
             return nextToken();
         } else {
-            panic("lexer", sl, "unsupported starting character");
+            panic("lexer", start_sl, "unsupported starting character");
         }
         return Token(start_sl, std::move(text));
     };
@@ -376,7 +379,7 @@ struct AccessNode : public ExprNode {
     std::unique_ptr<ExprNode> expr;
 };
 
-std::unique_ptr<ExprNode> parse(std::deque<Token> &tokens) {
+std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
     auto isNumberToken = [](const Token &token) {
         return
             token.text.size() > 0 && (
@@ -632,14 +635,14 @@ using Location = int;
 
 struct Void {
     Void() = default;
-    std::string toString() {
+    std::string toString() const {
         return "<void>";
     }
 };
 
 struct Integer {
     Integer(int v): value(v) {}
-    std::string toString() {
+    std::string toString() const {
         return std::to_string(value);
     }
 
@@ -648,7 +651,7 @@ struct Integer {
 
 struct String {
     String(std::string v): value(std::move(v)) {}
-    std::string toString() {
+    std::string toString() const {
         return value;
     }
 
@@ -669,8 +672,8 @@ std::optional<Location> lookup(const std::string &name, const Env &env) {
 struct Closure {
     Closure(Env e, LambdaNode *f):
         env(std::move(e)), fun(f) {}
-    std::string toString() {
-        return std::format("<closure evaluated at {}>", fun->sl.toString());
+    std::string toString() const {
+        return "<closure evaluated at " + fun->sl.toString() + ">";
     }
 
     Env env;
@@ -678,6 +681,18 @@ struct Closure {
 };
 
 using Value = std::variant<Void, Integer, String, Closure>;
+
+std::string valueToString(const Value &v) {
+    if (std::holds_alternative<Void>(v)) {
+        return std::get<Void>(v).toString();
+    } else if (std::holds_alternative<Integer>(v)) {
+        return std::get<Integer>(v).toString();
+    } else if (std::holds_alternative<String>(v)) {
+        return std::get<String>(v).toString();
+    } else {
+        return std::get<Closure>(v).toString();
+    }
+}
 
 template <typename Type, typename Variant>
 struct isAlternativeOf {
@@ -703,22 +718,15 @@ bool holds(Variant&&... vars) {
 }
 
 struct Layer {
-    Layer(std::variant<Env, Env*> e, ExprNode *x):
-      env(std::move(e)), expr(x) {}
+    Layer(std::shared_ptr<Env> e, ExprNode *x, bool f = false):
+      env(std::move(e)), expr(x), frame(f) {}
     bool isFrame() const {
-        return std::holds_alternative<Env>(env);
-    }
-    Env *getEnvPtr() {
-        if (std::holds_alternative<Env>(env)) {
-            return &(std::get<Env>(env));
-        } else {
-            return std::get<Env*>(env);
-        }
+        return frame;
     }
 
-    // Env for frame, Env* for others
-    std::variant<Env, Env*> env;
+    std::shared_ptr<Env> env;
     ExprNode *expr;
+    bool frame;
     // program counter
     int pc = 0;
     // local helpers for evaluation
@@ -736,22 +744,16 @@ class State {
 public:
     State(ExprNode *e) {
         // the main frame
-        stack.push_back(Layer(Env(), nullptr));
+        stack.push_back(Layer(std::make_shared<Env>(), nullptr, true));
         // the first expression
-        stack.push_back(Layer(stack.back().getEnvPtr(), e));
-    }
-    void clear() {
-        stack.clear();
-        heap.clear();
-        resultLoc = -1;
+        stack.push_back(Layer(stack.back().env, e));
     }
     bool step() {
         // careful! this reference may be invalidated after modifying stack
-        // so always keep the stack operation as the last one
+        // so always keep the stack change operation as the last one
         auto &layer = stack.back();
         if (layer.expr == nullptr) {
             // end of evaluation
-            clear();
             return false;
         } else if (auto inode = dynamic_cast<IntegerNode*>(layer.expr)) {
             resultLoc = _new<Integer>(inode->val);
@@ -762,9 +764,11 @@ public:
         } else if (auto snode = dynamic_cast<SetNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(layer.getEnvPtr(), snode->expr.get()));
+                stack.push_back(Layer(
+                    layer.env, snode->expr.get()
+                ));
             } else {
-                auto loc = lookup(snode->var->name, *(layer.getEnvPtr()));
+                auto loc = lookup(snode->var->name, *(layer.env));
                 if (!loc.has_value()) {
                     panic("runtime", layer.expr->sl, "undefined variable");
                 }
@@ -773,14 +777,14 @@ public:
                 stack.pop_back();
             }
         } else if (auto lnode = dynamic_cast<LambdaNode*>(layer.expr)) {
-            resultLoc = _new<Closure>(*layer.getEnvPtr(), lnode);
+            resultLoc = _new<Closure>(*(layer.env), lnode);
             stack.pop_back();
         } else if (auto lnode = dynamic_cast<LetrecNode*>(layer.expr)) {
             // unified argument copy
             if (layer.pc > 1 && layer.pc <= lnode->varExprList.size() + 1) {
                 auto loc = lookup(
                     lnode->varExprList[layer.pc - 2].first->name,
-                    *(layer.getEnvPtr())
+                    *(layer.env)
                 );
                 if (!loc.has_value()) {
                     panic("runtime", layer.expr->sl, "undefined variable");
@@ -792,7 +796,7 @@ public:
             if (layer.pc == 0) {
                 layer.pc++;
                 for (const auto &[var, _] : lnode->varExprList) {
-                    layer.getEnvPtr()->push_back(std::make_pair(
+                    layer.env->push_back(std::make_pair(
                         var->name,
                         _new<Void>()
                     ));
@@ -802,7 +806,7 @@ public:
                 layer.pc++;
                 stack.push_back(
                     Layer(
-                        layer.getEnvPtr(),
+                        layer.env,
                         lnode->varExprList[layer.pc - 2].second.get()
                     )
                 );
@@ -811,7 +815,7 @@ public:
                 layer.pc++;
                 stack.push_back(
                     Layer(
-                        layer.getEnvPtr(),
+                        layer.env,
                         lnode->expr.get()
                     )
                 );
@@ -819,7 +823,7 @@ public:
             } else {
                 int nParams = lnode->varExprList.size();
                 for (int i = 0; i < nParams; i++) {
-                    layer.getEnvPtr()->pop_back();
+                    layer.env->pop_back();
                 }
                 // no need to update resultLoc: inherited
                 stack.pop_back();
@@ -827,7 +831,7 @@ public:
         } else if (auto inode = dynamic_cast<IfNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(layer.getEnvPtr(), inode->cond.get()));
+                stack.push_back(Layer(layer.env, inode->cond.get()));
             } else if (layer.pc == 1) {
                 layer.pc++;
                 if (!holds<Integer>(heap[resultLoc])) {
@@ -835,11 +839,11 @@ public:
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
                     stack.push_back(
-                        Layer(layer.getEnvPtr(), inode->branch1.get())
+                        Layer(layer.env, inode->branch1.get())
                     );
                 } else {
                     stack.push_back(
-                        Layer(layer.getEnvPtr(), inode->branch2.get())
+                        Layer(layer.env, inode->branch2.get())
                     );
                 }
             } else {
@@ -849,7 +853,7 @@ public:
         } else if (auto wnode = dynamic_cast<WhileNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(layer.getEnvPtr(), wnode->cond.get()));
+                stack.push_back(Layer(layer.env, wnode->cond.get()));
             } else if (layer.pc == 1) {
                 if (!holds<Integer>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "wrong cond type");
@@ -858,7 +862,7 @@ public:
                     // loop
                     layer.pc = 0;
                     stack.push_back(
-                        Layer(layer.getEnvPtr(), wnode->body.get())
+                        Layer(layer.env, wnode->body.get())
                     );
                 } else {
                     resultLoc = _new<Void>();
@@ -866,7 +870,7 @@ public:
                 }
             }
         } else if (auto vnode = dynamic_cast<VariableNode*>(layer.expr)) {
-            auto loc = lookup(vnode->name, *(layer.getEnvPtr()));
+            auto loc = lookup(vnode->name, *(layer.env));
             if (!loc.has_value()) {
                 panic("runtime", layer.expr->sl, "undefined variable");
             }
@@ -889,7 +893,7 @@ public:
                 } else if (layer.pc <= cnode->argList.size()) {
                     layer.pc++;
                     stack.push_back(Layer(
-                        layer.getEnvPtr(),
+                        layer.env,
                         cnode->argList[layer.pc - 2].get()
                     ));
                 // intrinsic call doesn't grow the stack
@@ -897,6 +901,7 @@ public:
                     auto value = _callIntrinsic(
                         layer.expr->sl,
                         callee->name,
+                        // intrinsic call is pass by reference
                         std::get<std::vector<Location>>(layer.local["args"])
                     );
                     resultLoc = _moveNew(value);
@@ -912,7 +917,7 @@ public:
                 if (layer.pc == 0) {
                     layer.pc++;
                     stack.push_back(Layer(
-                        layer.getEnvPtr(),
+                        layer.env,
                         cnode->callee.get()
                     ));
                 // initialization
@@ -924,7 +929,7 @@ public:
                 } else if (layer.pc <= cnode->argList.size() + 1) {
                     layer.pc++;
                     stack.push_back(Layer(
-                        layer.getEnvPtr(),
+                        layer.env,
                         cnode->argList[layer.pc - 3].get()
                     ));
                 // call
@@ -945,7 +950,7 @@ public:
                     int nArgs = argsLoc.size();
                     auto newEnv = callee.env;
                     for (int i = 0; i < nArgs; i++) {
-                        // pass by reference
+                        // closure call is pass by reference
                         newEnv.push_back(std::make_pair(
                             callee.fun->varList[i]->name,
                             argsLoc[i]
@@ -953,7 +958,10 @@ public:
                     }
                     // evaluation of the closure body
                     stack.push_back(Layer(
-                        newEnv, callee.fun->expr.get()
+                        // new frame has new env
+                        std::make_shared<Env>(std::move(newEnv)),
+                        callee.fun->expr.get(),
+                        true
                     ));
                 // finish
                 } else {
@@ -965,7 +973,7 @@ public:
             if (layer.pc < snode->exprList.size()) {
                 layer.pc++;
                 stack.push_back(Layer(
-                    layer.getEnvPtr(),
+                    layer.env,
                     snode->exprList[layer.pc - 1].get()
                 ));
             } else {
@@ -975,7 +983,7 @@ public:
         } else if (auto qnode = dynamic_cast<QueryNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(layer.getEnvPtr(), qnode->expr.get()));
+                stack.push_back(Layer(layer.env, qnode->expr.get()));
             } else {
                 if (!holds<Closure>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "@ wrong type");
@@ -991,7 +999,7 @@ public:
         } else if (auto anode = dynamic_cast<AccessNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(layer.getEnvPtr(), anode->expr.get()));
+                stack.push_back(Layer(layer.env, anode->expr.get()));
             } else {
                 if (!holds<Closure>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "& wrong type");
@@ -1016,9 +1024,12 @@ public:
         while (step()) {
             ctr++;
             if (ctr && (ctr % GC_INTERVAL == 0)) {
-                std::cerr << "[Note] GC collected: " << _gc() << "\n";
+                std::cerr << "[note] GC collected: " << _gc() << "\n";
             }
         }
+    }
+    Value getResult() {
+        return heap[resultLoc];
     }
 private:
     // intrinsic dispatch
@@ -1191,6 +1202,7 @@ private:
             );
         } else {
             panic("runtime", sl, "unrecognized intrinsic call");
+            return Void();
         }
     }
     // memory management
@@ -1223,7 +1235,7 @@ private:
         // tarverse the stack
         for (const auto &layer : stack) {
             if (layer.isFrame()) {
-                for (const auto &[_, loc] : std::get<Env>(layer.env)) {
+                for (const auto &[_, loc] : (*(layer.env))) {
                     traverseLocation(loc);
                 }
             }
@@ -1292,4 +1304,10 @@ private:
 };
 
 int main() {
+    std::string source = "(lambda (x) (.+ x 1) 2)";
+    auto tokens = lex(std::move(source));
+    auto expr = parse(std::move(tokens));
+    State state(expr.get());
+    state.execute();
+    std::cout << valueToString(state.getResult()) << std::endl;
 }
