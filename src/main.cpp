@@ -119,7 +119,7 @@ std::deque<Token> lex(std::string source) {
             return std::nullopt;
         }
         // read the next token
-        auto start_sl = ss.getNextSourceLocation();
+        auto startSl = ss.getNextSourceLocation();
         std::string text = "";
         // integer literal
         if (
@@ -171,7 +171,7 @@ std::deque<Token> lex(std::string source) {
             if (ss.hasNext() && ss.peekNext() == '"') {
                 text += ss.popNext();
             } else {
-                panic("lexer", start_sl, "incomplete string literal");
+                panic("lexer", startSl, "incomplete string literal");
             }
         // comment
         } else if (ss.peekNext() == '#') {
@@ -181,9 +181,9 @@ std::deque<Token> lex(std::string source) {
             // nextToken() will consume the \n and recursively continue
             return nextToken();
         } else {
-            panic("lexer", start_sl, "unsupported starting character");
+            panic("lexer", startSl, "unsupported starting character");
         }
-        return Token(start_sl, std::move(text));
+        return Token(startSl, std::move(text));
     };
 
     std::deque<Token> tokens;
@@ -1329,22 +1329,34 @@ letrec (
 {
 R"(
 letrec (
-  x = ""
-  r = ""
-  change = lambda (var val) set var val
+    x = ""
+    r = ""
+    change = lambda (var val) set var val
 )
 [
-  set x "a"
-  set r (.s+ r x)
-  (change x "b")
-  set r (.s+ r x)
-  letrec (z = x) set z "c"
-  set r (.s+ r x)
-  r
+    set x "a"
+    set r (.s+ r x)
+    (change x "b")
+    set r (.s+ r x)
+    letrec (z = x) set z "c"
+    set r (.s+ r x)
+    r
 ]
 )"
 ,
 "abb"
+},
+{
+R"(
+letrec (a = 0 b = 1)
+[
+    while (.< a 100)
+        letrec (t = a) [ set a b set b (.+ t b) ]
+    a
+]
+)"
+,
+"144"
 }
 };
 
