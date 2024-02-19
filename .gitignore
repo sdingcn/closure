@@ -1,3 +1,2 @@
-py.src/*.pyc
-cpp.src/build/
-cpp.src/.vscode/
+src/build/
+src/.vscode/

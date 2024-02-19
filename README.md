@@ -2,9 +2,9 @@
 
 ![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
 
-This repository is for experimenting with programming language features, interpreters and optimizations,
+This repository is for experimenting with programming language interpreters and optimizations,
 multitasking and schedulers, memory managers and garbage collectors, etc.
-So it is always "work in progress".
+It is always "work in progress".
 
 ## Language
 
@@ -60,5 +60,4 @@ sd                // shutdown
 
 ## Dependency
 
-Python >= 3.9  
 C++20

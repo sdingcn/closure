@@ -761,6 +761,13 @@ public:
         } else if (auto snode = dynamic_cast<StringNode*>(layer.expr)) {
             resultLoc = _new<String>(snode->val);
             stack.pop_back();
+        } else if (auto vnode = dynamic_cast<VariableNode*>(layer.expr)) {
+            auto loc = lookup(vnode->name, *(layer.env));
+            if (!loc.has_value()) {
+                panic("runtime", layer.expr->sl, "undefined variable");
+            }
+            resultLoc = loc.value();
+            stack.pop_back();
         } else if (auto snode = dynamic_cast<SetNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
@@ -869,13 +876,6 @@ public:
                     stack.pop_back();
                 }
             }
-        } else if (auto vnode = dynamic_cast<VariableNode*>(layer.expr)) {
-            auto loc = lookup(vnode->name, *(layer.env));
-            if (!loc.has_value()) {
-                panic("runtime", layer.expr->sl, "undefined variable");
-            }
-            resultLoc = loc.value();
-            stack.pop_back();
         } else if (auto cnode = dynamic_cast<CallNode*>(layer.expr)) {
             if (
                 auto callee = dynamic_cast<IntrinsicNode*>(cnode->callee.get())
@@ -1303,11 +1303,67 @@ private:
     Location resultLoc;
 };
 
+const std::unordered_map<std::string, std::string> tests = {
+{
+R"(
+letrec (
+    leaf = lambda () lambda () 0
+    node = lambda (value left right) lambda () 1
+    # in-order DFS
+    dfs = lambda (tree)
+        if (.< (tree) 1)
+        ""
+        (.s+ (.s+ (dfs &left tree) &value tree) (dfs &right tree))
+)
+(dfs
+    (node "4"
+        (node "2"
+            (node "1" (leaf) (leaf))
+            (node "3" (leaf) (leaf)))
+        (node "5" (leaf) (leaf))))
+)"
+,
+"12345"
+}
+,
+{
+R"(
+letrec (
+  x = ""
+  r = ""
+  change = lambda (var val) set var val
+)
+[
+  set x "a"
+  set r (.s+ r x)
+  (change x "b")
+  set r (.s+ r x)
+  letrec (z = x) set z "c"
+  set r (.s+ r x)
+  r
+]
+)"
+,
+"abb"
+}
+};
+
+void test() {
+    int i = 0;
+    for (const auto &[source, result] : tests) {
+        auto tokens = lex(source);
+        auto expr = parse(std::move(tokens));
+        State state(expr.get());
+        state.execute();
+        auto r = valueToString(state.getResult());
+        if (r == result) {
+            std::cout << "Passed test " << ++i << "\n";
+        } else {
+            std::cout << "Failed test " << ++i << "\n";
+        }
+    }
+}
+
 int main() {
-    std::string source = "(lambda (x) (.+ x 1) 2)";
-    auto tokens = lex(std::move(source));
-    auto expr = parse(std::move(tokens));
-    State state(expr.get());
-    state.execute();
-    std::cout << valueToString(state.getResult()) << std::endl;
+    test();
 }
