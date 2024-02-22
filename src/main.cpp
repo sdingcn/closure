@@ -160,6 +160,7 @@ std::deque<Token> lex(std::string source) {
         // string literal
         } else if (ss.peekNext() == '"') {
             text += ss.popNext();
+            // support multi-line strings
             while (
                 ss.hasNext() && (
                     ss.peekNext() != '"' ||
@@ -209,6 +210,16 @@ struct ExprNode {
     SourceLocation sl;
 };
 
+struct IntrinsicNode : public ExprNode {
+    IntrinsicNode(SourceLocation s, std::string n):
+        ExprNode(s), name(std::move(n)) {}
+    IntrinsicNode(const IntrinsicNode &) = delete;
+    IntrinsicNode &operator=(const IntrinsicNode &) = delete;
+    virtual ~IntrinsicNode() override {}
+
+    std::string name;
+};
+
 struct IntegerNode : public ExprNode {
     IntegerNode(SourceLocation s, int v): ExprNode(s), val(v) {}
     IntegerNode(const IntegerNode&) = delete;
@@ -226,16 +237,6 @@ struct StringNode : public ExprNode {
     virtual ~StringNode() override {}
 
     std::string val;
-};
-
-struct IntrinsicNode : public ExprNode {
-    IntrinsicNode(SourceLocation s, std::string n):
-        ExprNode(s), name(std::move(n)) {}
-    IntrinsicNode(const IntrinsicNode &) = delete;
-    IntrinsicNode &operator=(const IntrinsicNode &) = delete;
-    virtual ~IntrinsicNode() override {}
-
-    std::string name;
 };
 
 struct VariableNode : public ExprNode {
@@ -380,7 +381,7 @@ struct AccessNode : public ExprNode {
 };
 
 std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
-    auto isNumberToken = [](const Token &token) {
+    auto isIntegerToken = [](const Token &token) {
         return
             token.text.size() > 0 && (
                 std::isdigit(token.text[0]) ||
@@ -418,32 +419,41 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         return token;
     };
 
-    std::function<std::unique_ptr<IntegerNode>()> parseNumber;
-    std::function<std::unique_ptr<StringNode>()> parseString;
     std::function<std::unique_ptr<IntrinsicNode>()> parseIntrinsic;
+    std::function<std::unique_ptr<IntegerNode>()> parseInteger;
+    std::function<std::unique_ptr<StringNode>()> parseString;
+    std::function<std::unique_ptr<VariableNode>()> parseVariable;
     std::function<std::unique_ptr<SetNode>()> parseSet;
     std::function<std::unique_ptr<LambdaNode>()> parseLambda;
     std::function<std::unique_ptr<LetrecNode>()> parseLetrec;
     std::function<std::unique_ptr<IfNode>()> parseIf;
     std::function<std::unique_ptr<WhileNode>()> parseWhile;
-    std::function<std::unique_ptr<VariableNode>()> parseVariable;
     std::function<std::unique_ptr<CallNode>()> parseCall;
     std::function<std::unique_ptr<SequenceNode>()> parseSequence;
     std::function<std::unique_ptr<QueryNode>()> parseQuery;
     std::function<std::unique_ptr<AccessNode>()> parseAccess;
     std::function<std::unique_ptr<ExprNode>()> parseExpr;
 
-    parseNumber = [&]() -> std::unique_ptr<IntegerNode> {
-        auto token = consume(isNumberToken);
+    parseIntrinsic = [&]() -> std::unique_ptr<IntrinsicNode> {
+        auto token = consume(isIntrinsicToken);
+        return std::make_unique<IntrinsicNode>(token.sl, token.text);
+    };
+    parseInteger = [&]() -> std::unique_ptr<IntegerNode> {
+        auto token = consume(isIntegerToken);
         return std::make_unique<IntegerNode>(token.sl, std::stoi(token.text));
     };
     parseString = [&]() -> std::unique_ptr<StringNode> {
         auto token = consume(isStringToken);
         auto content = token.text;
+        // remove the two double-quotes ""
         content.pop_back();
         std::reverse(content.begin(), content.end());
         content.pop_back();
         std::string s;
+        // escape sequences: for example, newline can either be written
+        // directly in the source (multi-line strings) or be written in the
+        // source as "\n", but double-quotes can only be written as \",
+        // and backslashes can only be written as \\ .
         while (content.size()) {
             auto c = content.back();
             content.pop_back();
@@ -475,9 +485,9 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         }
         return std::make_unique<StringNode>(token.sl, std::move(s));
     };
-    parseIntrinsic = [&]() -> std::unique_ptr<IntrinsicNode> {
-        auto token = consume(isIntrinsicToken);
-        return std::make_unique<IntrinsicNode>(token.sl, token.text);
+    parseVariable = [&]() -> std::unique_ptr<VariableNode> {
+        auto token = consume(isVariableToken);
+        return std::make_unique<VariableNode>(token.sl, std::move(token.text));
     };
     parseSet = [&]() -> std::unique_ptr<SetNode> {
         auto start = consume(isToken("set"));
@@ -536,10 +546,6 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
             start.sl, std::move(cond), std::move(body)
         );
     };
-    parseVariable = [&]() -> std::unique_ptr<VariableNode> {
-        auto token = consume(isVariableToken);
-        return std::make_unique<VariableNode>(token.sl, std::move(token.text));
-    };
     parseCall = [&]() -> std::unique_ptr<CallNode> {
         auto start = consume(isToken("("));
         if (!tokens.size()) {
@@ -590,8 +596,9 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
                 "parser", SourceLocation(-1, -1), "incomplete token stream"
             );
             return nullptr;
-        } else if (isNumberToken(tokens[0])) {
-            return parseNumber();
+        // there is no stand-alone intrinsic, so we start from integers
+        } else if (isIntegerToken(tokens[0])) {
+            return parseInteger();
         } else if (isStringToken(tokens[0])) {
             return parseString();
         } else if (tokens[0].text == "set") {
