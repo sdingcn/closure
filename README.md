@@ -60,4 +60,16 @@ sd                // shutdown
 
 ## Dependency
 
-C++20
+cmake >= 3.28.1
+clang++ >= C++20
+make
+
+## Build (on Linux/macOS)
+
+Go to `src/`, and do the following.
+
+```
+mkdir build
+cmake -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) -S . -B build/ -G "Unix Makefiles"
+make
+```
