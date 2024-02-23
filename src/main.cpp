@@ -16,7 +16,32 @@
 #include <iostream>
 #include <array>
 
-// helper(s)
+// ------------------------------
+// global helper(s)
+// ------------------------------
+
+template <typename Type, typename Variant>
+struct isAlternativeOf {
+    static constexpr bool value = false;
+};
+
+template <typename Type, typename... Alternative>
+requires ((0 + ... + (std::same_as<Type, Alternative> ? 1 : 0)) == 1)
+struct isAlternativeOf<Type, std::variant<Alternative...>> {
+    static constexpr bool value = true;
+};
+
+template <typename... Alternative, typename... Variant>
+requires (
+    true && ... &&
+    isAlternativeOf<Alternative, std::remove_cvref_t<Variant>>::value
+)
+bool holds(Variant&&... vars) {
+    return (
+        true && ... &&
+        std::holds_alternative<Alternative>(std::forward<Variant>(vars))
+    );
+}
 
 struct SourceLocation {
     SourceLocation(int l = 1, int c = 1): line(l), column(c) {}
@@ -51,7 +76,9 @@ void panic(const std::string &type, const SourceLocation &sl,
     );
 }
 
+// ------------------------------
 // lexer
+// ------------------------------
 
 struct SourceStream {
     SourceStream(std::string s): source(std::move(s)) {
@@ -199,7 +226,9 @@ std::deque<Token> lex(std::string source) {
     return tokens;
 }
 
+// ------------------------------
 // parser
+// ------------------------------
 
 struct ExprNode {
     ExprNode(SourceLocation s): sl(s) {}
@@ -635,7 +664,9 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
     return expr;
 }
 
+// ------------------------------
 // runtime
+// ------------------------------
 
 // every value is accessed by reference, which is its location on the heap 
 using Location = int;
@@ -665,6 +696,7 @@ struct String {
     std::string value;
 };
 
+// variable environment; newer variables have larger indices
 using Env = std::vector<std::pair<std::string, Location>>;
 
 std::optional<Location> lookup(const std::string &name, const Env &env) {
@@ -701,28 +733,7 @@ std::string valueToString(const Value &v) {
     }
 }
 
-template <typename Type, typename Variant>
-struct isAlternativeOf {
-    static constexpr bool value = false;
-};
-
-template <typename Type, typename... Alternative>
-requires ((0 + ... + (std::same_as<Type, Alternative> ? 1 : 0)) == 1)
-struct isAlternativeOf<Type, std::variant<Alternative...>> {
-    static constexpr bool value = true;
-};
-
-template <typename... Alternative, typename... Variant>
-requires (
-    true && ... &&
-    isAlternativeOf<Alternative, std::remove_cvref_t<Variant>>::value
-)
-bool holds(Variant&&... vars) {
-    return (
-        true && ... &&
-        std::holds_alternative<Alternative>(std::forward<Variant>(vars))
-    );
-}
+// stack layer
 
 struct Layer {
     Layer(std::shared_ptr<Env> e, ExprNode *x, bool f = false):
@@ -733,17 +744,15 @@ struct Layer {
 
     std::shared_ptr<Env> env;
     ExprNode *expr;
+    // whether this is a closure call layer (a frame)
     bool frame;
-    // program counter
+    // program counter inside this expr
     int pc = 0;
-    // local helpers for evaluation
+    // temporary local information for evaluation
     std::unordered_map<
         std::string, std::variant<Location, std::vector<Location>>
     > local;
 };
-
-using Stack = std::vector<Layer>;
-using Heap = std::vector<Value>;
 
 constexpr int GC_INTERVAL = 10000;
 
@@ -1305,10 +1314,14 @@ private:
         return removed;
     }
     // fields
-    Stack stack;
-    Heap heap;
+    std::vector<Layer> stack;
+    std::vector<Value> heap;
     Location resultLoc;
 };
+
+// ------------------------------
+// tests
+// ------------------------------
 
 const std::unordered_map<std::string, std::string> tests = {
 {
@@ -1382,6 +1395,10 @@ void test() {
         }
     }
 }
+
+// ------------------------------
+// main
+// ------------------------------
 
 int main() {
     test();
