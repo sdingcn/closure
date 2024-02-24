@@ -4,5 +4,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - run: python3 ./test.py
+      - uses: actions/checkout@v4
+      - run: cd src
+      - run: mkdir build
+      - run: cmake -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) -S . -B build -G "Unix Makefiles"
+      - run: cd build
+      - run: make
+      - run: ./cvm
