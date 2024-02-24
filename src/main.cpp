@@ -1380,7 +1380,7 @@ letrec (a = 0 b = 1)
 }
 };
 
-void test() {
+int test() {
     int i = 0;
     for (const auto &[source, result] : tests) {
         auto tokens = lex(source);
@@ -1389,11 +1389,13 @@ void test() {
         state.execute();
         auto r = valueToString(state.getResult());
         if (r == result) {
-            std::cout << "Passed test " << ++i << "\n";
+            std::cerr << "Passed test " << ++i << "\n";
         } else {
-            std::cout << "Failed test " << ++i << "\n";
+            std::cerr << "Failed test " << ++i << "\n";
+            return 1;
         }
     }
+    return 0;
 }
 
 // ------------------------------
@@ -1401,5 +1403,5 @@ void test() {
 // ------------------------------
 
 int main() {
-    test();
+    return test();
 }

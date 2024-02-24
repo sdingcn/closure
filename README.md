@@ -66,7 +66,7 @@ clang++ >= C++20
 
 make
 
-## Build (on Linux/macOS)
+## Build and run (on Linux/macOS)
 
 Go to `src/`, and do the following.
 
