@@ -21,20 +21,23 @@
 // ------------------------------
 
 template <typename Type, typename Variant>
-struct isAlternativeOf {
+struct isAlternativeOfHelper {
     static constexpr bool value = false;
 };
 
 template <typename Type, typename... Alternative>
 requires ((0 + ... + (std::same_as<Type, Alternative> ? 1 : 0)) == 1)
-struct isAlternativeOf<Type, std::variant<Alternative...>> {
+struct isAlternativeOfHelper<Type, std::variant<Alternative...>> {
     static constexpr bool value = true;
 };
+
+template <typename Type, typename Variant>
+constexpr bool isAlternativeOf = isAlternativeOfHelper<Type, Variant>::value;
 
 template <typename... Alternative, typename... Variant>
 requires (
     true && ... &&
-    isAlternativeOf<Alternative, std::remove_cvref_t<Variant>>::value
+    isAlternativeOf<Alternative, std::remove_cvref_t<Variant>>
 )
 bool holds(Variant&&... vars) {
     return (
@@ -760,9 +763,9 @@ class State {
 public:
     State(ExprNode *e) {
         // the main frame
-        stack.push_back(Layer(std::make_shared<Env>(), nullptr, true));
+        stack.emplace_back(std::make_shared<Env>(), nullptr, true);
         // the first expression
-        stack.push_back(Layer(stack.back().env, e));
+        stack.emplace_back(stack.back().env, e);
     }
     bool step() {
         // careful! this reference may be invalidated after modifying stack
@@ -787,9 +790,7 @@ public:
         } else if (auto snode = dynamic_cast<SetNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(
-                    layer.env, snode->expr.get()
-                ));
+                stack.emplace_back(layer.env, snode->expr.get());
             } else {
                 auto loc = lookup(snode->var->name, *(layer.env));
                 if (!loc.has_value()) {
@@ -827,20 +828,16 @@ public:
             // evaluate bindings
             } else if (layer.pc <= lnode->varExprList.size()) {
                 layer.pc++;
-                stack.push_back(
-                    Layer(
-                        layer.env,
-                        lnode->varExprList[layer.pc - 2].second.get()
-                    )
+                stack.emplace_back(
+                    layer.env,
+                    lnode->varExprList[layer.pc - 2].second.get()
                 );
             // evaluate body
             } else if (layer.pc == lnode->varExprList.size() + 1) {
                 layer.pc++;
-                stack.push_back(
-                    Layer(
-                        layer.env,
-                        lnode->expr.get()
-                    )
+                stack.emplace_back(
+                    layer.env,
+                    lnode->expr.get()
                 );
             // finish letrec
             } else {
@@ -854,20 +851,16 @@ public:
         } else if (auto inode = dynamic_cast<IfNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(layer.env, inode->cond.get()));
+                stack.emplace_back(layer.env, inode->cond.get());
             } else if (layer.pc == 1) {
                 layer.pc++;
                 if (!holds<Integer>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "wrong cond type");
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
-                    stack.push_back(
-                        Layer(layer.env, inode->branch1.get())
-                    );
+                    stack.emplace_back(layer.env, inode->branch1.get());
                 } else {
-                    stack.push_back(
-                        Layer(layer.env, inode->branch2.get())
-                    );
+                    stack.emplace_back(layer.env, inode->branch2.get());
                 }
             } else {
                 // no need to update resultLoc: inherited
@@ -876,7 +869,7 @@ public:
         } else if (auto wnode = dynamic_cast<WhileNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(layer.env, wnode->cond.get()));
+                stack.emplace_back(layer.env, wnode->cond.get());
             } else if (layer.pc == 1) {
                 if (!holds<Integer>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "wrong cond type");
@@ -884,9 +877,7 @@ public:
                 if (std::get<Integer>(heap[resultLoc]).value) {
                     // loop
                     layer.pc = 0;
-                    stack.push_back(
-                        Layer(layer.env, wnode->body.get())
-                    );
+                    stack.emplace_back(layer.env, wnode->body.get());
                 } else {
                     resultLoc = _new<Void>();
                     stack.pop_back();
@@ -908,10 +899,10 @@ public:
                 // evaluate arguments
                 } else if (layer.pc <= cnode->argList.size()) {
                     layer.pc++;
-                    stack.push_back(Layer(
+                    stack.emplace_back(
                         layer.env,
                         cnode->argList[layer.pc - 2].get()
-                    ));
+                    );
                 // intrinsic call doesn't grow the stack
                 } else {
                     auto value = _callIntrinsic(
@@ -932,10 +923,10 @@ public:
                 // evaluate the callee
                 if (layer.pc == 0) {
                     layer.pc++;
-                    stack.push_back(Layer(
+                    stack.emplace_back(
                         layer.env,
                         cnode->callee.get()
-                    ));
+                    );
                 // initialization
                 } else if (layer.pc == 1) {
                     layer.pc++;
@@ -944,10 +935,10 @@ public:
                 // evaluate arguments
                 } else if (layer.pc <= cnode->argList.size() + 1) {
                     layer.pc++;
-                    stack.push_back(Layer(
+                    stack.emplace_back(
                         layer.env,
                         cnode->argList[layer.pc - 3].get()
-                    ));
+                    );
                 // call
                 } else if (layer.pc == cnode->argList.size() + 2) {
                     layer.pc++;
@@ -973,12 +964,12 @@ public:
                         ));
                     }
                     // evaluation of the closure body
-                    stack.push_back(Layer(
+                    stack.emplace_back(
                         // new frame has new env
                         std::make_shared<Env>(std::move(newEnv)),
                         callee.fun->expr.get(),
                         true
-                    ));
+                    );
                 // finish
                 } else {
                     // no need to update resultLoc: inherited
@@ -988,10 +979,10 @@ public:
         } else if (auto snode = dynamic_cast<SequenceNode*>(layer.expr)) {
             if (layer.pc < snode->exprList.size()) {
                 layer.pc++;
-                stack.push_back(Layer(
+                stack.emplace_back(
                     layer.env,
                     snode->exprList[layer.pc - 1].get()
-                ));
+                );
             } else {
                 // no need to update resultLoc: inherited
                 stack.pop_back();
@@ -999,7 +990,7 @@ public:
         } else if (auto qnode = dynamic_cast<QueryNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(layer.env, qnode->expr.get()));
+                stack.emplace_back(layer.env, qnode->expr.get());
             } else {
                 if (!holds<Closure>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "@ wrong type");
@@ -1015,7 +1006,7 @@ public:
         } else if (auto anode = dynamic_cast<AccessNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.push_back(Layer(layer.env, anode->expr.get()));
+                stack.emplace_back(layer.env, anode->expr.get());
             } else {
                 if (!holds<Closure>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "& wrong type");
@@ -1048,6 +1039,26 @@ public:
         return heap[resultLoc];
     }
 private:
+    template <typename... Alt>
+    requires (true && ... &&
+        (std::same_as<Alt, Value> || isAlternativeOf<Alt, Value>))
+    void _typecheck(SourceLocation sl, const std::vector<Location> &args) {
+        bool ok = args.size() == sizeof...(Alt);
+        int i = -1;
+        ok = ok && (true && ... && (
+            i++,
+            [&] {
+                if constexpr (std::same_as<Alt, Value>) {
+                    return true;
+                } else {
+                    return std::holds_alternative<Alt>(heap[args[i]]);
+                }
+            } ()
+        ));
+        if (!ok) {
+            panic("runtime", sl, "type error on intrinsic call");
+        }
+    }
     // intrinsic dispatch
     Value _callIntrinsic(
         SourceLocation sl,
@@ -1055,92 +1066,51 @@ private:
         const std::vector<Location> &args
     ) {
         if (name == ".void") {
-            if (!(args.size() == 0)) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<>(sl, args);
             return Void();
         } else if (name == ".+") {
-            if (
-                !(args.size() == 2 &&
-                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
-            ) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Integer, Integer>(sl, args);
             return Integer(
                 std::get<Integer>(heap[args[0]]).value +
                 std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == ".-") {
-            if (
-                !(args.size() == 2 &&
-                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
-            ) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Integer, Integer>(sl, args);
             return Integer(
                 std::get<Integer>(heap[args[0]]).value -
                 std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == ".*") {
-            if (
-                !(args.size() == 2 &&
-                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
-            ) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Integer, Integer>(sl, args);
             return Integer(
                 std::get<Integer>(heap[args[0]]).value *
                 std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == "./") {
-            if (
-                !(args.size() == 2 &&
-                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
-            ) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Integer, Integer>(sl, args);
             return Integer(
                 std::get<Integer>(heap[args[0]]).value /
                 std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == ".%") {
-            if (
-                !(args.size() == 2 &&
-                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
-            ) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Integer, Integer>(sl, args);
             return Integer(
                 std::get<Integer>(heap[args[0]]).value %
                 std::get<Integer>(heap[args[1]]).value
             );
         } else if (name == ".<") {
-            if (
-                !(args.size() == 2 &&
-                holds<Integer, Integer>(heap[args[0]], heap[args[1]]))
-            ) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Integer, Integer>(sl, args);
             return Integer(
                 std::get<Integer>(heap[args[0]]).value <
                 std::get<Integer>(heap[args[1]]).value ? 1 : 0
             );
         } else if (name == ".slen") {
-            if (!(args.size() == 1 && holds<String>(heap[args[0]]))) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<String>(sl, args);
             return Integer(
                 std::get<String>(heap[args[0]]).value.size()
             );
         } else if (name == ".ssub") {
-            if (!(
-                args.size() == 3 &&
-                holds<String, Integer, Integer>(
-                    heap[args[0]], heap[args[1]], heap[args[2]]
-                )
-            )) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<String, Integer, Integer>(sl, args);
             return String(
                 std::get<String>(heap[args[0]]).value.substr(
                     std::get<Integer>(heap[args[1]]).value,
@@ -1149,70 +1119,44 @@ private:
                 )
             );
         } else if (name == ".s+") {
-            if (!(
-                args.size() == 2 &&
-                holds<String, String>(heap[args[0]], heap[args[1]])
-            )) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<String, String>(sl, args);
             return String(
                 std::get<String>(heap[args[0]]).value +
                 std::get<String>(heap[args[1]]).value
             );
         } else if (name == ".s<") {
-            if (!(
-                args.size() == 2 &&
-                holds<String, String>(heap[args[0]], heap[args[1]])
-            )) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<String, String>(sl, args);
             return Integer(
                 std::get<String>(heap[args[0]]).value <
                 std::get<String>(heap[args[1]]).value ? 1 : 0
             );
         } else if (name == ".i->s") {
-            if (!(
-                args.size() == 1 && holds<Integer>(heap[args[0]])
-            )) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Integer>(sl, args);
             return String(
                 std::to_string(std::get<Integer>(heap[args[0]]).value)
             );
         } else if (name == ".s->i") {
-            if (!(
-                args.size() == 1 && holds<String>(heap[args[0]])
-            )) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<String>(sl, args);
             return Integer(
                 std::stoi(std::get<String>(heap[args[0]]).value)
             );
         } else if (name == ".v?") {
-            if (!(args.size() == 1)) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Value>(sl, args);
             return Integer(
                 holds<Void>(heap[args[0]]) ? 1 : 0
             );
         } else if (name == ".i?") {
-            if (!(args.size() == 1)) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Value>(sl, args);
             return Integer(
                 holds<Integer>(heap[args[0]]) ? 1 : 0
             );
         } else if (name == ".s?") {
-            if (!(args.size() == 1)) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Value>(sl, args);
             return Integer(
                 holds<String>(heap[args[0]]) ? 1 : 0
             );
         } else if (name == ".c?") {
-            if (!(args.size() == 1)) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
+            _typecheck<Value>(sl, args);
             return Integer(
                 holds<Closure>(heap[args[0]]) ? 1 : 0
             );
@@ -1223,7 +1167,7 @@ private:
     }
     // memory management
     template <typename V, typename... Args>
-    requires isAlternativeOf<V, Value>::value
+    requires isAlternativeOf<V, Value>
     Location _new(Args&&... args) {
         heap.push_back(V(std::forward<Args>(args)...));
         return heap.size() - 1;
