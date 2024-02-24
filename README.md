@@ -68,15 +68,15 @@ make
 
 ## Build and run (on Linux/macOS)
 
-Go to `src/`, and do the following.
-
 ```
+cd src
 mkdir build
 cmake -DCMAKE_BUILD_TYPE:STRING=Debug \
       -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) \
       -S . \
-      -B build/ \
+      -B build \
       -G "Unix Makefiles"
 cd build
 make
+./cvm
 ```
