@@ -1,6 +1,6 @@
 # cvm.experimental
 
-![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
+![](https://github.com/sdingcn/cvm.experimental/actions/workflows/auto-test.yml/badge.svg)
 
 This repository is for experimenting with programming language interpreters and optimizations,
 multitasking and schedulers, memory managers and garbage collectors, etc.
