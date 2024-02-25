@@ -35,10 +35,7 @@ template <typename Type, typename Variant>
 constexpr bool isAlternativeOf = isAlternativeOfHelper<Type, Variant>::value;
 
 template <typename... Alternative, typename... Variant>
-requires (
-    true && ... &&
-    isAlternativeOf<Alternative, std::remove_cvref_t<Variant>>
-)
+requires (true && ... && isAlternativeOf<Alternative, std::remove_cvref_t<Variant>>)
 bool holds(Variant&&... vars) {
     return (
         true && ... &&
@@ -152,11 +149,7 @@ std::deque<Token> lex(std::string source) {
         auto startSl = ss.getNextSourceLocation();
         std::string text = "";
         // integer literal
-        if (
-            std::isdigit(ss.peekNext()) ||
-            ss.peekNext() == '-' ||
-            ss.peekNext() == '+'
-        ) {
+        if (std::isdigit(ss.peekNext()) || ss.peekNext() == '-' || ss.peekNext() == '+') {
             if (ss.peekNext() == '-' || ss.peekNext() == '+') {
                 text += ss.popNext();
             }
@@ -183,9 +176,7 @@ std::deque<Token> lex(std::string source) {
                 text += ss.popNext();
             }
         // special symbol
-        } else if (
-            std::string("()[]=@&").find(ss.peekNext()) != std::string::npos
-        ) {
+        } else if (std::string("()[]=@&").find(ss.peekNext()) != std::string::npos) {
             text += ss.popNext();
         // string literal
         } else if (ss.peekNext() == '"') {
@@ -332,9 +323,7 @@ struct IfNode : public ExprNode {
         std::unique_ptr<ExprNode> c,
         std::unique_ptr<ExprNode> b1,
         std::unique_ptr<ExprNode> b2
-    ): 
-        ExprNode(s), cond(std::move(c)),
-        branch1(std::move(b1)), branch2(std::move(b2)) {}
+    ): ExprNode(s), cond(std::move(c)), branch1(std::move(b1)), branch2(std::move(b2)) {}
     IfNode(const IfNode &) = delete;
     IfNode &operator=(const IfNode &) = delete;
     virtual ~IfNode() override {}
@@ -436,12 +425,9 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         };
     };
 
-    auto consume =
-        [&tokens]<typename Callable>(const Callable &predicate) -> Token {
+    auto consume = [&tokens]<typename Callable>(const Callable &predicate) -> Token {
         if (tokens.size() == 0) {
-            panic(
-                "parser", SourceLocation(-1, -1), "incomplete token stream"
-            );
+            panic("parser", SourceLocation(-1, -1), "incomplete token stream");
         }
         auto token = tokens.front();
         tokens.pop_front();
@@ -502,14 +488,10 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
                     } else if (next == 'n') {
                         s += '\n';
                     } else {
-                        panic(
-                            "parser", token.sl, "unsupported escape sequence"
-                        );
+                        panic("parser", token.sl, "unsupported escape sequence");
                     }
                 } else {
-                    panic(
-                        "parser", token.sl, "incomplete escape sequence"
-                    );
+                    panic("parser", token.sl, "incomplete escape sequence");
                 }
             } else {
                 s += c;
@@ -525,9 +507,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         auto start = consume(isToken("set"));
         auto var = parseVariable();
         auto expr = parseExpr();
-        return std::make_unique<SetNode>(
-            start.sl, std::move(var), std::move(expr)
-        );
+        return std::make_unique<SetNode>(start.sl, std::move(var), std::move(expr));
     };
     parseLambda = [&]() -> std::unique_ptr<LambdaNode> {
         auto start = consume(isToken("lambda"));
@@ -538,9 +518,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         }
         consume(isToken(")"));
         auto expr = parseExpr();
-        return std::make_unique<LambdaNode>(
-            start.sl, std::move(varList), std::move(expr)
-        );
+        return std::make_unique<LambdaNode>(start.sl, std::move(varList), std::move(expr));
     };
     parseLetrec = [&]() -> std::unique_ptr<LetrecNode> {
         auto start = consume(isToken("letrec"));
@@ -557,9 +535,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         }
         consume(isToken(")"));
         auto expr = parseExpr();
-        return std::make_unique<LetrecNode>(
-            start.sl, std::move(varExprList), std::move(expr)
-        );
+        return std::make_unique<LetrecNode>(start.sl, std::move(varExprList), std::move(expr));
     };
     parseIf = [&]() -> std::unique_ptr<IfNode> {
         auto start = consume(isToken("if"));
@@ -574,9 +550,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         auto start = consume(isToken("while"));
         auto cond = parseExpr();
         auto body = parseExpr();
-        return std::make_unique<WhileNode>(
-            start.sl, std::move(cond), std::move(body)
-        );
+        return std::make_unique<WhileNode>(start.sl, std::move(cond), std::move(body));
     };
     parseCall = [&]() -> std::unique_ptr<CallNode> {
         auto start = consume(isToken("("));
@@ -590,9 +564,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
             argList.push_back(parseExpr());
         }
         consume(isToken(")"));
-        return std::make_unique<CallNode>(
-            start.sl, std::move(callee), std::move(argList)
-        );
+        return std::make_unique<CallNode>(start.sl, std::move(callee), std::move(argList));
     };
     parseSequence = [&]() -> std::unique_ptr<SequenceNode> {
         auto start = consume(isToken("["));
@@ -610,23 +582,17 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         auto start = consume(isToken("@"));
         auto var = parseVariable();
         auto expr = parseExpr();
-        return std::make_unique<QueryNode>(
-            start.sl, std::move(var), std::move(expr)
-        );
+        return std::make_unique<QueryNode>(start.sl, std::move(var), std::move(expr));
     };
     parseAccess = [&]() -> std::unique_ptr<AccessNode> {
         auto start = consume(isToken("&"));
         auto var = parseVariable();
         auto expr = parseExpr();
-        return std::make_unique<AccessNode>(
-            start.sl, std::move(var), std::move(expr)
-        );
+        return std::make_unique<AccessNode>(start.sl, std::move(var), std::move(expr));
     };
     parseExpr = [&]() -> std::unique_ptr<ExprNode> {
         if (!tokens.size()) {
-            panic(
-                "parser", SourceLocation(-1, -1), "incomplete token stream"
-            );
+            panic("parser", SourceLocation(-1, -1), "incomplete token stream");
             return nullptr;
         // there is no stand-alone intrinsic, so we start from integers
         } else if (isIntegerToken(tokens[0])) {
@@ -712,14 +678,14 @@ std::optional<Location> lookup(const std::string &name, const Env &env) {
 }
 
 struct Closure {
-    Closure(Env e, LambdaNode *f):
+    Closure(Env e, const LambdaNode *f):
         env(std::move(e)), fun(f) {}
     std::string toString() const {
         return "<closure evaluated at " + fun->sl.toString() + ">";
     }
 
     Env env;
-    LambdaNode *fun;
+    const LambdaNode *fun;
 };
 
 using Value = std::variant<Void, Integer, String, Closure>;
@@ -739,25 +705,22 @@ std::string valueToString(const Value &v) {
 // stack layer
 
 struct Layer {
-    Layer(std::shared_ptr<Env> e, ExprNode *x, bool f = false):
+    Layer(std::shared_ptr<Env> e, const ExprNode *x, bool f = false):
       env(std::move(e)), expr(x), frame(f) {}
     bool isFrame() const {
         return frame;
     }
 
+    // one env per frame
     std::shared_ptr<Env> env;
-    ExprNode *expr;
+    const ExprNode *expr;
     // whether this is a closure call layer (a frame)
     bool frame;
     // program counter inside this expr
     int pc = 0;
     // temporary local information for evaluation
-    std::unordered_map<
-        std::string, std::variant<Location, std::vector<Location>>
-    > local;
+    std::unordered_map<std::string, std::variant<Location, std::vector<Location>>> local;
 };
-
-constexpr int GC_INTERVAL = 10000;
 
 class State {
 public:
@@ -774,20 +737,20 @@ public:
         if (layer.expr == nullptr) {
             // end of evaluation
             return false;
-        } else if (auto inode = dynamic_cast<IntegerNode*>(layer.expr)) {
+        } else if (auto inode = dynamic_cast<const IntegerNode*>(layer.expr)) {
             resultLoc = _new<Integer>(inode->val);
             stack.pop_back();
-        } else if (auto snode = dynamic_cast<StringNode*>(layer.expr)) {
+        } else if (auto snode = dynamic_cast<const StringNode*>(layer.expr)) {
             resultLoc = _new<String>(snode->val);
             stack.pop_back();
-        } else if (auto vnode = dynamic_cast<VariableNode*>(layer.expr)) {
+        } else if (auto vnode = dynamic_cast<const VariableNode*>(layer.expr)) {
             auto loc = lookup(vnode->name, *(layer.env));
             if (!loc.has_value()) {
                 panic("runtime", layer.expr->sl, "undefined variable");
             }
             resultLoc = loc.value();
             stack.pop_back();
-        } else if (auto snode = dynamic_cast<SetNode*>(layer.expr)) {
+        } else if (auto snode = dynamic_cast<const SetNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
                 stack.emplace_back(layer.env, snode->expr.get());
@@ -800,10 +763,10 @@ public:
                 resultLoc = _new<Void>();
                 stack.pop_back();
             }
-        } else if (auto lnode = dynamic_cast<LambdaNode*>(layer.expr)) {
+        } else if (auto lnode = dynamic_cast<const LambdaNode*>(layer.expr)) {
             resultLoc = _new<Closure>(*(layer.env), lnode);
             stack.pop_back();
-        } else if (auto lnode = dynamic_cast<LetrecNode*>(layer.expr)) {
+        } else if (auto lnode = dynamic_cast<const LetrecNode*>(layer.expr)) {
             // unified argument copy
             if (layer.pc > 1 && layer.pc <= lnode->varExprList.size() + 1) {
                 auto loc = lookup(
@@ -848,7 +811,7 @@ public:
                 // no need to update resultLoc: inherited
                 stack.pop_back();
             }
-        } else if (auto inode = dynamic_cast<IfNode*>(layer.expr)) {
+        } else if (auto inode = dynamic_cast<const IfNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
                 stack.emplace_back(layer.env, inode->cond.get());
@@ -866,7 +829,7 @@ public:
                 // no need to update resultLoc: inherited
                 stack.pop_back();
             }
-        } else if (auto wnode = dynamic_cast<WhileNode*>(layer.expr)) {
+        } else if (auto wnode = dynamic_cast<const WhileNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
                 stack.emplace_back(layer.env, wnode->cond.get());
@@ -883,10 +846,8 @@ public:
                     stack.pop_back();
                 }
             }
-        } else if (auto cnode = dynamic_cast<CallNode*>(layer.expr)) {
-            if (
-                auto callee = dynamic_cast<IntrinsicNode*>(cnode->callee.get())
-            ) {
+        } else if (auto cnode = dynamic_cast<const CallNode*>(layer.expr)) {
+            if (auto callee = dynamic_cast<const IntrinsicNode*>(cnode->callee.get())) {
                 // unified argument recording
                 if (layer.pc > 1 && layer.pc <= cnode->argList.size() + 1) {
                     std::get<std::vector<Location>>(layer.local["args"])
@@ -943,9 +904,7 @@ public:
                 } else if (layer.pc == cnode->argList.size() + 2) {
                     layer.pc++;
                     auto calleeLoc = std::get<Location>(layer.local["callee"]);
-                    auto argsLoc = std::get<std::vector<Location>>(
-                        layer.local["args"]
-                    );
+                    auto argsLoc = std::get<std::vector<Location>>(layer.local["args"]);
                     if (!std::holds_alternative<Closure>(heap[calleeLoc])) {
                         panic("runtime", layer.expr->sl, "non-callable");
                     }
@@ -976,7 +935,7 @@ public:
                     stack.pop_back();
                 }
             }
-        } else if (auto snode = dynamic_cast<SequenceNode*>(layer.expr)) {
+        } else if (auto snode = dynamic_cast<const SequenceNode*>(layer.expr)) {
             if (layer.pc < snode->exprList.size()) {
                 layer.pc++;
                 stack.emplace_back(
@@ -987,7 +946,7 @@ public:
                 // no need to update resultLoc: inherited
                 stack.pop_back();
             }
-        } else if (auto qnode = dynamic_cast<QueryNode*>(layer.expr)) {
+        } else if (auto qnode = dynamic_cast<const QueryNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
                 stack.emplace_back(layer.env, qnode->expr.get());
@@ -1003,7 +962,7 @@ public:
                 );
                 stack.pop_back();
             }
-        } else if (auto anode = dynamic_cast<AccessNode*>(layer.expr)) {
+        } else if (auto anode = dynamic_cast<const AccessNode*>(layer.expr)) {
             if (layer.pc == 0) {
                 layer.pc++;
                 stack.emplace_back(layer.env, anode->expr.get());
@@ -1027,6 +986,7 @@ public:
         return true;
     }
     void execute() {
+        static constexpr int GC_INTERVAL = 10000;
         int ctr = 0;
         while (step()) {
             ctr++;
@@ -1040,8 +1000,7 @@ public:
     }
 private:
     template <typename... Alt>
-    requires (true && ... &&
-        (std::same_as<Alt, Value> || isAlternativeOf<Alt, Value>))
+    requires (true && ... && (std::same_as<Alt, Value> || isAlternativeOf<Alt, Value>))
     void _typecheck(SourceLocation sl, const std::vector<Location> &args) {
         bool ok = args.size() == sizeof...(Alt);
         int i = -1;
@@ -1106,9 +1065,7 @@ private:
             );
         } else if (name == ".slen") {
             _typecheck<String>(sl, args);
-            return Integer(
-                std::get<String>(heap[args[0]]).value.size()
-            );
+            return Integer(std::get<String>(heap[args[0]]).value.size());
         } else if (name == ".ssub") {
             _typecheck<String, Integer, Integer>(sl, args);
             return String(
@@ -1132,34 +1089,22 @@ private:
             );
         } else if (name == ".i->s") {
             _typecheck<Integer>(sl, args);
-            return String(
-                std::to_string(std::get<Integer>(heap[args[0]]).value)
-            );
+            return String(std::to_string(std::get<Integer>(heap[args[0]]).value));
         } else if (name == ".s->i") {
             _typecheck<String>(sl, args);
-            return Integer(
-                std::stoi(std::get<String>(heap[args[0]]).value)
-            );
+            return Integer(std::stoi(std::get<String>(heap[args[0]]).value));
         } else if (name == ".v?") {
             _typecheck<Value>(sl, args);
-            return Integer(
-                holds<Void>(heap[args[0]]) ? 1 : 0
-            );
+            return Integer(holds<Void>(heap[args[0]]) ? 1 : 0);
         } else if (name == ".i?") {
             _typecheck<Value>(sl, args);
-            return Integer(
-                holds<Integer>(heap[args[0]]) ? 1 : 0
-            );
+            return Integer(holds<Integer>(heap[args[0]]) ? 1 : 0);
         } else if (name == ".s?") {
             _typecheck<Value>(sl, args);
-            return Integer(
-                holds<String>(heap[args[0]]) ? 1 : 0
-            );
+            return Integer(holds<String>(heap[args[0]]) ? 1 : 0);
         } else if (name == ".c?") {
             _typecheck<Value>(sl, args);
-            return Integer(
-                holds<Closure>(heap[args[0]]) ? 1 : 0
-            );
+            return Integer(holds<Closure>(heap[args[0]]) ? 1 : 0);
         } else {
             panic("runtime", sl, "unrecognized intrinsic call");
             return Void();
