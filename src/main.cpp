@@ -34,12 +34,6 @@ struct isAlternativeOfHelper<Type, std::variant<Alternative...>> {
 template <typename Type, typename Variant>
 constexpr bool isAlternativeOf = isAlternativeOfHelper<Type, Variant>::value;
 
-template <typename... Alternative, typename... Variant>
-requires (true && ... && isAlternativeOf<Alternative, std::remove_cvref_t<Variant>>)
-bool holds(Variant&&... vars) {
-    return (true && ... && std::holds_alternative<Alternative>(std::forward<Variant>(vars)));
-}
-
 struct SourceLocation {
     SourceLocation(int l = 1, int c = 1): line(l), column(c) {}
     std::string toString() const {
@@ -820,7 +814,7 @@ public:
             } else if (layer.pc == 1) {
                 layer.pc++;
                 // inherited condition value
-                if (!holds<Integer>(heap[resultLoc])) {
+                if (!std::holds_alternative<Integer>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "wrong cond type");
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
@@ -841,7 +835,7 @@ public:
             // whether to evaluate body
             } else if (layer.pc == 1) {
                 // inherited condition value
-                if (!holds<Integer>(heap[resultLoc])) {
+                if (!std::holds_alternative<Integer>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "wrong cond type");
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
@@ -966,7 +960,7 @@ public:
             // finish
             } else {
                 // inherited resultLoc
-                if (!holds<Closure>(heap[resultLoc])) {
+                if (!std::holds_alternative<Closure>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "@ wrong type");
                 }
                 resultLoc = _new<Integer>(
@@ -984,7 +978,7 @@ public:
                 stack.emplace_back(layer.env, anode->expr.get());
             } else {
                 // inherited resultLoc
-                if (!holds<Closure>(heap[resultLoc])) {
+                if (!std::holds_alternative<Closure>(heap[resultLoc])) {
                     panic("runtime", layer.expr->sl, "& wrong type");
                 }
                 auto loc = lookup(
@@ -1111,16 +1105,16 @@ private:
             return Integer(std::stoi(std::get<String>(heap[args[0]]).value));
         } else if (name == ".v?") {
             _typecheck<Value>(sl, args);
-            return Integer(holds<Void>(heap[args[0]]) ? 1 : 0);
+            return Integer(std::holds_alternative<Void>(heap[args[0]]) ? 1 : 0);
         } else if (name == ".i?") {
             _typecheck<Value>(sl, args);
-            return Integer(holds<Integer>(heap[args[0]]) ? 1 : 0);
+            return Integer(std::holds_alternative<Integer>(heap[args[0]]) ? 1 : 0);
         } else if (name == ".s?") {
             _typecheck<Value>(sl, args);
-            return Integer(holds<String>(heap[args[0]]) ? 1 : 0);
+            return Integer(std::holds_alternative<String>(heap[args[0]]) ? 1 : 0);
         } else if (name == ".c?") {
             _typecheck<Value>(sl, args);
-            return Integer(holds<Closure>(heap[args[0]]) ? 1 : 0);
+            return Integer(std::holds_alternative<Closure>(heap[args[0]]) ? 1 : 0);
         } else {
             panic("runtime", sl, "unrecognized intrinsic call");
             return Void();
