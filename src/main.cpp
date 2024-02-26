@@ -1249,7 +1249,7 @@ private:
 // tests
 // ------------------------------
 
-const std::unordered_map<std::string, std::string> tests = {
+const std::vector<std::pair<std::string, std::string>> tests = {
 {
 R"(
 letrec (
@@ -1303,6 +1303,19 @@ letrec (a = 0 b = 1)
 )"
 ,
 "144"
+},
+{
+R"(
+letrec (
+    sum = lambda (n)
+        if (.< n 1)
+        0
+        (.+ n (sum (.- n 1)))
+)
+(sum 10000)
+)"
+,
+"50005000"
 }
 };
 
