@@ -874,7 +874,7 @@ public:
                         // intrinsic call is pass by reference
                         std::get<std::vector<Location>>(layer.local["args"])
                     );
-                    resultLoc = _moveNew(value);
+                    resultLoc = _moveNew(std::move(value));
                     stack.pop_back();
                 }
             } else {
@@ -1135,25 +1135,26 @@ private:
         std::unordered_set<Location> visited;
         // for each traversed location, specifically handle the closure case
         std::function<void(Location)> traverseLocation =
+            // "this" captures the current object by reference
             [this, &visited, &traverseLocation](Location loc) {
             if (!(visited.contains(loc))) {
                 visited.insert(loc);
                 if (std::holds_alternative<Closure>(heap[loc])) {
-                    for (
-                        const auto &[_, l] : std::get<Closure>(heap[loc]).env
-                    ) {
+                    for (const auto &[_, l] : std::get<Closure>(heap[loc]).env) {
                         traverseLocation(l);
                     }
                 }
             }
         };
-        // tarverse the stack
+        // traverse the stack
         for (const auto &layer : stack) {
+            // only frames "own" the environments
             if (layer.isFrame()) {
                 for (const auto &[_, loc] : (*(layer.env))) {
                     traverseLocation(loc);
                 }
             }
+            // but each layer can still have locals
             for (const auto &[_, v] : layer.local) {
                 if (std::holds_alternative<Location>(v)) {
                     traverseLocation(std::get<Location>(v));
@@ -1195,13 +1196,39 @@ private:
         return std::make_pair(removed, relocation);
     }
     void _relocate(const std::unordered_map<Location, Location> &relocation) {
+        auto reloc = [&relocation](Location &loc) -> void {
+            if (relocation.contains(loc)) {
+                loc = relocation.at(loc);
+            }
+        };
+        // traverse the stack
+        for (auto &layer : stack) {
+            // only frames "own" the environments
+            if (layer.isFrame()) {
+                for (auto &[_, loc] : (*(layer.env))) {
+                    reloc(loc);
+                }
+            }
+            // but each layer can still have locals
+            for (auto &[_, v] : layer.local) {
+                if (std::holds_alternative<Location>(v)) {
+                    reloc(std::get<Location>(v));
+                } else {
+                    auto &vec = std::get<std::vector<Location>>(v);
+                    for (auto &loc : vec) {
+                        reloc(loc);
+                    }
+                }
+            }
+        }
+        // traverse the resultLoc
+        reloc(resultLoc);
+        // traverse the closure values
         for (auto &v : heap) {
             if (std::holds_alternative<Closure>(v)) {
                 auto &c = std::get<Closure>(v);
                 for (auto &[_, loc] : c.env) {
-                    if (relocation.contains(loc)) {
-                        loc = relocation.at(loc);
-                    }
+                    reloc(loc);
                 }
             }
         }
