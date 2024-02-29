@@ -48,14 +48,13 @@ It is always "work in progress".
 ```
 cn <name> <expr>  // create a new (global) name (no duplicate)
 ln                // list all defined names
-pn <name>         // examine the value of a defined name
 dn <name>         // delete a defined name
-sp <pid> <expr>   // start a (background) process
-kp <pid>          // kill a process
-lp                // list all processes (including terminated, need to be explicitly killed)
+cp <pid> <name>   // create a (background) process
+lp                // list all processes (including terminated, need to be explicitly deleted)
+dp <pid>          // delete a process
+sd                // shutdown
 sm <label> <expr> // send a message
 rm <label>        // receive a message
-sd                // shutdown
 ```
 
 ## Dependency

@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <unordered_set>
 #include <unordered_map>
+#include <set>
+#include <map>
 #include <algorithm>
 #include <optional>
 #include <cctype>
@@ -16,6 +18,7 @@
 #include <iostream>
 #include <array>
 #include <thread>
+#include <mutex>
 
 // ------------------------------
 // global helper(s)
@@ -217,6 +220,10 @@ struct ExprNode {
     ExprNode &operator=(const ExprNode &) = delete;
     virtual ~ExprNode() {}
 
+    virtual std::string toString() const {
+        return "<ExprNode>";
+    }
+
     SourceLocation sl;
 };
 
@@ -229,6 +236,10 @@ struct IntrinsicNode : public ExprNode {
     IntrinsicNode &operator=(const IntrinsicNode &) = delete;
     virtual ~IntrinsicNode() override {}
 
+    virtual std::string toString() const override {
+        return name;
+    }
+
     std::string name;
 };
 
@@ -237,6 +248,10 @@ struct IntegerNode : public ExprNode {
     IntegerNode(const IntegerNode&) = delete;
     IntegerNode &operator=(const IntegerNode &) = delete;
     virtual ~IntegerNode() override {}
+
+    virtual std::string toString() const override {
+        return std::to_string(val);
+    }
 
     int val;
 };
@@ -248,6 +263,10 @@ struct StringNode : public ExprNode {
     StringNode &operator=(const StringNode &) = delete;
     virtual ~StringNode() override {}
 
+    virtual std::string toString() const override {
+        return "<StringNode>";
+    }
+
     std::string val;
 };
 
@@ -257,6 +276,10 @@ struct VariableNode : public ExprNode {
     VariableNode(const VariableNode &) = delete;
     VariableNode &operator=(const VariableNode &) = delete;
     virtual ~VariableNode() override {}
+
+    virtual std::string toString() const override {
+        return name;
+    }
 
     std::string name;
 };
@@ -271,6 +294,10 @@ struct SetNode : public ExprNode {
     SetNode &operator=(const SetNode &) = delete;
     virtual ~SetNode() override {}
 
+    virtual std::string toString() const override {
+        return "set " + var->toString() + " " + expr->toString();
+    }
+
     std::unique_ptr<VariableNode> var;
     std::unique_ptr<ExprNode> expr;
 };
@@ -283,6 +310,20 @@ struct LambdaNode : public ExprNode {
     LambdaNode(const LambdaNode &) = delete;
     LambdaNode &operator=(const LambdaNode &) = delete;
     virtual ~LambdaNode() override {}
+
+    virtual std::string toString() const override {
+        std::string ret = "lambda (";
+        for (const auto &v : varList) {
+            ret += v->toString();
+            ret += " ";
+        }
+        if (ret.back() == ' ') {
+            ret.pop_back();
+        }
+        ret += ") ";
+        ret += expr->toString();
+        return ret;
+    }
 
     std::vector<std::unique_ptr<VariableNode>> varList;
     std::unique_ptr<ExprNode> expr;
@@ -299,6 +340,22 @@ struct LetrecNode : public ExprNode {
     LetrecNode(const LetrecNode &) = delete;
     LetrecNode &operator=(const LetrecNode &) = delete;
     virtual ~LetrecNode() override {}
+
+    virtual std::string toString() const override {
+        std::string ret = "letrec (";
+        for (const auto &p : varExprList) {
+            ret += p.first->toString();
+            ret += " = ";
+            ret += p.second->toString();
+            ret += " ";
+        }
+        if (ret.back() == ' ') {
+            ret.pop_back();
+        }
+        ret += ") ";
+        ret += expr->toString();
+        return ret;
+    }
     
     std::vector<std::pair<
         std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>
@@ -317,6 +374,10 @@ struct IfNode : public ExprNode {
     IfNode &operator=(const IfNode &) = delete;
     virtual ~IfNode() override {}
 
+    virtual std::string toString() const override {
+        return "if " + cond->toString() + " " + branch1->toString() + " " + branch2->toString();
+    }
+
     std::unique_ptr<ExprNode> cond;
     std::unique_ptr<ExprNode> branch1;
     std::unique_ptr<ExprNode> branch2;
@@ -332,6 +393,10 @@ struct WhileNode : public ExprNode {
     WhileNode &operator=(const WhileNode &) = delete;
     virtual ~WhileNode() override {}
 
+    virtual std::string toString() const override {
+        return "while " + cond->toString() + " " + body->toString();
+    }
+
     std::unique_ptr<ExprNode> cond;
     std::unique_ptr<ExprNode> body;
 };
@@ -346,6 +411,16 @@ struct CallNode : public ExprNode {
     CallNode &operator=(const CallNode &) = delete;
     virtual ~CallNode() override {}
 
+    virtual std::string toString() const override {
+        std::string ret = "(" + callee->toString();
+        for (const auto &a : argList) {
+            ret += " ";
+            ret += a->toString();
+        }
+        ret += ")";
+        return ret;
+    }
+
     std::unique_ptr<ExprNode> callee;
     std::vector<std::unique_ptr<ExprNode>> argList;
 };
@@ -358,6 +433,19 @@ struct SequenceNode : public ExprNode {
     SequenceNode(const SequenceNode &) = delete;
     SequenceNode &operator=(const SequenceNode &) = delete;
     virtual ~SequenceNode() override {}
+
+    virtual std::string toString() const override {
+        std::string ret = "[";
+        for (const auto &e : exprList) {
+            ret += e->toString();
+            ret += " ";
+        }
+        if (ret.back() == ' ') {
+            ret.pop_back();
+        }
+        ret += "]";
+        return ret;
+    }
 
     std::vector<std::unique_ptr<ExprNode>> exprList;
 };
@@ -372,6 +460,10 @@ struct QueryNode : public ExprNode {
     QueryNode &operator=(const QueryNode &) = delete;
     virtual ~QueryNode() override {}
 
+    virtual std::string toString() const override {
+        return "@ " + var->toString() + " " + expr->toString();
+    }
+
     std::unique_ptr<VariableNode> var;
     std::unique_ptr<ExprNode> expr;
 };
@@ -385,6 +477,10 @@ struct AccessNode : public ExprNode {
     AccessNode(const AccessNode &) = delete;
     AccessNode &operator=(const AccessNode &) = delete;
     virtual ~AccessNode() override {}
+
+    virtual std::string toString() const override {
+        return "& " + var->toString() + " " + expr->toString();
+    }
 
     std::unique_ptr<VariableNode> var;
     std::unique_ptr<ExprNode> expr;
@@ -1339,14 +1435,116 @@ int test() {
 }
 
 // ------------------------------
+// names, processes, and the scheduler
+// ------------------------------
+
+namespace global {
+
+std::mutex mtx;
+bool halted = false;
+std::map<std::string, std::unique_ptr<ExprNode>> names;
+std::map<int, std::pair<std::string, State>> processes;
+
+}
+
+// simple round-robin scheduling
+void scheduler() {
+    while (true) {
+        // RAII-based lock
+        std::scoped_lock lock { global::mtx };
+        if (global::halted) {
+            return;
+        }
+        for (auto &p : global::processes) {
+            p.second.second.step();
+        }
+    }
+}
+
+// ------------------------------
 // main
 // ------------------------------
+
+std::optional<std::string> eat(std::string &s) {
+    while (s.size() && std::isspace(s.back())) {
+        s.pop_back();
+    }
+    std::string ret = "";
+    while (s.size() && (!std::isspace(s.back()))) {
+        ret += s.back();
+        s.pop_back();
+    }
+    if (ret.size()) {
+        return ret;
+    } else {
+        return std::nullopt;
+    }
+}
+
+#define CHECK_COND(cond) do {\
+    if (!(cond)) {\
+        std::cerr << "[sys] condition check failed at line " << __LINE__ << "\n";\
+        return;\
+    }\
+} while (false)
+
+void handleCommand(std::string command) {
+    std::reverse(command.begin(), command.end());
+    auto header = eat(command);
+    CHECK_COND(header.has_value());
+    if (header.value() == "cn") {
+        auto name = eat(command);
+        CHECK_COND(name.has_value());
+        CHECK_COND(!global::names.contains(name.value()));
+        std::reverse(command.begin(), command.end());
+        global::names[name.value()] = parse(lex(command));
+    } else if (header.value() == "ln") {
+        for (const auto &p : global::names) {
+            std::cout << p.first << "\t" << p.second->toString() << std::endl;
+        }
+    } else if (header.value() == "dn") {
+        auto name = eat(command);
+        CHECK_COND(name.has_value());
+        CHECK_COND(global::names.contains(name.value()));
+        bool running = false;
+        for (const auto &p : global::processes) {
+            if (p.second.first == name.value()) {
+                running = true;
+                break;
+            }
+        }
+        CHECK_COND(!running);
+        global::names.erase(name.value());
+    } else if (header.value() == "cp") {
+    } else if (header.value() == "lp") {
+    } else if (header.value() == "dp") {
+    } else if (header.value() == "sd") {
+        global::halted = true;
+    } else {
+        CHECK_COND(false);
+    }
+}
+
+#undef CHECK_COND
 
 int main(int argc, char **argv) {
     using namespace std::string_literals;
     if (argc == 1) {
-        // TODO: enter the main interactive loop
+        std::thread sched {scheduler};
+        while (true) {
+            std::cout << ">>> ";
+            std::string command;
+            std::getline(std::cin, command);
+            // RAII-based lock
+            std::scoped_lock lock { global::mtx };
+            handleCommand(std::move(command));
+            if (global::halted) {
+                break;
+            }
+        }
+        sched.join();
     } else if (argc == 2) {
+        // use std::string literals so this is not comparing pointers
         if (argv[1] == "test"s) {
             return test();
         } else {
