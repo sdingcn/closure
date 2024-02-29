@@ -15,6 +15,7 @@
 #include <type_traits>
 #include <iostream>
 #include <array>
+#include <thread>
 
 // ------------------------------
 // global helper(s)
@@ -1003,7 +1004,7 @@ public:
         while (step()) {
             ctr++;
             if (ctr && (ctr % GC_INTERVAL == 0)) {
-                std::cerr << "[note] GC collected: " << _gc() << "\n";
+                std::cerr << "[sys] GC collected: " << _gc() << "\n";
             }
         }
     }
@@ -1328,9 +1329,9 @@ int test() {
         state.execute();
         auto r = valueToString(state.getResult());
         if (r == result) {
-            std::cerr << "Passed test " << ++i << "\n";
+            std::cerr << "[sys] Passed test " << ++i << "\n";
         } else {
-            std::cerr << "Failed test " << ++i << "\n";
+            std::cerr << "[sys] Failed test " << ++i << "\n";
             return 1;
         }
     }
@@ -1341,6 +1342,16 @@ int test() {
 // main
 // ------------------------------
 
-int main() {
-    return test();
+int main(int argc, char **argv) {
+    using namespace std::string_literals;
+    if (argc == 1) {
+        // TODO: enter the main interactive loop
+    } else if (argc == 2) {
+        if (argv[1] == "test"s) {
+            return test();
+        } else {
+            std::cerr << "[sys] Unknown command line option\n";
+            return 1;
+        }
+    }
 }

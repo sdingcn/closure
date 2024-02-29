@@ -11,5 +11,5 @@ jobs:
         working-directory: src/
       - run: make
         working-directory: src/build/
-      - run: ./cvm
+      - run: ./cvm test
         working-directory: src/build/
