@@ -807,11 +807,14 @@ struct Layer {
 
 class State {
 public:
-    State(ExprNode *e) {
+    State(const ExprNode *e) {
         // the main frame
         stack.emplace_back(std::make_shared<Env>(), nullptr, true);
         // the first expression
         stack.emplace_back(stack.back().env, e);
+    }
+    bool isTerminated() const {
+        return stack.back().expr == nullptr;
     }
     // returns true iff the step completed without reaching the end of evaluation
     bool step() {
@@ -1104,7 +1107,7 @@ public:
             }
         }
     }
-    Value getResult() {
+    Value getResult() const {
         return heap[resultLoc];
     }
 private:
@@ -1456,7 +1459,9 @@ void scheduler() {
             return;
         }
         for (auto &p : global::processes) {
-            p.second.second.step();
+            if (!p.second.second.isTerminated()) {
+                p.second.second.step();
+            }
         }
     }
 }
@@ -1499,6 +1504,7 @@ void handleCommand(std::string command) {
         std::reverse(command.begin(), command.end());
         global::names[name.value()] = parse(lex(command));
     } else if (header.value() == "ln") {
+        std::cout << "Name\tCode" << std::endl;
         for (const auto &p : global::names) {
             std::cout << p.first << "\t" << p.second->toString() << std::endl;
         }
@@ -1516,8 +1522,33 @@ void handleCommand(std::string command) {
         CHECK_COND(!running);
         global::names.erase(name.value());
     } else if (header.value() == "cp") {
+        auto pid = eat(command);
+        CHECK_COND(pid.has_value());
+        CHECK_COND(!global::processes.contains(std::stoi(pid.value())));
+        auto name = eat(command);
+        CHECK_COND(name.has_value());
+        CHECK_COND(global::names.contains(name.value()));
+        global::processes.insert({
+            std::stoi(pid.value()),
+            std::make_pair(name.value(), State(global::names[name.value()].get()))
+        });
     } else if (header.value() == "lp") {
+        std::cout << "PID\tName\tStatus" << std::endl;
+        for (const auto &p : global::processes) {
+            std::cout << p.first << "\t"
+                << p.second.first << "\t"
+                << (
+                    p.second.second.isTerminated() ?
+                    ("Terminated (" + valueToString(p.second.second.getResult()) + ")") :
+                    "Running"
+                )
+                << std::endl;
+        }
     } else if (header.value() == "dp") {
+        auto pid = eat(command);
+        CHECK_COND(pid.has_value());
+        CHECK_COND(global::processes.contains(std::stoi(pid.value())));
+        global::processes.erase(std::stoi(pid.value()));
     } else if (header.value() == "sd") {
         global::halted = true;
     } else {
@@ -1530,7 +1561,7 @@ void handleCommand(std::string command) {
 int main(int argc, char **argv) {
     using namespace std::string_literals;
     if (argc == 1) {
-        std::thread sched {scheduler};
+        std::thread st {scheduler};
         while (true) {
             std::cout << ">>> ";
             std::string command;
@@ -1542,7 +1573,7 @@ int main(int argc, char **argv) {
                 break;
             }
         }
-        sched.join();
+        st.join();
     } else if (argc == 2) {
         // use std::string literals so this is not comparing pointers
         if (argv[1] == "test"s) {
