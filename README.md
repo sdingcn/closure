@@ -2,9 +2,7 @@
 
 ![](https://github.com/sdingcn/cvm.experimental/actions/workflows/auto-test.yml/badge.svg)
 
-This repository is for experimenting with programming language interpreters and optimizations,
-multitasking and schedulers, memory managers and garbage collectors, etc.
-It is always "work in progress".
+This repository is for experimenting with interpreters, schedulers, and garbage collectors.
 
 ## Language
 
@@ -36,10 +34,7 @@ It is always "work in progress".
              | .i->s                          // (int) -> str
              | .s->i                          // (str) -> int
              | .v? | .i? | .s? | .c?          // (any) -> int
-             | .time                          // () -> int
-             | .sleep                         // (int) -> void
-             | .exit                          // () -> void
-             | .send                          // (int, int | str) -> void
+             | .send                          // (int, any) -> void
              | .recv                          // (int) -> int | str | void
 ```
 
@@ -52,18 +47,13 @@ dn <name>         // delete a defined name
 cp <pid> <name>   // create a (background) process
 lp                // list all processes (including terminated, need to be explicitly deleted)
 dp <pid>          // delete a process
+lm                // list messages
 sd                // shutdown
-sm <label> <expr> // send a message
-rm <label>        // receive a message
 ```
 
 ## Dependency
 
-cmake >= 3.28.1
-
-clang++ >= C++20
-
-make
+`cmake` >= 3.28.1, a reasonable version of `make`, and `clang++` >= C++20
 
 ## Build and run (on Linux/macOS)
 
@@ -72,10 +62,13 @@ cd src
 mkdir build
 cmake -DCMAKE_BUILD_TYPE:STRING=Debug \
       -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) \
-      -S . \
-      -B build \
+      -S . -B build \
       -G "Unix Makefiles"
 cd build
 make
+```
+
+```
 ./cvm
+./cvm test
 ```

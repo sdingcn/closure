@@ -807,7 +807,10 @@ struct Layer {
 
 class State {
 public:
-    State(const ExprNode *e) {
+    State(
+        const ExprNode *e,
+        std::map<int, std::deque<std::variant<Integer, String>>> *m
+    ): messages(m) {
         // the main frame
         stack.emplace_back(std::make_shared<Env>(), nullptr, true);
         // the first expression
@@ -1215,6 +1218,43 @@ private:
         } else if (name == ".c?") {
             _typecheck<Value>(sl, args);
             return Integer(std::holds_alternative<Closure>(heap[args[0]]) ? 1 : 0);
+        } else if (name == ".send") {
+            if (!messages) {
+                panic("runtime", sl, "no message center given");
+            }
+            if (!(
+                args.size() == 2 &&
+                std::holds_alternative<Integer>(heap[args[0]]) &&
+                (
+                    std::holds_alternative<Integer>(heap[args[1]]) ||
+                    std::holds_alternative<String>(heap[args[1]])
+                )
+            )) {
+                panic("runtime", sl, "type error on intrinsic call");
+            }
+            (*messages)[std::get<Integer>(heap[args[0]]).value].push_back(
+                std::holds_alternative<Integer>(heap[args[1]]) ?
+                std::variant<Integer, String>(std::get<Integer>(heap[args[1]])) :
+                std::variant<Integer, String>(std::get<String>(heap[args[1]]))
+            );
+            return Void();
+        } else if (name == ".recv") {
+            if (!messages) {
+                panic("runtime", sl, "no message center given");
+            }
+            _typecheck<Integer>(sl, args);
+            int key = std::get<Integer>(heap[args[0]]).value;
+            if ((*messages)[key].size()) {
+                auto m = (*messages)[key].front();
+                (*messages)[key].pop_front();
+                if (std::holds_alternative<Integer>(m)) {
+                    return std::get<Integer>(m);
+                } else {
+                    return std::get<String>(m);
+                }
+            } else {
+                return Void();
+            }
         } else {
             panic("runtime", sl, "unrecognized intrinsic call");
             return Void();
@@ -1343,6 +1383,7 @@ private:
     std::vector<Layer> stack;
     std::vector<Value> heap;
     Location resultLoc;
+    std::map<int, std::deque<std::variant<Integer, String>>> *messages;
 };
 
 // ------------------------------
@@ -1424,7 +1465,7 @@ int test() {
     for (const auto &[source, result] : tests) {
         auto tokens = lex(source);
         auto expr = parse(std::move(tokens));
-        State state(expr.get());
+        State state(expr.get(), nullptr);
         state.execute();
         auto r = valueToString(state.getResult());
         if (r == result) {
@@ -1447,6 +1488,7 @@ std::mutex mtx;
 bool halted = false;
 std::map<std::string, std::unique_ptr<ExprNode>> names;
 std::map<int, std::pair<std::string, State>> processes;
+std::map<int, std::deque<std::variant<Integer, String>>> messages;
 
 }
 
@@ -1530,7 +1572,10 @@ void handleCommand(std::string command) {
         CHECK_COND(global::names.contains(name.value()));
         global::processes.insert({
             std::stoi(pid.value()),
-            std::make_pair(name.value(), State(global::names[name.value()].get()))
+            std::make_pair(
+                name.value(),
+                State(global::names[name.value()].get(), &global::messages)
+            )
         });
     } else if (header.value() == "lp") {
         std::cout << "PID\tName\tStatus" << std::endl;
@@ -1549,6 +1594,19 @@ void handleCommand(std::string command) {
         CHECK_COND(pid.has_value());
         CHECK_COND(global::processes.contains(std::stoi(pid.value())));
         global::processes.erase(std::stoi(pid.value()));
+    } else if (header.value() == "lm") {
+        std::cout << "CID\tMessages" << std::endl;
+        for (const auto &p : global::messages) {
+            std::cout << p.first << "\t";
+            for (const auto &m : p.second) {
+                if (std::holds_alternative<Integer>(m)) {
+                    std::cout << std::get<Integer>(m).value << " ";
+                } else {
+                    std::cout << "<String>" << " ";
+                }
+            }
+            std::cout << std::endl;
+        }
     } else if (header.value() == "sd") {
         global::halted = true;
     } else {
