@@ -34,8 +34,8 @@ This repository is for experimenting with interpreters, schedulers, and garbage 
              | .i->s                          // (int) -> str
              | .s->i                          // (str) -> int
              | .v? | .i? | .s? | .c?          // (any) -> int
-             | .send                          // (int, int | str) -> void
-             | .recv                          // (int) -> int | str | void
+             | .send                          // (int /* pid */, int | str) -> void
+             | .recv                          // () -> int | str | void
 ```
 
 ## Commands
