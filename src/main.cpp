@@ -1487,6 +1487,7 @@ namespace global {
 std::mutex mtx;
 bool halted = false;
 std::map<std::string, std::unique_ptr<ExprNode>> names;
+constexpr int maxProc = 1024;
 std::map<int, std::pair<std::string, State>> processes;
 std::map<int, std::deque<std::variant<Integer, String>>> messages;
 
@@ -1564,19 +1565,34 @@ void handleCommand(std::string command) {
         CHECK_COND(!running);
         global::names.erase(name.value());
     } else if (header.value() == "cp") {
-        auto pid = eat(command);
-        CHECK_COND(pid.has_value());
-        CHECK_COND(!global::processes.contains(std::stoi(pid.value())));
         auto name = eat(command);
         CHECK_COND(name.has_value());
         CHECK_COND(global::names.contains(name.value()));
-        global::processes.insert({
-            std::stoi(pid.value()),
-            std::make_pair(
-                name.value(),
-                State(global::names[name.value()].get(), &global::messages)
-            )
-        });
+        int pid = 0;
+        for (; pid < global::maxProc; pid++) {
+            bool ok = true;
+            for (const auto &p : global::processes) {
+                if (pid == p.first) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) {
+                break;
+            }
+        }
+        if (pid < global::maxProc) {
+            global::processes.insert({
+                pid,
+                std::make_pair(
+                    name.value(),
+                    State(global::names[name.value()].get(), &global::messages)
+                )
+            });
+            std::cout << "PID = " << pid << std::endl;
+        } else {
+            std::cout << "Reached the maximum number of processes" << std::endl;
+        }
     } else if (header.value() == "lp") {
         std::cout << "PID\tName\tStatus" << std::endl;
         for (const auto &p : global::processes) {

@@ -41,13 +41,13 @@ This repository is for experimenting with interpreters, schedulers, and garbage 
 ## Commands
 
 ```
-cn <name> <expr>  // create a new (global) name (no duplicate)
-ln                // list all defined names
-dn <name>         // delete a defined name
-cp <pid> <name>   // create a (background) process
-lp                // list all processes (including terminated, need to be explicitly deleted)
+cn <name> <expr>  // create a name
+ln                // list all names
+dn <name>         // delete a name
+cp <name>         // create a process
+lp                // list all processes
 dp <pid>          // delete a process
-lm                // list messages
+lm                // list all messages
 sd                // shutdown
 ```
 
