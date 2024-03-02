@@ -34,7 +34,7 @@ This repository is for experimenting with interpreters, schedulers, and garbage 
              | .i->s                          // (int) -> str
              | .s->i                          // (str) -> int
              | .v? | .i? | .s? | .c?          // (any) -> int
-             | .send                          // (int /* pid */, int | str) -> void
+             | .send                          // (str /* pid */, int | str) -> void
              | .recv                          // () -> int | str | void
 ```
 
@@ -47,7 +47,6 @@ dn <name>         // delete a name
 cp <name>         // create a process
 lp                // list all processes
 dp <pid>          // delete a process
-lm                // list all messages
 sd                // shutdown
 ```
 

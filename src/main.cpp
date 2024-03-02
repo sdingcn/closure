@@ -785,6 +785,16 @@ std::string valueToString(const Value &v) {
     }
 }
 
+using MessageValue = std::variant<Integer, String>;
+
+std::string messageValueToString(const MessageValue &v) {
+    if (std::holds_alternative<Integer>(v)) {
+        return std::get<Integer>(v).toString();
+    } else {
+        return std::get<String>(v).toString();
+    }
+}
+
 // stack layer
 
 struct Layer {
@@ -809,8 +819,9 @@ class State {
 public:
     State(
         const ExprNode *e,
-        std::map<int, std::deque<std::variant<Integer, String>>> *m
-    ): messages(m) {
+        std::function<void(std::string, MessageValue)> s,
+        std::function<Value()> r
+    ): sender(s), receiver(r) {
         // the main frame
         stack.emplace_back(std::make_shared<Env>(), nullptr, true);
         // the first expression
@@ -1219,12 +1230,9 @@ private:
             _typecheck<Value>(sl, args);
             return Integer(std::holds_alternative<Closure>(heap[args[0]]) ? 1 : 0);
         } else if (name == ".send") {
-            if (!messages) {
-                panic("runtime", sl, "no message center given");
-            }
             if (!(
                 args.size() == 2 &&
-                std::holds_alternative<Integer>(heap[args[0]]) &&
+                std::holds_alternative<String>(heap[args[0]]) &&
                 (
                     std::holds_alternative<Integer>(heap[args[1]]) ||
                     std::holds_alternative<String>(heap[args[1]])
@@ -1232,29 +1240,16 @@ private:
             )) {
                 panic("runtime", sl, "type error on intrinsic call");
             }
-            (*messages)[std::get<Integer>(heap[args[0]]).value].push_back(
+            sender(
+                std::get<String>(heap[args[0]]).value,
                 std::holds_alternative<Integer>(heap[args[1]]) ?
-                std::variant<Integer, String>(std::get<Integer>(heap[args[1]])) :
-                std::variant<Integer, String>(std::get<String>(heap[args[1]]))
+                MessageValue(std::get<Integer>(heap[args[1]])) :
+                MessageValue(std::get<String>(heap[args[1]]))
             );
             return Void();
         } else if (name == ".recv") {
-            if (!messages) {
-                panic("runtime", sl, "no message center given");
-            }
-            _typecheck<Integer>(sl, args);
-            int key = std::get<Integer>(heap[args[0]]).value;
-            if ((*messages)[key].size()) {
-                auto m = (*messages)[key].front();
-                (*messages)[key].pop_front();
-                if (std::holds_alternative<Integer>(m)) {
-                    return std::get<Integer>(m);
-                } else {
-                    return std::get<String>(m);
-                }
-            } else {
-                return Void();
-            }
+            _typecheck<>(sl, args);
+            return receiver();
         } else {
             panic("runtime", sl, "unrecognized intrinsic call");
             return Void();
@@ -1383,7 +1378,8 @@ private:
     std::vector<Layer> stack;
     std::vector<Value> heap;
     Location resultLoc;
-    std::map<int, std::deque<std::variant<Integer, String>>> *messages;
+    std::function<void(std::string, MessageValue)> sender;
+    std::function<Value()> receiver;
 };
 
 // ------------------------------
@@ -1465,7 +1461,7 @@ int test() {
     for (const auto &[source, result] : tests) {
         auto tokens = lex(source);
         auto expr = parse(std::move(tokens));
-        State state(expr.get(), nullptr);
+        State state(expr.get(), [](std::string pid, MessageValue m){}, [](){ return Void(); });
         state.execute();
         auto r = valueToString(state.getResult());
         if (r == result) {
@@ -1482,14 +1478,23 @@ int test() {
 // names, processes, and the scheduler
 // ------------------------------
 
+struct PCB {
+    PCB(std::string p, std::string sn, State st, std::deque<MessageValue> m)
+        : pid(p), sourceName(std::move(sn)), state(std::move(st)), messageQueue(std::move(m))
+    {}
+
+    std::string pid;
+    std::string sourceName;
+    State state;
+    std::deque<MessageValue> messageQueue;
+};
+
 namespace global {
 
-std::mutex mtx;
-bool halted = false;
+std::mutex mutex;
+bool shutdown = false;
 std::map<std::string, std::unique_ptr<ExprNode>> names;
-constexpr int maxProc = 1024;
-std::map<int, std::pair<std::string, State>> processes;
-std::map<int, std::deque<std::variant<Integer, String>>> messages;
+std::map<std::string, PCB> processes;
 
 }
 
@@ -1497,13 +1502,13 @@ std::map<int, std::deque<std::variant<Integer, String>>> messages;
 void scheduler() {
     while (true) {
         // RAII-based lock
-        std::scoped_lock lock { global::mtx };
-        if (global::halted) {
+        std::scoped_lock lock { global::mutex };
+        if (global::shutdown) {
             return;
         }
         for (auto &p : global::processes) {
-            if (!p.second.second.isTerminated()) {
-                p.second.second.step();
+            if (!p.second.state.isTerminated()) {
+                p.second.state.step();
             }
         }
     }
@@ -1557,7 +1562,7 @@ void handleCommand(std::string command) {
         CHECK_COND(global::names.contains(name.value()));
         bool running = false;
         for (const auto &p : global::processes) {
-            if (p.second.first == name.value()) {
+            if (p.second.sourceName == name.value()) {
                 running = true;
                 break;
             }
@@ -1568,39 +1573,62 @@ void handleCommand(std::string command) {
         auto name = eat(command);
         CHECK_COND(name.has_value());
         CHECK_COND(global::names.contains(name.value()));
-        int pid = 0;
-        for (; pid < global::maxProc; pid++) {
-            bool ok = true;
-            for (const auto &p : global::processes) {
-                if (pid == p.first) {
-                    ok = false;
-                    break;
+        int width = 0;
+        for (const auto &p : global::processes) {
+            width = std::max(width, static_cast<int>(p.first.size()));
+        }
+        std::vector<std::set<char>> vec(width, std::set<char> {'0', '1'});
+        for (const auto &p : global::processes) {
+            int w = p.first.size();
+            for (int i = 0; i < w; i++) {
+                vec[i].erase(p.first[i]);
+            }
+        }
+        std::string pid;
+        for (int i = 0; i < width + 1; i++) {
+            if (i < width && vec[i].size()) {
+                pid.push_back(*(vec[i].begin()));
+                break;
+            } else {
+                pid.push_back('0');
+            }
+        }
+        auto sender = [](std::string pid, MessageValue m) -> void {
+            if (global::processes.contains(pid)) {
+                global::processes.at(pid).messageQueue.push_back(m);
+            }
+        };
+        auto receiver = [pid]() -> Value {
+            if (global::processes.at(pid).messageQueue.empty()) {
+                return Void();
+            } else {
+                auto m = global::processes.at(pid).messageQueue.front();
+                global::processes.at(pid).messageQueue.pop_front();
+                if (std::holds_alternative<Integer>(m)) {
+                    return std::get<Integer>(m);
+                } else {
+                    return std::get<String>(m);
                 }
             }
-            if (ok) {
-                break;
-            }
-        }
-        if (pid < global::maxProc) {
-            global::processes.insert({
+        };
+        global::processes.insert({
+            pid,
+            PCB(
                 pid,
-                std::make_pair(
-                    name.value(),
-                    State(global::names[name.value()].get(), &global::messages)
-                )
-            });
-            std::cout << "PID = " << pid << std::endl;
-        } else {
-            std::cout << "Reached the maximum number of processes" << std::endl;
-        }
+                name.value(),
+                State(global::names[name.value()].get(), sender, receiver),
+                std::deque<MessageValue>()
+            )
+        });
+        std::cout << "PID = " << pid << std::endl;
     } else if (header.value() == "lp") {
         std::cout << "PID\tName\tStatus" << std::endl;
         for (const auto &p : global::processes) {
             std::cout << p.first << "\t"
-                << p.second.first << "\t"
+                << p.second.sourceName << "\t"
                 << (
-                    p.second.second.isTerminated() ?
-                    ("Terminated (" + valueToString(p.second.second.getResult()) + ")") :
+                    p.second.state.isTerminated() ?
+                    ("Terminated (" + valueToString(p.second.state.getResult()) + ")") :
                     "Running"
                 )
                 << std::endl;
@@ -1608,23 +1636,10 @@ void handleCommand(std::string command) {
     } else if (header.value() == "dp") {
         auto pid = eat(command);
         CHECK_COND(pid.has_value());
-        CHECK_COND(global::processes.contains(std::stoi(pid.value())));
-        global::processes.erase(std::stoi(pid.value()));
-    } else if (header.value() == "lm") {
-        std::cout << "CID\tMessages" << std::endl;
-        for (const auto &p : global::messages) {
-            std::cout << p.first << "\t";
-            for (const auto &m : p.second) {
-                if (std::holds_alternative<Integer>(m)) {
-                    std::cout << std::get<Integer>(m).value << " ";
-                } else {
-                    std::cout << "<String>" << " ";
-                }
-            }
-            std::cout << std::endl;
-        }
+        CHECK_COND(global::processes.contains(pid.value()));
+        global::processes.erase(pid.value());
     } else if (header.value() == "sd") {
-        global::halted = true;
+        global::shutdown = true;
     } else {
         CHECK_COND(false);
     }
@@ -1641,9 +1656,9 @@ int main(int argc, char **argv) {
             std::string command;
             std::getline(std::cin, command);
             // RAII-based lock
-            std::scoped_lock lock { global::mtx };
+            std::scoped_lock lock { global::mutex };
             handleCommand(std::move(command));
-            if (global::halted) {
+            if (global::shutdown) {
                 break;
             }
         }
