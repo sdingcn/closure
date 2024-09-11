@@ -24,18 +24,18 @@ An interpreted programming language supporting suspension and resumption
              | [ <expr>+ ]
              | @ <variable> <expr>
              | & <variable> <expr>
-<intrinsic> := .void                          // () -> void
-             | .+ | .- | .* | ./ | .% | .<    // (int, int) -> int
-             | .slen                          // (str) -> int
-             | .ssub                          // (str, int, int) -> str
-             | .s+                            // (str, str) -> str
-             | .s<                            // (str, str) -> int
-             | .i->s                          // (int) -> str
-             | .s->i                          // (str) -> int
-             | .v? | .i? | .s? | .c?          // (any) -> int
-             | .getline                       // () -> str
-             | .putline                       // (str) -> void
-             | .save                          // (str) -> void
+<intrinsic> := .void                               // () -> void
+             | .+ | .- | .* | ./ | .% | .<         // (int, int) -> int
+             | .strlen                             // (str) -> int
+             | .strsub                             // (str, int, int) -> str
+             | .str+                               // (str, str) -> str
+             | .str<                               // (str, str) -> int
+             | .int->str                           // (int) -> str
+             | .str->int                           // (str) -> int
+             | .void? | .int? | .str? | .closure?  // (any) -> int
+             | .getline                            // () -> str
+             | .put                                // (str) -> void
+             | .save                               // (str) -> void
 ```
 
 ## Dependency
