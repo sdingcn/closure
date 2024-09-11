@@ -56,6 +56,7 @@ make
 ```
 
 ```
-./closure
 ./closure test
+./closure <filename.closure>
+./closure <filename.state>
 ```
