@@ -1,14 +1,13 @@
-# cvm.experimental
+# closure (work in progress)
 
-![](https://github.com/sdingcn/cvm.experimental/actions/workflows/auto-test.yml/badge.svg)
+![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
 
-This repository is for experimenting with interpreters, schedulers, and garbage collectors.
+An interpreted programming language supporting suspension and resumption
 
-## Language
+## Syntax
 
 ```
 // types: void, int, str, closure
-<comment>   := #[^\n]*
 <variable>  := [a-zA-Z][a-zA-Z0-9_]*
 <binding>   := <variable> = <expr>
 <callee>    := <intrinsic>
@@ -26,7 +25,7 @@ This repository is for experimenting with interpreters, schedulers, and garbage 
              | @ <variable> <expr>
              | & <variable> <expr>
 <intrinsic> := .void                          // () -> void
-             | .+ | .- | .* | ./ | .% | .<    // (int, int) -> int {no currying}
+             | .+ | .- | .* | ./ | .% | .<    // (int, int) -> int
              | .slen                          // (str) -> int
              | .ssub                          // (str, int, int) -> str
              | .s+                            // (str, str) -> str
@@ -34,20 +33,9 @@ This repository is for experimenting with interpreters, schedulers, and garbage 
              | .i->s                          // (int) -> str
              | .s->i                          // (str) -> int
              | .v? | .i? | .s? | .c?          // (any) -> int
-             | .send                          // (str /* pid */, int | str) -> void
-             | .recv                          // () -> int | str | void
-```
-
-## Commands
-
-```
-cn <name> <expr>  // create a name
-ln                // list all names
-dn <name>         // delete a name
-cp <name>         // create a process
-lp                // list all processes
-dp <pid>          // delete a process
-sd                // shutdown
+             | .getline                       // () -> str
+             | .putline                       // (str) -> void
+             | .save                          // (str) -> void
 ```
 
 ## Dependency
@@ -68,6 +56,6 @@ make
 ```
 
 ```
-./cvm
-./cvm test
+./closure
+./closure test
 ```

@@ -817,15 +817,14 @@ struct Layer {
 
 class State {
 public:
-    State(
-        const ExprNode *e,
-        std::function<void(std::string, MessageValue)> s,
-        std::function<Value()> r
-    ): sender(s), receiver(r) {
+    State(const ExprNode *e) {
         // the main frame
         stack.emplace_back(std::make_shared<Env>(), nullptr, true);
         // the first expression
         stack.emplace_back(stack.back().env, e);
+    }
+    State(const std::string &s) {
+        // load from serialized state
     }
     bool isTerminated() const {
         return stack.back().expr == nullptr;
@@ -1124,6 +1123,8 @@ public:
     Value getResult() const {
         return heap[resultLoc];
     }
+    void save(const std::string &filePath) {
+    }
 private:
     template <typename... Alt>
     requires (true && ... && (std::same_as<Alt, Value> || isAlternativeOf<Alt, Value>))
@@ -1229,27 +1230,6 @@ private:
         } else if (name == ".c?") {
             _typecheck<Value>(sl, args);
             return Integer(std::holds_alternative<Closure>(heap[args[0]]) ? 1 : 0);
-        } else if (name == ".send") {
-            if (!(
-                args.size() == 2 &&
-                std::holds_alternative<String>(heap[args[0]]) &&
-                (
-                    std::holds_alternative<Integer>(heap[args[1]]) ||
-                    std::holds_alternative<String>(heap[args[1]])
-                )
-            )) {
-                panic("runtime", sl, "type error on intrinsic call");
-            }
-            sender(
-                std::get<String>(heap[args[0]]).value,
-                std::holds_alternative<Integer>(heap[args[1]]) ?
-                MessageValue(std::get<Integer>(heap[args[1]])) :
-                MessageValue(std::get<String>(heap[args[1]]))
-            );
-            return Void();
-        } else if (name == ".recv") {
-            _typecheck<>(sl, args);
-            return receiver();
         } else {
             panic("runtime", sl, "unrecognized intrinsic call");
             return Void();
@@ -1378,8 +1358,6 @@ private:
     std::vector<Layer> stack;
     std::vector<Value> heap;
     Location resultLoc;
-    std::function<void(std::string, MessageValue)> sender;
-    std::function<Value()> receiver;
 };
 
 // ------------------------------
@@ -1461,7 +1439,7 @@ int test() {
     for (const auto &[source, result] : tests) {
         auto tokens = lex(source);
         auto expr = parse(std::move(tokens));
-        State state(expr.get(), [](std::string pid, MessageValue m){}, [](){ return Void(); });
+        State state(expr.get());
         state.execute();
         auto r = valueToString(state.getResult());
         if (r == result) {
@@ -1475,201 +1453,8 @@ int test() {
 }
 
 // ------------------------------
-// names, processes, and the scheduler
-// ------------------------------
-
-struct PCB {
-    PCB(std::string p, std::string sn, State st, std::deque<MessageValue> m)
-        : pid(p), sourceName(std::move(sn)), state(std::move(st)), messageQueue(std::move(m))
-    {}
-
-    std::string pid;
-    std::string sourceName;
-    State state;
-    std::deque<MessageValue> messageQueue;
-};
-
-namespace global {
-
-std::mutex mutex;
-bool shutdown = false;
-std::map<std::string, std::unique_ptr<ExprNode>> names;
-std::map<std::string, PCB> processes;
-
-}
-
-// simple round-robin scheduling
-void scheduler() {
-    while (true) {
-        // RAII-based lock
-        std::scoped_lock lock { global::mutex };
-        if (global::shutdown) {
-            return;
-        }
-        for (auto &p : global::processes) {
-            if (!p.second.state.isTerminated()) {
-                p.second.state.step();
-            }
-        }
-    }
-}
-
-// ------------------------------
 // main
 // ------------------------------
 
-std::optional<std::string> eat(std::string &s) {
-    while (s.size() && std::isspace(s.back())) {
-        s.pop_back();
-    }
-    std::string ret = "";
-    while (s.size() && (!std::isspace(s.back()))) {
-        ret += s.back();
-        s.pop_back();
-    }
-    if (ret.size()) {
-        return ret;
-    } else {
-        return std::nullopt;
-    }
-}
-
-#define CHECK_COND(cond) do {\
-    if (!(cond)) {\
-        std::cerr << "[sys] condition check failed at line " << __LINE__ << "\n";\
-        return;\
-    }\
-} while (false)
-
-void handleCommand(std::string command) {
-    std::reverse(command.begin(), command.end());
-    auto header = eat(command);
-    CHECK_COND(header.has_value());
-    if (header.value() == "cn") {
-        auto name = eat(command);
-        CHECK_COND(name.has_value());
-        CHECK_COND(!global::names.contains(name.value()));
-        std::reverse(command.begin(), command.end());
-        global::names[name.value()] = parse(lex(command));
-    } else if (header.value() == "ln") {
-        std::cout << "Name\tCode" << std::endl;
-        for (const auto &p : global::names) {
-            std::cout << p.first << "\t" << p.second->toString() << std::endl;
-        }
-    } else if (header.value() == "dn") {
-        auto name = eat(command);
-        CHECK_COND(name.has_value());
-        CHECK_COND(global::names.contains(name.value()));
-        bool running = false;
-        for (const auto &p : global::processes) {
-            if (p.second.sourceName == name.value()) {
-                running = true;
-                break;
-            }
-        }
-        CHECK_COND(!running);
-        global::names.erase(name.value());
-    } else if (header.value() == "cp") {
-        auto name = eat(command);
-        CHECK_COND(name.has_value());
-        CHECK_COND(global::names.contains(name.value()));
-        int width = 0;
-        for (const auto &p : global::processes) {
-            width = std::max(width, static_cast<int>(p.first.size()));
-        }
-        std::vector<std::set<char>> vec(width, std::set<char> {'0', '1'});
-        for (const auto &p : global::processes) {
-            int w = p.first.size();
-            for (int i = 0; i < w; i++) {
-                vec[i].erase(p.first[i]);
-            }
-        }
-        std::string pid;
-        for (int i = 0; i < width + 1; i++) {
-            if (i < width && vec[i].size()) {
-                pid.push_back(*(vec[i].begin()));
-                break;
-            } else {
-                pid.push_back('0');
-            }
-        }
-        auto sender = [](std::string pid, MessageValue m) -> void {
-            if (global::processes.contains(pid)) {
-                global::processes.at(pid).messageQueue.push_back(m);
-            }
-        };
-        auto receiver = [pid]() -> Value {
-            if (global::processes.at(pid).messageQueue.empty()) {
-                return Void();
-            } else {
-                auto m = global::processes.at(pid).messageQueue.front();
-                global::processes.at(pid).messageQueue.pop_front();
-                if (std::holds_alternative<Integer>(m)) {
-                    return std::get<Integer>(m);
-                } else {
-                    return std::get<String>(m);
-                }
-            }
-        };
-        global::processes.insert({
-            pid,
-            PCB(
-                pid,
-                name.value(),
-                State(global::names[name.value()].get(), sender, receiver),
-                std::deque<MessageValue>()
-            )
-        });
-        std::cout << "PID = " << pid << std::endl;
-    } else if (header.value() == "lp") {
-        std::cout << "PID\tName\tStatus" << std::endl;
-        for (const auto &p : global::processes) {
-            std::cout << p.first << "\t"
-                << p.second.sourceName << "\t"
-                << (
-                    p.second.state.isTerminated() ?
-                    ("Terminated (" + valueToString(p.second.state.getResult()) + ")") :
-                    "Running"
-                )
-                << std::endl;
-        }
-    } else if (header.value() == "dp") {
-        auto pid = eat(command);
-        CHECK_COND(pid.has_value());
-        CHECK_COND(global::processes.contains(pid.value()));
-        global::processes.erase(pid.value());
-    } else if (header.value() == "sd") {
-        global::shutdown = true;
-    } else {
-        CHECK_COND(false);
-    }
-}
-
-#undef CHECK_COND
-
 int main(int argc, char **argv) {
-    using namespace std::string_literals;
-    if (argc == 1) {
-        std::thread st {scheduler};
-        while (true) {
-            std::cout << ">>> ";
-            std::string command;
-            std::getline(std::cin, command);
-            // RAII-based lock
-            std::scoped_lock lock { global::mutex };
-            handleCommand(std::move(command));
-            if (global::shutdown) {
-                break;
-            }
-        }
-        st.join();
-    } else if (argc == 2) {
-        // use std::string literals so this is not comparing pointers
-        if (argv[1] == "test"s) {
-            return test();
-        } else {
-            std::cerr << "[sys] Unknown command line option\n";
-            return 1;
-        }
-    }
 }
