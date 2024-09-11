@@ -7,7 +7,10 @@ An interpreted programming language supporting suspension and resumption
 ## Syntax
 
 ```
-// types: void, int, str, closure
+// object types: void, int, str, closure
+// void, int, str objects are immutable
+// closure objects are mutable in the sense that their env variables can be re-bound
+// variables can be re-bound
 <variable>  := [a-zA-Z][a-zA-Z0-9_]*
 <binding>   := <variable> = <expr>
 <callee>    := <intrinsic>
@@ -15,15 +18,17 @@ An interpreted programming language supporting suspension and resumption
 <expr>      := <int>
              | <str>
              | <variable>
-             | set <variable> <expr>
+             | set <variable> <expr>          // re-bind a variable, evaluates to void
              | lambda ( <variable>* ) <expr>
-             | letrec ( <binding>* ) <expr>   // pass by deepcopy
+             | letrec ( <binding>* ) <expr>   // pass by reference
              | if <expr> <expr> <expr>
              | while <expr> <expr>
              | ( <callee> <expr>* )           // pass by reference
+             | clone <expr>                   // TBD
              | [ <expr>+ ]
-             | @ <variable> <expr>
-             | & <variable> <expr>
+             | @check <variable> <expr>       // does a variable exist in a closure's env
+             | @get <variable> <expr>         // access a variable in a closure's env
+             | @set <variable> <expr>         // re-bind a variable in a closure's env
 <intrinsic> := .void                               // () -> void
              | .+ | .- | .* | ./ | .% | .<         // (int, int) -> int
              | .strlen                             // (str) -> int
@@ -35,7 +40,7 @@ An interpreted programming language supporting suspension and resumption
              | .void? | .int? | .str? | .closure?  // (any) -> int
              | .getline                            // () -> str
              | .put                                // (str) -> void
-             | .save                               // (str) -> void
+             | .suspend                            // (str) -> void
 ```
 
 ## Dependency
@@ -56,7 +61,7 @@ make
 ```
 
 ```
-./closure test
-./closure <filename.closure>
-./closure <filename.state>
+./closure // prints the usage information
+./closure [-step <count>] [-time <seconds>] (<filename.closure> | <filename.state>)
+Hit Ctrl+C to suspend at any time
 ```
