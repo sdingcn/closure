@@ -5,6 +5,8 @@
 ## Syntax
 
 ```
+<comment> := #[^\n]*\n
+
 <int-literal> := [+-]?[0-9]+
 <str-literal> := English keyboard + [\t\n]
 
@@ -19,7 +21,7 @@
 <expr> := <int-literal>
         | <str-literal>
         | <variable>
-        | set <variable> <expr>                  // re-bind a variable, evaluating to Void
+        | vset <variable> <expr>                 // re-bind a variable, evaluating to Void
         | lambda ( <variable>* ) <expr>
         | letrec ( <variable-binding>* ) <expr>
         | if <expr> <expr> <expr>
@@ -27,30 +29,30 @@
         | [ <expr>+ ]                            // sequenced evaluation
         | struct ( <struct-type-binding>* ) <expr>
         | ( <callee> <expr>* )
-        | @get <variable> <expr>                 // struct field reading
-        | @set <variable> <expr>                 // struct field modification, evaluating to Void
+        | sget <variable> <expr>                 // struct field reading
+        | sset <variable> <expr>                 // struct field modification, evaluating to Void
 
-<intrinsic> := void                   // () -> Void
-             | + | - | * | / | % | <  // (Int, Int) -> Int
-             | sl                     // (Str) -> Int
-             | ss                     // (Str, Int, Int) -> Str
-             | s+                     // (Str, Str) -> Str
-             | s<                     // (Str, Str) -> Int
-             | i->s                   // (Int) -> Str
-             | s->i                   // (Str) -> Int
-             | id                     // (Any) -> Int
-             | type                   // (Any) -> Str
-             | getchar                // () -> Str
-             | put                    // (Str) -> Void
+<intrinsic> := .void                        // () -> Void
+             | .+ | .- | .* | ./ | .% | .<  // (Int, Int) -> Int
+             | .sl                          // (Str) -> Int
+             | .ss                          // (Str, Int, Int) -> Str
+             | .s+                          // (Str, Str) -> Str
+             | .s<                          // (Str, Str) -> Int
+             | .i->s                        // (Int) -> Str
+             | .s->i                        // (Str) -> Int
+             | .id                          // (Any) -> Int
+             | .type                        // (Any) -> Str
+             | .getchar                     // () -> Str
+             | .put                         // (Str) -> Void
 ```
 
 ## Semantics
 
 There are four basic object types `Void`, `Int`, `Str`, `Closure`, all of which are immutable.
 
-New types defined using `struct` are mutable by `@set`. A `struct` is essentially a variable tuple.
+New types defined using `struct` are mutable by `sset`. A `struct` is essentially a variable tuple.
 
-Variables can be re-bound by `set`.
+Variables can be re-bound by `vset`.
 
 Both `letrec` and `( <callee> <expr>* )` use pass-by-reference for variables.
 

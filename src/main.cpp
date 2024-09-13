@@ -16,9 +16,6 @@
 #include <concepts>
 #include <type_traits>
 #include <iostream>
-#include <array>
-#include <thread>
-#include <mutex>
 
 // ------------------------------
 // global helper(s)
@@ -40,6 +37,7 @@ constexpr bool isAlternativeOf = isAlternativeOfHelper<Type, Variant>::value;
 
 struct SourceLocation {
     SourceLocation(int l = 1, int c = 1): line(l), column(c) {}
+
     std::string toString() const {
         if (line <= 0 || column <= 0) {
             return "(SourceLocation N/A)";
@@ -77,7 +75,7 @@ struct SourceStream {
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
             "0123456789`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/? \t\n";
         std::unordered_set<char> charset(charstr.begin(), charstr.end());
-        for (auto c : source) {
+        for (char c : source) {
             if (!charset.contains(c)) {
                 panic("lexer", sl, "unsupported character");
             }
@@ -86,6 +84,7 @@ struct SourceStream {
         sl.revert();
         std::reverse(source.begin(), source.end());
     }
+
     bool hasNext() const {
         return source.size() > 0;
     }
@@ -136,7 +135,7 @@ std::deque<Token> lex(std::string source) {
             return std::nullopt;
         }
         // read the next token
-        auto startSl = ss.getNextSourceLocation();
+        auto startsl = ss.getNextSourceLocation();
         std::string text = "";
         // integer literal
         if (std::isdigit(ss.peekNext()) || ss.peekNext() == '-' || ss.peekNext() == '+') {
@@ -146,7 +145,7 @@ std::deque<Token> lex(std::string source) {
             while (ss.hasNext() && std::isdigit(ss.peekNext())) {
                 text += ss.popNext();
             }
-        // variable / keyword
+        // variable / struct-type / keyword
         } else if (std::isalpha(ss.peekNext())) {
             while (
                 ss.hasNext() && (
@@ -166,7 +165,7 @@ std::deque<Token> lex(std::string source) {
                 text += ss.popNext();
             }
         // special symbol
-        } else if (std::string("()[]=@&").find(ss.peekNext()) != std::string::npos) {
+        } else if (std::string("()[]").find(ss.peekNext()) != std::string::npos) {
             text += ss.popNext();
         // string literal
         } else if (ss.peekNext() == '"') {
