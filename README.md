@@ -12,7 +12,7 @@
 <type>     := [A-Z][a-zA-Z0-9_]*
 
 <variable-binding> := <variable> = <expr>
-<type-binding>     := <type> = (<variable>*)
+<type-binding>     := <type> (<variable>*)
 
 <expr> := <int>
         | <str>
@@ -24,11 +24,16 @@
         | while <expr> <expr>
         | [ <expr>+ ]                            // sequenced evaluation
         | struct ( <type-binding>* ) <expr>
+        | union ( <type-binding>* ) <expr>
         | ( <intrinsic> <expr>* )                // intrinsic call
         | ( <variable> <expr>* )                 // user-defined function call
-        | ( <type> <expr>* )                     // constructor call
-        | @get <variable> <expr>                 // field reading
-        | @set <variable> <expr>                 // field modification
+        | ( <struct-type> <expr>* )              // struct constructor call
+        | ( <union-type> <variable> <expr> )     // union constructor call
+        | @struct-get <variable> <expr>          // struct field reading
+        | @struct-set <variable> <expr>          // struct field modification
+        | @union-get-tag <expr>                  // union tag reading
+        | @union-get-value <expr>                // union value reading
+        | @union-set <variable> <expr>           // union re-binding
 
 <intrinsic> := void                   // () -> void
              | + | - | * | / | % | <  // (int, int) -> int
@@ -44,15 +49,24 @@
              | put                    // (str) -> void
 ```
 
+```
+struct (
+    node (value left right)
+)
+union (
+    tree (node leaf)
+)
+```
+
 ## Semantics
 
 There are five basic object types `Void`, `Int`, `Str`, `Closure`, all of which are immutable.
 
-New types defined using `struct` are mutable in the sense that their fields can be re-bound by `@set`.
+New types defined using `struct` and `union` are mutable by `@struct-set` and `@union-set`.
 
 Variables can be re-bound by `set`.
 
-Both `letrec` and `(<callee> <expr>*)` (intrinsic / user-defined function / constructor call) have variables pass-by-reference.
+Both `letrec` and `(<callee> <expr>*)` have variables pass-by-reference.
 
 ## Dependency
 
