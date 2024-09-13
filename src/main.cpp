@@ -182,7 +182,7 @@ std::deque<Token> lex(std::string source) {
             if (ss.hasNext() && ss.peekNext() == '"') {
                 text += ss.popNext();
             } else {
-                panic("lexer", startSl, "incomplete string literal");
+                panic("lexer", startsl, "incomplete string literal");
             }
         // comment
         } else if (ss.peekNext() == '#') {
@@ -192,9 +192,9 @@ std::deque<Token> lex(std::string source) {
             // nextToken() will consume the \n and recursively continue
             return nextToken();
         } else {
-            panic("lexer", startSl, "unsupported starting character");
+            panic("lexer", startsl, "unsupported starting character");
         }
-        return Token(startSl, std::move(text));
+        return Token(startsl, std::move(text));
     };
 
     std::deque<Token> tokens;
