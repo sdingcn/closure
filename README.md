@@ -25,7 +25,7 @@
         | if <expr> <expr> <expr>
         | while <expr> <expr>
         | [ <expr>+ ]                            // sequenced evaluation
-        | struct ( <type-binding>* ) <expr>
+        | struct ( <struct-type-binding>* ) <expr>
         | ( <callee> <expr>* )
         | @get <variable> <expr>                 // struct field reading
         | @set <variable> <expr>                 // struct field modification, evaluating to Void
