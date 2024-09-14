@@ -158,10 +158,7 @@ std::deque<Token> lex(std::string source) {
             }
         // intrinsic
         } else if (ss.peekNext() == '.') {
-            while (
-                ss.hasNext() &&
-                !(std::isspace(ss.peekNext()) || ss.peekNext() == ')')
-            ) {
+            while (ss.hasNext() && !(std::isspace(ss.peekNext()) || ss.peekNext() == ')')) {
                 text += ss.popNext();
             }
         // special symbol
@@ -226,22 +223,6 @@ struct ExprNode {
     SourceLocation sl;
 };
 
-// intrinsics are not values and can only be called directly
-// and cannot be assigned to variables
-struct IntrinsicNode : public ExprNode {
-    IntrinsicNode(SourceLocation s, std::string n):
-        ExprNode(s), name(std::move(n)) {}
-    IntrinsicNode(const IntrinsicNode &) = delete;
-    IntrinsicNode &operator=(const IntrinsicNode &) = delete;
-    virtual ~IntrinsicNode() override {}
-
-    virtual std::string toString() const override {
-        return name;
-    }
-
-    std::string name;
-};
-
 struct IntegerNode : public ExprNode {
     IntegerNode(SourceLocation s, int v): ExprNode(s), val(v) {}
     IntegerNode(const IntegerNode&) = delete;
@@ -263,7 +244,7 @@ struct StringNode : public ExprNode {
     virtual ~StringNode() override {}
 
     virtual std::string toString() const override {
-        return "<StringNode>";
+        return val;
     }
 
     std::string val;
@@ -283,18 +264,32 @@ struct VariableNode : public ExprNode {
     std::string name;
 };
 
-struct SetNode : public ExprNode {
-    SetNode(
+struct StructTypeNode : public ExprNode {
+    StructTypeNode(SourceLocation s, std::string n):
+        ExprNode(s), name(std::move(n)) {}
+    StructTypeNode(const StructTypeNode &) = delete;
+    StructTypeNode &operator=(const StructTypeNode &) = delete;
+    virtual ~StructTypeNode() override {}
+
+    virtual std::string toString() const override {
+        return name;
+    }
+
+    std::string name;
+};
+
+struct VSetNode : public ExprNode {
+    VSetNode(
         SourceLocation s,
         std::unique_ptr<VariableNode> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
-    SetNode(const SetNode &) = delete;
-    SetNode &operator=(const SetNode &) = delete;
-    virtual ~SetNode() override {}
+    VSetNode(const VSetNode &) = delete;
+    VSetNode &operator=(const VSetNode &) = delete;
+    virtual ~VSetNode() override {}
 
     virtual std::string toString() const override {
-        return "set " + var->toString() + " " + expr->toString();
+        return "vset " + var->toString() + " " + expr->toString();
     }
 
     std::unique_ptr<VariableNode> var;
@@ -331,9 +326,7 @@ struct LambdaNode : public ExprNode {
 struct LetrecNode : public ExprNode {
     LetrecNode(
         SourceLocation s,
-        std::vector<std::pair<
-            std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>
-        >> v,
+        std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), varExprList(std::move(v)), expr(std::move(e)) {}
     LetrecNode(const LetrecNode &) = delete;
@@ -344,7 +337,7 @@ struct LetrecNode : public ExprNode {
         std::string ret = "letrec (";
         for (const auto &p : varExprList) {
             ret += p.first->toString();
-            ret += " = ";
+            ret += " ";
             ret += p.second->toString();
             ret += " ";
         }
@@ -356,9 +349,7 @@ struct LetrecNode : public ExprNode {
         return ret;
     }
     
-    std::vector<std::pair<
-        std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>
-    >> varExprList;
+    std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> varExprList;
     std::unique_ptr<ExprNode> expr;
 };
 
@@ -400,30 +391,6 @@ struct WhileNode : public ExprNode {
     std::unique_ptr<ExprNode> body;
 };
 
-struct CallNode : public ExprNode {
-    CallNode(
-        SourceLocation s,
-        std::unique_ptr<ExprNode> c,
-        std::vector<std::unique_ptr<ExprNode>> a
-    ): ExprNode(s), callee(std::move(c)), argList(std::move(a)) {}
-    CallNode(const CallNode &) = delete;
-    CallNode &operator=(const CallNode &) = delete;
-    virtual ~CallNode() override {}
-
-    virtual std::string toString() const override {
-        std::string ret = "(" + callee->toString();
-        for (const auto &a : argList) {
-            ret += " ";
-            ret += a->toString();
-        }
-        ret += ")";
-        return ret;
-    }
-
-    std::unique_ptr<ExprNode> callee;
-    std::vector<std::unique_ptr<ExprNode>> argList;
-};
-
 struct SequenceNode : public ExprNode {
     SequenceNode(
         SourceLocation s,
@@ -449,40 +416,123 @@ struct SequenceNode : public ExprNode {
     std::vector<std::unique_ptr<ExprNode>> exprList;
 };
 
-struct QueryNode : public ExprNode {
-    QueryNode(
+struct StructNode : public ExprNode {
+    StructNode(
         SourceLocation s,
-        std::unique_ptr<VariableNode> v,
+        std::vector<std::pair<
+            std::unique_ptr<StructTypeNode>, std::vector<std::unique_ptr<VariableNode>>
+        >> t,
         std::unique_ptr<ExprNode> e
-    ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
-    QueryNode(const QueryNode &) = delete;
-    QueryNode &operator=(const QueryNode &) = delete;
-    virtual ~QueryNode() override {}
+    ): ExprNode(s), typeVarTupleList(std::move(t)), expr(std::move(e)) {}
+    StructNode(const StructNode &) = delete;
+    StructNode &operator=(const StructNode &) = delete;
+    virtual ~StructNode() override {}
 
     virtual std::string toString() const override {
-        return "@ " + var->toString() + " " + expr->toString();
+        std::string ret = "struct (";
+        for (const auto &p : typeVarTupleList) {
+            ret += p.first->toString();
+            ret += " ";
+            ret += "(";
+            for (const auto &v : p.second) {
+                ret += v->toString();
+                ret += " ";
+            }
+            if (ret.back() == ' ') {
+                ret.pop_back();
+            }
+            ret += ")";
+            ret += " ";
+        }
+        if (ret.back() == ' ') {
+            ret.pop_back();
+        }
+        ret += ") ";
+        ret += expr->toString();
+        return ret;
     }
 
-    std::unique_ptr<VariableNode> var;
+    std::vector<std::pair<
+        std::unique_ptr<StructTypeNode>, std::vector<std::unique_ptr<VariableNode>>
+    >> typeVarTupleList,
     std::unique_ptr<ExprNode> expr;
 };
 
-struct AccessNode : public ExprNode {
-    AccessNode(
+struct SGetNode : public ExprNode {
+    SGetNode(
         SourceLocation s,
-        std::unique_ptr<VariableNode> v,
-        std::unique_ptr<ExprNode> e
-    ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
-    AccessNode(const AccessNode &) = delete;
-    AccessNode &operator=(const AccessNode &) = delete;
-    virtual ~AccessNode() override {}
+        std::unique_ptr<ExprNode> e,
+        std::unique_ptr<VariableNode> v
+    ): ExprNode(s), expr(std::move(e)), var(std::move(v)) {}
+    SGetNode(const SGetNode &) = delete;
+    SGetNode &operator=(const SGetNode &) = delete;
+    virtual ~SGetNode() override {}
 
     virtual std::string toString() const override {
-        return "& " + var->toString() + " " + expr->toString();
+        return "sget " + expr->toString() + " " + var->toString();
     }
 
-    std::unique_ptr<VariableNode> var;
     std::unique_ptr<ExprNode> expr;
+    std::unique_ptr<VariableNode> var;
+};
+
+struct SSetNode : public ExprNode {
+    SSetNode(
+        SourceLocation s,
+        std::unique_ptr<ExprNode> e1,
+        std::unique_ptr<VariableNode> v,
+        std::unique_ptr<ExprNode> e2
+    ): ExprNode(s), expr1(std::move(e1)), var(std::move(v)), expr2(std::move(e2)) {}
+    SSetNode(const SSetNode &) = delete;
+    SSetNode &operator=(const SSetNode &) = delete;
+    virtual ~SSetNode() override {}
+
+    virtual std::string toString() const override {
+        return "sset " + expr1->toString() + " " + var->toString() + " " + expr2->toString();
+    }
+
+    std::unique_ptr<ExprNode> expr1;
+    std::unique_ptr<VariableNode> var;
+    std::unique_ptr<ExprNode> expr2;
+};
+
+struct CallNode : public ExprNode {
+    CallNode(
+        SourceLocation s,
+        std::unique_ptr<ExprNode> c,
+        std::vector<std::unique_ptr<ExprNode>> a
+    ): ExprNode(s), callee(std::move(c)), argList(std::move(a)) {}
+    CallNode(const CallNode &) = delete;
+    CallNode &operator=(const CallNode &) = delete;
+    virtual ~CallNode() override {}
+
+    virtual std::string toString() const override {
+        std::string ret = "(" + callee->toString();
+        for (const auto &a : argList) {
+            ret += " ";
+            ret += a->toString();
+        }
+        ret += ")";
+        return ret;
+    }
+
+    std::unique_ptr<ExprNode> callee;
+    std::vector<std::unique_ptr<ExprNode>> argList;
+};
+
+// intrinsics are not values and can only be called directly and cannot be assigned to variables
+struct IntrinsicNode : public ExprNode {
+    IntrinsicNode(SourceLocation s, std::string n):
+        ExprNode(s), name(std::move(n)) {}
+    IntrinsicNode(const IntrinsicNode &) = delete;
+    IntrinsicNode &operator=(const IntrinsicNode &) = delete;
+    virtual ~IntrinsicNode() override {}
+
+    virtual std::string toString() const override {
+        return name;
+    }
+
+    std::string name;
 };
 
 std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {

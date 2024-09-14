@@ -21,16 +21,16 @@
 <expr> := <int-literal>
         | <str-literal>
         | <variable>
-        | vset <variable> <expr>                 // re-bind a variable, evaluating to Void
+        | vset <variable> <expr>                    // re-bind a variable, eval to Void
         | lambda ( <variable>* ) <expr>
         | letrec ( <variable-binding>* ) <expr>
         | if <expr> <expr> <expr>
         | while <expr> <expr>
-        | [ <expr>+ ]                            // sequenced evaluation
+        | [ <expr>+ ]                               // sequenced evaluation
         | struct ( <struct-type-binding>* ) <expr>
+        | sget <expr> <variable>                    // struct field reading
+        | sset <expr> <variable> <expr>             // struct field modification, eval to Void
         | ( <callee> <expr>* )
-        | sget <variable> <expr>                 // struct field reading
-        | sset <variable> <expr>                 // struct field modification, evaluating to Void
 
 <intrinsic> := .void                        // () -> Void
              | .+ | .- | .* | ./ | .% | .<  // (Int, Int) -> Int
