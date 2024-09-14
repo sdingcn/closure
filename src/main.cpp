@@ -61,8 +61,56 @@ struct SourceLocation {
     int column;
 };
 
-void panic(const std::string &type, const SourceLocation &sl, const std::string &msg) {
+void panic(
+    const std::string &type,
+    const std::string &msg,
+    const SourceLocation &sl = SourceLocation(0, 0)
+) {
     throw std::runtime_error("[" + type + " error " + sl.toString() + "] " + msg);
+}
+
+std::string quote(std::string s) {
+    std::string ret;
+    for (char c : s) {
+        if (c == '\\' || c == '"') {
+            ret += '\\';
+        }
+        ret += c;
+    }
+    return "\"" + ret + "\"";
+}
+
+std::string unquote(std::string s) {
+    s.pop_back();
+    std::reverse(s.begin(), s.end());
+    s.pop_back();
+    std::string ret;
+    while (s.size()) {
+        auto c = s.back();
+        s.pop_back();
+        if (c == '\\') {
+            if (s.size()) {
+                auto e = s.back();
+                s.pop_back();
+                if (e == '\\') {
+                    ret += '\\';
+                } else if (e == '"') {
+                    ret += '"';
+                } else if (e == 't') {
+                    ret += '\t';
+                } else if (e == 'n') {
+                    ret += '\n';
+                } else {
+                    panic("unquote", "unsupported escape sequence");
+                }
+            } else {
+                panic("unquote", "incomplete escape sequence");
+            }
+        } else {
+            ret += c;
+        }
+    }
+    return ret;
 }
 
 // ------------------------------
@@ -77,7 +125,7 @@ struct SourceStream {
         std::unordered_set<char> charset(charstr.begin(), charstr.end());
         for (char c : source) {
             if (!charset.contains(c)) {
-                panic("lexer", sl, "unsupported character");
+                panic("lexer", "unsupported character", sl);
             }
             sl.update(c);
         }
@@ -164,7 +212,7 @@ std::deque<Token> lex(std::string source) {
         // special symbol
         } else if (std::string("()[]").find(ss.peekNext()) != std::string::npos) {
             text += ss.popNext();
-        // string literal
+        // string literal (which preserves the quoted form after the lexer stage)
         } else if (ss.peekNext() == '"') {
             text += ss.popNext();
             // support multi-line strings
@@ -179,7 +227,7 @@ std::deque<Token> lex(std::string source) {
             if (ss.hasNext() && ss.peekNext() == '"') {
                 text += ss.popNext();
             } else {
-                panic("lexer", startsl, "incomplete string literal");
+                panic("lexer", "incomplete string literal", startsl);
             }
         // comment
         } else if (ss.peekNext() == '#') {
@@ -189,7 +237,7 @@ std::deque<Token> lex(std::string source) {
             // nextToken() will consume the \n and recursively continue
             return nextToken();
         } else {
-            panic("lexer", startsl, "unsupported starting character");
+            panic("lexer", "unsupported starting character", startsl);
         }
         return Token(startsl, std::move(text));
     };
@@ -244,7 +292,7 @@ struct StringNode : public ExprNode {
     virtual ~StringNode() override {}
 
     virtual std::string toString() const override {
-        return val;
+        return quote(val);
     }
 
     std::string val;
@@ -256,20 +304,6 @@ struct VariableNode : public ExprNode {
     VariableNode(const VariableNode &) = delete;
     VariableNode &operator=(const VariableNode &) = delete;
     virtual ~VariableNode() override {}
-
-    virtual std::string toString() const override {
-        return name;
-    }
-
-    std::string name;
-};
-
-struct StructTypeNode : public ExprNode {
-    StructTypeNode(SourceLocation s, std::string n):
-        ExprNode(s), name(std::move(n)) {}
-    StructTypeNode(const StructTypeNode &) = delete;
-    StructTypeNode &operator=(const StructTypeNode &) = delete;
-    virtual ~StructTypeNode() override {}
 
     virtual std::string toString() const override {
         return name;
@@ -420,7 +454,7 @@ struct StructNode : public ExprNode {
     StructNode(
         SourceLocation s,
         std::vector<std::pair<
-            std::unique_ptr<StructTypeNode>, std::vector<std::unique_ptr<VariableNode>>
+            std::string, std::vector<std::unique_ptr<VariableNode>>
         >> t,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), typeVarTupleList(std::move(t)), expr(std::move(e)) {}
@@ -431,7 +465,7 @@ struct StructNode : public ExprNode {
     virtual std::string toString() const override {
         std::string ret = "struct (";
         for (const auto &p : typeVarTupleList) {
-            ret += p.first->toString();
+            ret += p.first;
             ret += " ";
             ret += "(";
             for (const auto &v : p.second) {
@@ -453,7 +487,7 @@ struct StructNode : public ExprNode {
     }
 
     std::vector<std::pair<
-        std::unique_ptr<StructTypeNode>, std::vector<std::unique_ptr<VariableNode>>
+        std::string, std::vector<std::unique_ptr<VariableNode>>
     >> typeVarTupleList,
     std::unique_ptr<ExprNode> expr;
 };
@@ -520,21 +554,6 @@ struct CallNode : public ExprNode {
     std::vector<std::unique_ptr<ExprNode>> argList;
 };
 
-// intrinsics are not values and can only be called directly and cannot be assigned to variables
-struct IntrinsicNode : public ExprNode {
-    IntrinsicNode(SourceLocation s, std::string n):
-        ExprNode(s), name(std::move(n)) {}
-    IntrinsicNode(const IntrinsicNode &) = delete;
-    IntrinsicNode &operator=(const IntrinsicNode &) = delete;
-    virtual ~IntrinsicNode() override {}
-
-    virtual std::string toString() const override {
-        return name;
-    }
-
-    std::string name;
-};
-
 std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
     auto isIntegerToken = [](const Token &token) {
         return token.text.size() > 0 && (
@@ -552,7 +571,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
     auto isVariableToken = [](const Token &token) {
         return token.text.size() > 0 && std::isalpha(token.text[0]);
     };
-    auto isToken = [](const std::string &s) {
+    auto isTheToken = [](const std::string &s) {
         return [s](const Token &token) {
             return token.text == s;
         };
@@ -560,12 +579,12 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
 
     auto consume = [&tokens]<typename Callable>(const Callable &predicate) -> Token {
         if (tokens.size() == 0) {
-            panic("parser", SourceLocation(-1, -1), "incomplete token stream");
+            panic("parser", "incomplete token stream");
         }
         auto token = tokens.front();
         tokens.pop_front();
         if (!predicate(token)) {
-            panic("parser", token.sl, "unexpected token");
+            panic("parser", "unexpected token", token.sl);
         }
         return token;
     };
@@ -621,10 +640,10 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
                     } else if (next == 'n') {
                         s += '\n';
                     } else {
-                        panic("parser", token.sl, "unsupported escape sequence");
+                        panic("parser", "unsupported escape sequence", token.sl);
                     }
                 } else {
-                    panic("parser", token.sl, "incomplete escape sequence");
+                    panic("parser", "incomplete escape sequence", token.sl);
                 }
             } else {
                 s += c;
@@ -637,41 +656,41 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         return std::make_unique<VariableNode>(token.sl, std::move(token.text));
     };
     parseSet = [&]() -> std::unique_ptr<SetNode> {
-        auto start = consume(isToken("set"));
+        auto start = consume(isTheToken("set"));
         auto var = parseVariable();
         auto expr = parseExpr();
         return std::make_unique<SetNode>(start.sl, std::move(var), std::move(expr));
     };
     parseLambda = [&]() -> std::unique_ptr<LambdaNode> {
-        auto start = consume(isToken("lambda"));
-        consume(isToken("("));
+        auto start = consume(isTheToken("lambda"));
+        consume(isTheToken("("));
         std::vector<std::unique_ptr<VariableNode>> varList;
         while (tokens.size() && isVariableToken(tokens[0])) {
             varList.push_back(parseVariable());
         }
-        consume(isToken(")"));
+        consume(isTheToken(")"));
         auto expr = parseExpr();
         return std::make_unique<LambdaNode>(start.sl, std::move(varList), std::move(expr));
     };
     parseLetrec = [&]() -> std::unique_ptr<LetrecNode> {
-        auto start = consume(isToken("letrec"));
-        consume(isToken("("));
+        auto start = consume(isTheToken("letrec"));
+        consume(isTheToken("("));
         std::vector<std::pair<
             std::unique_ptr<VariableNode>,
             std::unique_ptr<ExprNode>
         >> varExprList;
         while (tokens.size() && isVariableToken(tokens[0])) {
             auto v = parseVariable();
-            consume(isToken("="));
+            consume(isTheToken("="));
             auto e = parseExpr();
             varExprList.emplace_back(std::move(v), std::move(e));
         }
-        consume(isToken(")"));
+        consume(isTheToken(")"));
         auto expr = parseExpr();
         return std::make_unique<LetrecNode>(start.sl, std::move(varExprList), std::move(expr));
     };
     parseIf = [&]() -> std::unique_ptr<IfNode> {
-        auto start = consume(isToken("if"));
+        auto start = consume(isTheToken("if"));
         auto cond = parseExpr();
         auto branch1 = parseExpr();
         auto branch2 = parseExpr();
@@ -680,15 +699,15 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         );
     };
     parseWhile = [&]() -> std::unique_ptr<WhileNode> {
-        auto start = consume(isToken("while"));
+        auto start = consume(isTheToken("while"));
         auto cond = parseExpr();
         auto body = parseExpr();
         return std::make_unique<WhileNode>(start.sl, std::move(cond), std::move(body));
     };
     parseCall = [&]() -> std::unique_ptr<CallNode> {
-        auto start = consume(isToken("("));
+        auto start = consume(isTheToken("("));
         if (!tokens.size()) {
-            panic("parser", start.sl, "incomplete tokens stream");
+            panic("parser", "incomplete tokens stream", start.sl);
         }
         std::unique_ptr<ExprNode> callee =
             isIntrinsicToken(tokens[0]) ? parseIntrinsic() : parseExpr();
@@ -696,36 +715,36 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         while (tokens.size() && tokens[0].text != ")") {
             argList.push_back(parseExpr());
         }
-        consume(isToken(")"));
+        consume(isTheToken(")"));
         return std::make_unique<CallNode>(start.sl, std::move(callee), std::move(argList));
     };
     parseSequence = [&]() -> std::unique_ptr<SequenceNode> {
-        auto start = consume(isToken("["));
+        auto start = consume(isTheToken("["));
         std::vector<std::unique_ptr<ExprNode>> exprList;
         while (tokens.size() && tokens[0].text != "]") {
             exprList.push_back(parseExpr());
         }
         if (!exprList.size()) {
-            panic("parser", start.sl, "zero-length sequence");
+            panic("parser", "zero-length sequence", start.sl);
         }
-        consume(isToken("]"));
+        consume(isTheToken("]"));
         return std::make_unique<SequenceNode>(start.sl, std::move(exprList));
     };
     parseQuery = [&]() -> std::unique_ptr<QueryNode> {
-        auto start = consume(isToken("@"));
+        auto start = consume(isTheToken("@"));
         auto var = parseVariable();
         auto expr = parseExpr();
         return std::make_unique<QueryNode>(start.sl, std::move(var), std::move(expr));
     };
     parseAccess = [&]() -> std::unique_ptr<AccessNode> {
-        auto start = consume(isToken("&"));
+        auto start = consume(isTheToken("&"));
         auto var = parseVariable();
         auto expr = parseExpr();
         return std::make_unique<AccessNode>(start.sl, std::move(var), std::move(expr));
     };
     parseExpr = [&]() -> std::unique_ptr<ExprNode> {
         if (!tokens.size()) {
-            panic("parser", SourceLocation(-1, -1), "incomplete token stream");
+            panic("parser", "incomplete token stream");
             return nullptr;
         // there is no stand-alone intrinsic, so we start from integers
         } else if (isIntegerToken(tokens[0])) {
@@ -754,14 +773,14 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         } else if (tokens[0].text == "&") {
             return parseAccess();
         } else {
-            panic("parser", tokens[0].sl, "unrecognized token");
+            panic("parser", "unrecognized token", tokens[0].sl);
             return nullptr;
         }
     };
 
     auto expr = parseExpr();
     if (tokens.size()) {
-        panic("parser", tokens[0].sl, "redundant token(s)");
+        panic("parser", "redundant token(s)", tokens[0].sl);
     }
     return expr;
 }
@@ -897,7 +916,7 @@ public:
         } else if (auto vnode = dynamic_cast<const VariableNode*>(layer.expr)) {
             auto loc = lookup(vnode->name, *(layer.env));
             if (!loc.has_value()) {
-                panic("runtime", layer.expr->sl, "undefined variable");
+                panic("runtime", "undefined variable", layer.expr->sl);
             }
             resultLoc = loc.value();
             stack.pop_back();
@@ -910,7 +929,7 @@ public:
             } else {
                 auto loc = lookup(snode->var->name, *(layer.env));
                 if (!loc.has_value()) {
-                    panic("runtime", layer.expr->sl, "undefined variable");
+                    panic("runtime", "undefined variable", layer.expr->sl);
                 }
                 // inherit resultLoc from last iteration
                 heap[loc.value()] = heap[resultLoc];
@@ -930,7 +949,7 @@ public:
                 );
                 // this shouldn't happen since those variables are newly introduced by letrec
                 if (!loc.has_value()) {
-                    panic("runtime", layer.expr->sl, "undefined variable");
+                    panic("runtime", "undefined variable", layer.expr->sl);
                 }
                 // copy
                 heap[loc.value()] = heap[resultLoc];
@@ -977,7 +996,7 @@ public:
                 layer.pc++;
                 // inherited condition value
                 if (!std::holds_alternative<Integer>(heap[resultLoc])) {
-                    panic("runtime", layer.expr->sl, "wrong cond type");
+                    panic("runtime", "wrong cond type", layer.expr->sl);
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
                     stack.emplace_back(layer.env, inode->branch1.get());
@@ -998,7 +1017,7 @@ public:
             } else if (layer.pc == 1) {
                 // inherited condition value
                 if (!std::holds_alternative<Integer>(heap[resultLoc])) {
-                    panic("runtime", layer.expr->sl, "wrong cond type");
+                    panic("runtime", "wrong cond type", layer.expr->sl);
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
                     // loop: revert the pc so next iteration will run it again
@@ -1070,12 +1089,12 @@ public:
                     auto &calleeLoc = std::get<Location>(layer.local["callee"]);
                     auto &argsLoc = std::get<std::vector<Location>>(layer.local["args"]);
                     if (!std::holds_alternative<Closure>(heap[calleeLoc])) {
-                        panic("runtime", layer.expr->sl, "calling a non-callable");
+                        panic("runtime", "calling a non-callable", layer.expr->sl);
                     }
                     auto &callee = std::get<Closure>(heap[calleeLoc]);
                     // types will be checked inside the closure call
                     if (argsLoc.size() != callee.fun->varList.size()) {
-                        panic("runtime", layer.expr->sl, "wrong number of arguments");
+                        panic("runtime", "wrong number of arguments", layer.expr->sl);
                     }
                     int nArgs = argsLoc.size();
                     // lexical scope: copy the env from the closure definition place
@@ -1123,7 +1142,7 @@ public:
             } else {
                 // inherited resultLoc
                 if (!std::holds_alternative<Closure>(heap[resultLoc])) {
-                    panic("runtime", layer.expr->sl, "@ wrong type");
+                    panic("runtime", "@ wrong type", layer.expr->sl);
                 }
                 resultLoc = _new<Integer>(
                     lookup(
@@ -1141,21 +1160,21 @@ public:
             } else {
                 // inherited resultLoc
                 if (!std::holds_alternative<Closure>(heap[resultLoc])) {
-                    panic("runtime", layer.expr->sl, "& wrong type");
+                    panic("runtime", "& wrong type", layer.expr->sl);
                 }
                 auto loc = lookup(
                     anode->var->name,
                     std::get<Closure>(heap[resultLoc]).env
                 );
                 if (!loc.has_value()) {
-                    panic("runtime", layer.expr->sl, "undefined variable");
+                    panic("runtime", "undefined variable", layer.expr->sl);
                 }
                 // "access by reference"
                 resultLoc = loc.value();
                 stack.pop_back();
             }
         } else {
-            panic("runtime", layer.expr->sl, "unrecognized AST node");
+            panic("runtime", "unrecognized AST node", layer.expr->sl);
         }
         return true;
     }
@@ -1191,7 +1210,7 @@ private:
             } ()
         ));
         if (!ok) {
-            panic("runtime", sl, "type error on intrinsic call");
+            panic("runtime", "type error on intrinsic call", sl);
         }
     }
     // intrinsic dispatch
@@ -1280,7 +1299,7 @@ private:
             _typecheck<Value>(sl, args);
             return Integer(std::holds_alternative<Closure>(heap[args[0]]) ? 1 : 0);
         } else {
-            panic("runtime", sl, "unrecognized intrinsic call");
+            panic("runtime", "unrecognized intrinsic call", sl);
             return Void();
         }
     }

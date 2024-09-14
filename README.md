@@ -7,43 +7,33 @@
 ```
 <comment> := #[^\n]*\n
 
-<int-literal> := [+-]?[0-9]+
-<str-literal> := English keyboard + [\t\n]
-
-<variable>        := [a-zA-Z][a-zA-Z0-9_]*
+<integer-literal> := [+-]?[0-9]+
+<string-literal>  := "([English keyboard with \ and " escaped] | [\t\n])*"
+<variable>        := [a-z][a-zA-Z0-9_]*
 <struct-type>     := [A-Z][a-zA-Z0-9_]*
 
-<variable-binding>    := <variable> <expr>
-<struct-type-binding> := <struct-type> (<variable>*)
+<intrinsic> := .void
+             | .+ | .- | .* | ./ | .% | .<
+             | .sl | .ss | .s+ | .s<
+             | .i->s | .s->i
+             | .id | .type
+             | .getchar | .put
 
-<callee> := <expr> | <intrinsic> | <struct-type>
-
-<expr> := <int-literal>
-        | <str-literal>
+<expr> := <integer-literal>
+        | <string-literal>
         | <variable>
-        | vset <variable> <expr>                    // re-bind a variable, eval to Void
-        | lambda ( <variable>* ) <expr>
-        | letrec ( <variable-binding>* ) <expr>
+        | vset <variable> <expr>
+        | lambda "(" <variable>* ")" <expr>
+        | letrec "(" (<variable> <expr>)* ")" <expr>
         | if <expr> <expr> <expr>
         | while <expr> <expr>
-        | [ <expr>+ ]                               // sequenced evaluation
-        | struct ( <struct-type-binding>* ) <expr>
-        | sget <expr> <variable>                    // struct field reading
-        | sset <expr> <variable> <expr>             // struct field modification, eval to Void
-        | ( <callee> <expr>* )
-
-<intrinsic> := .void                        // () -> Void
-             | .+ | .- | .* | ./ | .% | .<  // (Int, Int) -> Int
-             | .sl                          // (Str) -> Int
-             | .ss                          // (Str, Int, Int) -> Str
-             | .s+                          // (Str, Str) -> Str
-             | .s<                          // (Str, Str) -> Int
-             | .i->s                        // (Int) -> Str
-             | .s->i                        // (Str) -> Int
-             | .id                          // (Any) -> Int
-             | .type                        // (Any) -> Str
-             | .getchar                     // () -> Str
-             | .put                         // (Str) -> Void
+        | "[" <expr>+ "]"
+        | struct "(" (<struct-type> "(" <variable>* ")")* ")" <expr>
+        | sget <expr> <variable>
+        | sset <expr> <variable> <expr>
+        | ( <intrinsic> <expr>* )
+        | ( <struct-type> <expr>* )
+        | ( <expr> <expr>* )
 ```
 
 ## Semantics
