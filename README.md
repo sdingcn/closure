@@ -73,3 +73,7 @@ cmake -DCMAKE_BUILD_TYPE:STRING=Debug \
 cd build
 make
 ```
+
+## Use
+
+Open the internal state manipulation to the command line (so it's easy to debug the code, save the state, etc.)?
