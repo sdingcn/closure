@@ -8,29 +8,32 @@
 <comment> := #[^\n]*\n
 
 <integer-literal> := [+-]?[0-9]+
-<string-literal>  := "([English keyboard with \ and " escaped] | [\t\n])*"
+<string-literal>  := see the interpreter source
 <variable>        := [a-z][a-zA-Z0-9_]*
+<field>           := [a-z][a-zA-Z0-9_]*
 <struct-type>     := [A-Z][a-zA-Z0-9_]*
 
 <intrinsic> := .void
              | .+ | .- | .* | ./ | .% | .<
              | .sl | .ss | .s+ | .s<
              | .i->s | .s->i
-             | .id | .type
+             | .id | .clone | .type
              | .getchar | .put
 
 <expr> := <integer-literal>
         | <string-literal>
         | <variable>
         | vset <variable> <expr>
-        | lambda "(" <variable>* ")" <expr>
-        | letrec "(" (<variable> <expr>)* ")" <expr>
+        | lambda ( <variable>* ) <expr>
+        | letrec ( <vepair>* ) <expr>
+          where <vepair> := <variable> <expr>
         | if <expr> <expr> <expr>
         | while <expr> <expr>
-        | "[" <expr>+ "]"
-        | struct "(" (<struct-type> "(" <variable>* ")")* ")" <expr>
-        | sget <expr> <variable>
-        | sset <expr> <variable> <expr>
+        | { <expr>+ }
+        | struct ( <sfpair>* ) <expr>
+          where <sfpair> := <struct-type> ( <field>* )
+        | sget <expr> <field>
+        | sset <expr> <field> <expr>
         | ( <intrinsic> <expr>* )
         | ( <struct-type> <expr>* )
         | ( <expr> <expr>* )
@@ -38,11 +41,13 @@
 
 ## Semantics
 
-There are four basic object types `Void`, `Int`, `Str`, `Closure`, all of which are immutable.
-
-New types defined using `struct` are mutable by `sset`. A `struct` is essentially a variable tuple.
+Reference semantic: all variables and fields are references to objects; all expressions evaluate to locations of objects.
 
 Variables can be re-bound by `vset`.
+
+Four basic, immutable object types: `Void`, `Int`, `Str`, `Closure`.
+
+Objects of struct types are mutable by `sset`, where a struct is essentially a tuple of fields (references).
 
 Both `letrec` and `( <callee> <expr>* )` use pass-by-reference for variables.
 
@@ -62,7 +67,3 @@ cmake -DCMAKE_BUILD_TYPE:STRING=Debug \
 cd build
 make
 ```
-
-## Interpreter commands
-
-TODO: basically making a reversible debugger
