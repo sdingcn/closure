@@ -18,8 +18,10 @@
              | .sl | .ss | .s+ | .s<
              | .i->s | .s->i
              | .id  // returns an int representation of the object's location; can be applied to any expr
+                    // an object's id is unique and never changes during the object's lifetime
              | .clone  // makes a shallow copy
              | .type  // returns a string representation of the object's type; can be applied to any expr
+                      // an object's type never changes during the object's lifetime
              | .getchar | .put
 
 <expr> := <integer-literal>
@@ -52,6 +54,8 @@ Four basic, immutable object types: `Void`, `Int`, `Str`, `Closure`.
 Objects of struct types are mutable by `sset`, where a struct is essentially a tuple of fields (references).
 
 Both `letrec` and `( <callee> <expr>* )` use pass-by-reference for variables. To make a deep copy, recursively use the `.clone` intrinsic function (be aware of cycles).
+
+Garbage collection: do a simple periodic GC and don't do compaction.
 
 ## Dependency
 
