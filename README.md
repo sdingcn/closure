@@ -17,7 +17,9 @@
              | .+ | .- | .* | ./ | .% | .<
              | .sl | .ss | .s+ | .s<
              | .i->s | .s->i
-             | .id | .clone | .type
+             | .id  // returns an int representation of the object's location; can be applied to any expr
+             | .clone  // makes a shallow copy
+             | .type  // returns a string representation of the object's type; can be applied to any expr
              | .getchar | .put
 
 <expr> := <integer-literal>
@@ -41,7 +43,7 @@
 
 ## Semantics
 
-Reference semantic: all variables and fields are references to objects; all expressions evaluate to locations of objects.
+Reference semantic: all variables and fields are references to objects; all expressions evaluate to references of objects.
 
 Variables can be re-bound by `vset`.
 
@@ -49,7 +51,7 @@ Four basic, immutable object types: `Void`, `Int`, `Str`, `Closure`.
 
 Objects of struct types are mutable by `sset`, where a struct is essentially a tuple of fields (references).
 
-Both `letrec` and `( <callee> <expr>* )` use pass-by-reference for variables.
+Both `letrec` and `( <callee> <expr>* )` use pass-by-reference for variables. To make a deep copy, recursively use the `.clone` intrinsic function (be aware of cycles).
 
 ## Dependency
 
