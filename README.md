@@ -8,36 +8,31 @@
 <comment> := #[^\n]*\n
 
 <integer-literal> := [+-]?[0-9]+
-<string-literal>  := see the interpreter source
-<variable>        := [a-z][a-zA-Z0-9_]*
-<field>           := [a-z][a-zA-Z0-9_]*
+<name>            := [a-z][a-zA-Z0-9_]*
 <struct-type>     := [A-Z][a-zA-Z0-9_]*
 
 <intrinsic> := .void
              | .+ | .- | .* | ./ | .% | .<
-             | .sl | .ss | .s+ | .s<
-             | .i->s | .s->i
-             | .id  // returns an int representation of the object's location; can be applied to any expr
+             | .id  // returns an int rep of the object's location; can be applied to any expr
                     // an object's id is unique and never changes during the object's lifetime
              | .clone  // makes a shallow copy
-             | .type  // returns a string representation of the object's type; can be applied to any expr
+             | .type  // returns an int rep of the object's type; can be applied to any expr
                       // an object's type never changes during the object's lifetime
-             | .getchar | .put
+             | .getint | .putint
+
+<ref> := <name>
+       | <expr> . <name>
 
 <expr> := <integer-literal>
-        | <string-literal>
-        | <variable>
-        | vset <variable> <expr>
-        | lambda ( <variable>* ) <expr>
-        | letrec ( <vepair>* ) <expr>
-          where <vepair> := <variable> <expr>
+        | <ref>
+        | ! <ref> <expr>
+        | lambda ( <name>* ) <expr>
+        | letrec ( <nepair>* ) <expr>
+          where <nepair> := <name> <expr>
         | if <expr> <expr> <expr>
-        | while <expr> <expr>
         | { <expr>+ }
-        | struct ( <sfpair>* ) <expr>
-          where <sfpair> := <struct-type> ( <field>* )
-        | sget <expr> <field>
-        | sset <expr> <field> <expr>
+        | struct ( <snpair>* ) <expr>
+          where <snpair> := <struct-type> ( <name>* )
         | ( <intrinsic> <expr>* )
         | ( <struct-type> <expr>* )
         | ( <expr> <expr>* )
@@ -45,17 +40,19 @@
 
 ## Semantics
 
-Reference semantic: all variables and fields are references to objects; all expressions evaluate to references of objects.
+Reference semantic: all names are references to objects;
+all expressions evaluate to references of objects.
 
-Variables can be re-bound by `vset`.
+Names can be re-bound by `!`.
 
-Four basic, immutable object types: `Void`, `Int`, `Str`, `Closure`.
+Three basic, immutable object types: `Void`, `Int`, `Closure`.
 
-Objects of struct types are mutable by `sset`, where a struct is essentially a tuple of fields (references).
+Objects of struct types are mutable by `!`, where a struct is a tuple of names (references).
 
-Both `letrec` and `( <callee> <expr>* )` use pass-by-reference for variables. To make a deep copy, recursively use the `.clone` intrinsic function (be aware of cycles).
+Both `letrec` and `( <callee> <expr>* )` use pass-by-reference for names.
+To make a deep copy, recursively use the `.clone` intrinsic function (be aware of cycles).
 
-Garbage collection: do a simple periodic GC and don't do compaction.
+Garbage collection: do a simple periodic GC and don't do compaction; maybe use a free list.
 
 ## Dependency
 
@@ -73,7 +70,3 @@ cmake -DCMAKE_BUILD_TYPE:STRING=Debug \
 cd build
 make
 ```
-
-## Use
-
-Open the internal state manipulation to the command line (so it's easy to debug the code, save the state, etc.)?

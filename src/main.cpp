@@ -255,14 +255,16 @@ std::deque<Token> lex(std::string source) {
 }
 
 // ------------------------------
-// parser
+// AST
 // ------------------------------
 
-struct ExprNode {
+#define COPY_CONTROL(CLASS)\
+    virtual ~CLASS() {}\
+    CLASS(const CLASS &) = delete;\
+    CLASS &operator=(const CLASS &) = delete
+
+struct ExprNode { COPY_CONTROL(ExprNode);
     ExprNode(SourceLocation s): sl(s) {}
-    ExprNode(const ExprNode &) = delete;
-    ExprNode &operator=(const ExprNode &) = delete;
-    virtual ~ExprNode() {}
 
     virtual std::string toString() const {
         return "<ExprNode>";
@@ -271,11 +273,8 @@ struct ExprNode {
     SourceLocation sl;
 };
 
-struct IntegerNode : public ExprNode {
+struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
     IntegerNode(SourceLocation s, int v): ExprNode(s), val(v) {}
-    IntegerNode(const IntegerNode&) = delete;
-    IntegerNode &operator=(const IntegerNode &) = delete;
-    virtual ~IntegerNode() override {}
 
     virtual std::string toString() const override {
         return std::to_string(val);
@@ -284,12 +283,9 @@ struct IntegerNode : public ExprNode {
     int val;
 };
 
-struct StringNode : public ExprNode {
+struct StringNode : public ExprNode { COPY_CONTROL(StringNode);
     StringNode(SourceLocation s, std::string v):
         ExprNode(s), val(std::move(v)) {}
-    StringNode(const StringNode &) = delete;
-    StringNode &operator=(const StringNode &) = delete;
-    virtual ~StringNode() override {}
 
     virtual std::string toString() const override {
         return quote(val);
@@ -298,12 +294,9 @@ struct StringNode : public ExprNode {
     std::string val;
 };
 
-struct VariableNode : public ExprNode {
+struct VariableNode : public ExprNode { COPY_CONTROL(VariableNode);
     VariableNode(SourceLocation s, std::string n):
         ExprNode(s), name(std::move(n)) {}
-    VariableNode(const VariableNode &) = delete;
-    VariableNode &operator=(const VariableNode &) = delete;
-    virtual ~VariableNode() override {}
 
     virtual std::string toString() const override {
         return name;
@@ -312,15 +305,12 @@ struct VariableNode : public ExprNode {
     std::string name;
 };
 
-struct VSetNode : public ExprNode {
+struct VSetNode : public ExprNode { COPY_CONTROL(VSetNode);
     VSetNode(
         SourceLocation s,
         std::unique_ptr<VariableNode> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
-    VSetNode(const VSetNode &) = delete;
-    VSetNode &operator=(const VSetNode &) = delete;
-    virtual ~VSetNode() override {}
 
     virtual std::string toString() const override {
         return "vset " + var->toString() + " " + expr->toString();
@@ -330,14 +320,11 @@ struct VSetNode : public ExprNode {
     std::unique_ptr<ExprNode> expr;
 };
 
-struct LambdaNode : public ExprNode {
+struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
     LambdaNode(SourceLocation s,
         std::vector<std::unique_ptr<VariableNode>> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), varList(std::move(v)), expr(std::move(e)) {}
-    LambdaNode(const LambdaNode &) = delete;
-    LambdaNode &operator=(const LambdaNode &) = delete;
-    virtual ~LambdaNode() override {}
 
     virtual std::string toString() const override {
         std::string ret = "lambda (";
@@ -357,15 +344,12 @@ struct LambdaNode : public ExprNode {
     std::unique_ptr<ExprNode> expr;
 };
 
-struct LetrecNode : public ExprNode {
+struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
     LetrecNode(
         SourceLocation s,
         std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), varExprList(std::move(v)), expr(std::move(e)) {}
-    LetrecNode(const LetrecNode &) = delete;
-    LetrecNode &operator=(const LetrecNode &) = delete;
-    virtual ~LetrecNode() override {}
 
     virtual std::string toString() const override {
         std::string ret = "letrec (";
@@ -387,16 +371,13 @@ struct LetrecNode : public ExprNode {
     std::unique_ptr<ExprNode> expr;
 };
 
-struct IfNode : public ExprNode {
+struct IfNode : public ExprNode { COPY_CONTROL(IfNode);
     IfNode(
         SourceLocation s,
         std::unique_ptr<ExprNode> c,
         std::unique_ptr<ExprNode> b1,
         std::unique_ptr<ExprNode> b2
     ): ExprNode(s), cond(std::move(c)), branch1(std::move(b1)), branch2(std::move(b2)) {}
-    IfNode(const IfNode &) = delete;
-    IfNode &operator=(const IfNode &) = delete;
-    virtual ~IfNode() override {}
 
     virtual std::string toString() const override {
         return "if " + cond->toString() + " " + branch1->toString() + " " + branch2->toString();
@@ -407,15 +388,12 @@ struct IfNode : public ExprNode {
     std::unique_ptr<ExprNode> branch2;
 };
 
-struct WhileNode : public ExprNode {
+struct WhileNode : public ExprNode { COPY_CONTROL(WhileNode);
     WhileNode(
         SourceLocation s,
         std::unique_ptr<ExprNode> c,
         std::unique_ptr<ExprNode> b
     ): ExprNode(s), cond(std::move(c)), body(std::move(b)) {}
-    WhileNode(const WhileNode &) = delete;
-    WhileNode &operator=(const WhileNode &) = delete;
-    virtual ~WhileNode() override {}
 
     virtual std::string toString() const override {
         return "while " + cond->toString() + " " + body->toString();
@@ -425,14 +403,11 @@ struct WhileNode : public ExprNode {
     std::unique_ptr<ExprNode> body;
 };
 
-struct SequenceNode : public ExprNode {
+struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
     SequenceNode(
         SourceLocation s,
         std::vector<std::unique_ptr<ExprNode>> e
     ): ExprNode(s), exprList(std::move(e)) {}
-    SequenceNode(const SequenceNode &) = delete;
-    SequenceNode &operator=(const SequenceNode &) = delete;
-    virtual ~SequenceNode() override {}
 
     virtual std::string toString() const override {
         std::string ret = "[";
@@ -450,7 +425,7 @@ struct SequenceNode : public ExprNode {
     std::vector<std::unique_ptr<ExprNode>> exprList;
 };
 
-struct StructNode : public ExprNode {
+struct StructNode : public ExprNode { COPY_CONTROL(StructNode);
     StructNode(
         SourceLocation s,
         std::vector<std::pair<
@@ -458,9 +433,6 @@ struct StructNode : public ExprNode {
         >> t,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), typeVarTupleList(std::move(t)), expr(std::move(e)) {}
-    StructNode(const StructNode &) = delete;
-    StructNode &operator=(const StructNode &) = delete;
-    virtual ~StructNode() override {}
 
     virtual std::string toString() const override {
         std::string ret = "struct (";
@@ -492,15 +464,12 @@ struct StructNode : public ExprNode {
     std::unique_ptr<ExprNode> expr;
 };
 
-struct SGetNode : public ExprNode {
+struct SGetNode : public ExprNode { COPY_CONTROL(SGetNode);
     SGetNode(
         SourceLocation s,
         std::unique_ptr<ExprNode> e,
         std::unique_ptr<VariableNode> v
     ): ExprNode(s), expr(std::move(e)), var(std::move(v)) {}
-    SGetNode(const SGetNode &) = delete;
-    SGetNode &operator=(const SGetNode &) = delete;
-    virtual ~SGetNode() override {}
 
     virtual std::string toString() const override {
         return "sget " + expr->toString() + " " + var->toString();
@@ -510,16 +479,13 @@ struct SGetNode : public ExprNode {
     std::unique_ptr<VariableNode> var;
 };
 
-struct SSetNode : public ExprNode {
+struct SSetNode : public ExprNode { COPY_CONTROL(SSetNode);
     SSetNode(
         SourceLocation s,
         std::unique_ptr<ExprNode> e1,
         std::unique_ptr<VariableNode> v,
         std::unique_ptr<ExprNode> e2
     ): ExprNode(s), expr1(std::move(e1)), var(std::move(v)), expr2(std::move(e2)) {}
-    SSetNode(const SSetNode &) = delete;
-    SSetNode &operator=(const SSetNode &) = delete;
-    virtual ~SSetNode() override {}
 
     virtual std::string toString() const override {
         return "sset " + expr1->toString() + " " + var->toString() + " " + expr2->toString();
@@ -530,15 +496,12 @@ struct SSetNode : public ExprNode {
     std::unique_ptr<ExprNode> expr2;
 };
 
-struct CallNode : public ExprNode {
+struct CallNode : public ExprNode { COPY_CONTROL(CallNode);
     CallNode(
         SourceLocation s,
         std::unique_ptr<ExprNode> c,
         std::vector<std::unique_ptr<ExprNode>> a
     ): ExprNode(s), callee(std::move(c)), argList(std::move(a)) {}
-    CallNode(const CallNode &) = delete;
-    CallNode &operator=(const CallNode &) = delete;
-    virtual ~CallNode() override {}
 
     virtual std::string toString() const override {
         std::string ret = "(" + callee->toString();
@@ -553,6 +516,8 @@ struct CallNode : public ExprNode {
     std::unique_ptr<ExprNode> callee;
     std::vector<std::unique_ptr<ExprNode>> argList;
 };
+
+#undef COPY_CONTROL
 
 std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
     auto isIntegerToken = [](const Token &token) {
