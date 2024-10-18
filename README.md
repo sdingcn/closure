@@ -12,34 +12,34 @@
 
 <intrinsic> := .void
              | .+ | .- | .* | ./ | .% | .<
-             | .type  // returns an int rep of the object's type; can be applied to any expr
-                      // an object's type never changes during the object's lifetime
-             | .getint | .putint
+             | .type  // returns an integer representation (see below) of the object's type
+                      // an object's type never changes during its lifetime
+             | .get | .put  // get/put integers
+
+<vepair> := <variable> <expr>
 
 <expr> := <integer-literal>
         | <variable>
         | lambda ( <variable>* ) <expr>
         | letrec ( <vepair>* ) <expr>
-          where <vepair> := <variable> <expr>
         | if <expr> <expr> <expr>
         | { <expr>+ }
         | ( <intrinsic> <expr>* )
         | ( <expr> <expr>* )
-        | @ <variable> <expr>
+        | @ <variable> <expr>  // access a closure's env variable
 ```
 
 ## Semantics
 
-Reference semantic (unobservable): all names are references to objects;
-all expressions evaluate to references of objects.
-
-Three basic, immutable object types: `Void`, `Int`, `Closure`.
-
-Variables cannot be re-bound.
-
-Both `letrec` and `( <callee> <expr>* )` use pass-by-reference for names.
-
-Garbage collection: do a simple periodic GC and don't do compaction; maybe use a free list.
++ Reference semantics (unobservable):
+  variables are references to objects;
+  expressions evaluate to references of objects;
+  both `letrec` and `( <expr> <expr>* )` use pass-by-reference.
++ Three object types, all immutable: `Void` (0), `Int` (1), `Closure` (2).
++ Variables cannot be re-bound.
++ The evaluation order of `lambda` and `letrec` is left-to-right.
++ Simple periodic GC without compaction; using a free-list.
++ No tail-call optimization.
 
 ## Dependency
 
