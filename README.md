@@ -5,20 +5,17 @@
 ## Syntax
 
 ```
-<comment> := #[^\n]*\n
-
-<integer-literal> := [+-]?[0-9]+
-<variable>        := [a-z][a-zA-Z0-9_]*
-
+<comment>   := #[^\n]*\n
+<integer>   := [+-]?[0-9]+
+<variable>  := [a-zA-Z_][a-zA-Z0-9_]*
 <intrinsic> := .void
              | .+ | .- | .* | ./ | .% | .<
              | .type  // returns an integer representation (see below) of the object's type
                       // an object's type never changes during its lifetime
              | .get | .put  // get/put integers
+<vepair>    := <variable> <expr>
 
-<vepair> := <variable> <expr>
-
-<expr> := <integer-literal>
+<expr> := <integer>
         | <variable>
         | lambda ( <variable>* ) <expr>
         | letrec ( <vepair>* ) <expr>
@@ -34,7 +31,7 @@
 + Reference semantics (unobservable):
   variables are references to objects;
   expressions evaluate to references of objects;
-  both `letrec` and `( <expr> <expr>* )` use pass-by-reference.
+  both `letrec` and `( <callee> <expr>* )` use pass-by-reference.
 + Three object types, all immutable: `Void` (0), `Int` (1), `Closure` (2).
 + Variables cannot be re-bound.
 + The evaluation order of `lambda` and `letrec` is left-to-right.
