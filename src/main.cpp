@@ -69,50 +69,6 @@ void panic(
     throw std::runtime_error("[" + type + " error " + sl.toString() + "] " + msg);
 }
 
-std::string quote(std::string s) {
-    std::string ret;
-    for (char c : s) {
-        if (c == '\\' || c == '"') {
-            ret += '\\';
-        }
-        ret += c;
-    }
-    return "\"" + ret + "\"";
-}
-
-std::string unquote(std::string s) {
-    s.pop_back();
-    std::reverse(s.begin(), s.end());
-    s.pop_back();
-    std::string ret;
-    while (s.size()) {
-        auto c = s.back();
-        s.pop_back();
-        if (c == '\\') {
-            if (s.size()) {
-                auto e = s.back();
-                s.pop_back();
-                if (e == '\\') {
-                    ret += '\\';
-                } else if (e == '"') {
-                    ret += '"';
-                } else if (e == 't') {
-                    ret += '\t';
-                } else if (e == 'n') {
-                    ret += '\n';
-                } else {
-                    panic("unquote", "unsupported escape sequence");
-                }
-            } else {
-                panic("unquote", "incomplete escape sequence");
-            }
-        } else {
-            ret += c;
-        }
-    }
-    return ret;
-}
-
 // ------------------------------
 // lexer
 // ------------------------------
@@ -120,8 +76,8 @@ std::string unquote(std::string s) {
 struct SourceStream {
     SourceStream(std::string s): source(std::move(s)) {
         std::string charstr =
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "0123456789`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/? \t\n";
+            "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "+-0123456789.*/%<(){}@# \t\n";
         std::unordered_set<char> charset(charstr.begin(), charstr.end());
         for (char c : source) {
             if (!charset.contains(c)) {
@@ -163,18 +119,8 @@ struct Token {
 std::deque<Token> lex(std::string source) {
     SourceStream ss(std::move(source));
 
-    auto countTrailingEscape = [](const std::string &s) -> int {
-        int cnt = 0;
-        int pos = s.size() - 1;
-        while (pos >= 0 && s[pos] == '\\') {
-            cnt++;
-            pos--;
-        }
-        return cnt;
-    };
-
     std::function<std::optional<Token>()> nextToken =
-        [&ss, &countTrailingEscape, &nextToken]() -> std::optional<Token> {
+        [&ss, &nextToken]() -> std::optional<Token> {
         // skip whitespaces
         while (ss.hasNext() && std::isspace(ss.peekNext())) {
             ss.popNext();
@@ -193,8 +139,8 @@ std::deque<Token> lex(std::string source) {
             while (ss.hasNext() && std::isdigit(ss.peekNext())) {
                 text += ss.popNext();
             }
-        // variable / struct-type / keyword
-        } else if (std::isalpha(ss.peekNext())) {
+        // variable / keyword
+        } else if (std::isalpha(ss.peekNext()) || ss.peekNext() == '_') {
             while (
                 ss.hasNext() && (
                     std::isalpha(ss.peekNext()) ||
@@ -210,25 +156,8 @@ std::deque<Token> lex(std::string source) {
                 text += ss.popNext();
             }
         // special symbol
-        } else if (std::string("()[]").find(ss.peekNext()) != std::string::npos) {
+        } else if (std::string("(){}@").find(ss.peekNext()) != std::string::npos) {
             text += ss.popNext();
-        // string literal (which preserves the quoted form after the lexer stage)
-        } else if (ss.peekNext() == '"') {
-            text += ss.popNext();
-            // support multi-line strings
-            while (
-                ss.hasNext() && (
-                    ss.peekNext() != '"' ||
-                    (ss.peekNext() == '"' && countTrailingEscape(text) % 2 != 0)
-                )
-            ) {
-                text += ss.popNext();
-            }
-            if (ss.hasNext() && ss.peekNext() == '"') {
-                text += ss.popNext();
-            } else {
-                panic("lexer", "incomplete string literal", startsl);
-            }
         // comment
         } else if (ss.peekNext() == '#') {
             while (ss.hasNext() && ss.peekNext() != '\n') {
@@ -283,17 +212,6 @@ struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
     int val;
 };
 
-struct StringNode : public ExprNode { COPY_CONTROL(StringNode);
-    StringNode(SourceLocation s, std::string v):
-        ExprNode(s), val(std::move(v)) {}
-
-    virtual std::string toString() const override {
-        return quote(val);
-    }
-
-    std::string val;
-};
-
 struct VariableNode : public ExprNode { COPY_CONTROL(VariableNode);
     VariableNode(SourceLocation s, std::string n):
         ExprNode(s), name(std::move(n)) {}
@@ -303,21 +221,6 @@ struct VariableNode : public ExprNode { COPY_CONTROL(VariableNode);
     }
 
     std::string name;
-};
-
-struct VSetNode : public ExprNode { COPY_CONTROL(VSetNode);
-    VSetNode(
-        SourceLocation s,
-        std::unique_ptr<VariableNode> v,
-        std::unique_ptr<ExprNode> e
-    ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
-
-    virtual std::string toString() const override {
-        return "vset " + var->toString() + " " + expr->toString();
-    }
-
-    std::unique_ptr<VariableNode> var;
-    std::unique_ptr<ExprNode> expr;
 };
 
 struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
@@ -388,21 +291,6 @@ struct IfNode : public ExprNode { COPY_CONTROL(IfNode);
     std::unique_ptr<ExprNode> branch2;
 };
 
-struct WhileNode : public ExprNode { COPY_CONTROL(WhileNode);
-    WhileNode(
-        SourceLocation s,
-        std::unique_ptr<ExprNode> c,
-        std::unique_ptr<ExprNode> b
-    ): ExprNode(s), cond(std::move(c)), body(std::move(b)) {}
-
-    virtual std::string toString() const override {
-        return "while " + cond->toString() + " " + body->toString();
-    }
-
-    std::unique_ptr<ExprNode> cond;
-    std::unique_ptr<ExprNode> body;
-};
-
 struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
     SequenceNode(
         SourceLocation s,
@@ -410,7 +298,7 @@ struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
     ): ExprNode(s), exprList(std::move(e)) {}
 
     virtual std::string toString() const override {
-        std::string ret = "[";
+        std::string ret = "{";
         for (const auto &e : exprList) {
             ret += e->toString();
             ret += " ";
@@ -418,82 +306,11 @@ struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
         if (ret.back() == ' ') {
             ret.pop_back();
         }
-        ret += "]";
+        ret += "}";
         return ret;
     }
 
     std::vector<std::unique_ptr<ExprNode>> exprList;
-};
-
-struct StructNode : public ExprNode { COPY_CONTROL(StructNode);
-    StructNode(
-        SourceLocation s,
-        std::vector<std::pair<
-            std::string, std::vector<std::unique_ptr<VariableNode>>
-        >> t,
-        std::unique_ptr<ExprNode> e
-    ): ExprNode(s), typeVarTupleList(std::move(t)), expr(std::move(e)) {}
-
-    virtual std::string toString() const override {
-        std::string ret = "struct (";
-        for (const auto &p : typeVarTupleList) {
-            ret += p.first;
-            ret += " ";
-            ret += "(";
-            for (const auto &v : p.second) {
-                ret += v->toString();
-                ret += " ";
-            }
-            if (ret.back() == ' ') {
-                ret.pop_back();
-            }
-            ret += ")";
-            ret += " ";
-        }
-        if (ret.back() == ' ') {
-            ret.pop_back();
-        }
-        ret += ") ";
-        ret += expr->toString();
-        return ret;
-    }
-
-    std::vector<std::pair<
-        std::string, std::vector<std::unique_ptr<VariableNode>>
-    >> typeVarTupleList,
-    std::unique_ptr<ExprNode> expr;
-};
-
-struct SGetNode : public ExprNode { COPY_CONTROL(SGetNode);
-    SGetNode(
-        SourceLocation s,
-        std::unique_ptr<ExprNode> e,
-        std::unique_ptr<VariableNode> v
-    ): ExprNode(s), expr(std::move(e)), var(std::move(v)) {}
-
-    virtual std::string toString() const override {
-        return "sget " + expr->toString() + " " + var->toString();
-    }
-
-    std::unique_ptr<ExprNode> expr;
-    std::unique_ptr<VariableNode> var;
-};
-
-struct SSetNode : public ExprNode { COPY_CONTROL(SSetNode);
-    SSetNode(
-        SourceLocation s,
-        std::unique_ptr<ExprNode> e1,
-        std::unique_ptr<VariableNode> v,
-        std::unique_ptr<ExprNode> e2
-    ): ExprNode(s), expr1(std::move(e1)), var(std::move(v)), expr2(std::move(e2)) {}
-
-    virtual std::string toString() const override {
-        return "sset " + expr1->toString() + " " + var->toString() + " " + expr2->toString();
-    }
-
-    std::unique_ptr<ExprNode> expr1;
-    std::unique_ptr<VariableNode> var;
-    std::unique_ptr<ExprNode> expr2;
 };
 
 struct CallNode : public ExprNode { COPY_CONTROL(CallNode);
@@ -517,6 +334,21 @@ struct CallNode : public ExprNode { COPY_CONTROL(CallNode);
     std::vector<std::unique_ptr<ExprNode>> argList;
 };
 
+struct AtNode : public ExprNode { COPY_CONTROL(AtNode);
+    AtNode(
+        SourceLocation s,
+        std::unique_ptr<VariableNode> v,
+        std::unique_ptr<ExprNode> e
+    ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
+
+    virtual std::string toString() const override {
+        return "@ " + var.toString() + " " + expr.toString();
+    }
+
+    std::unique_ptr<VariableNode> var;
+    std::unique_ptr<ExprNode> expr;
+};
+
 #undef COPY_CONTROL
 
 std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
@@ -527,14 +359,11 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
             token.text[0] == '+'
         );
     };
-    auto isStringToken = [](const Token &token) {
-        return token.text.size() > 0 && token.text[0] == '"';
-    };
     auto isIntrinsicToken = [](const Token &token) {
         return token.text.size() > 0 && token.text[0] == '.';
     };
     auto isVariableToken = [](const Token &token) {
-        return token.text.size() > 0 && std::isalpha(token.text[0]);
+        return token.text.size() > 0 && (std::isalpha(token.text[0]) || token.text[0] == '_');
     };
     auto isTheToken = [](const std::string &s) {
         return [s](const Token &token) {
