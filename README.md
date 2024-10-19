@@ -66,7 +66,7 @@ letrec (
 + Simple periodic garbage collection with memory compaction.
 + No tail-call optimization.
 + The language's stacks and heaps are explicit in the implementation,
-  so it should be easy to support debugging, exceptions, continuations, etc.
+  so it should be easy to support debugging, exceptions, continuations, threads, coroutines, etc.
 
 ## dependencies
 
