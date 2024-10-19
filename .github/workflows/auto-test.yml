@@ -6,8 +6,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: mkdir build
-        working-directory: src/
-      - run: cmake -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) -S . -B build -G "Unix Makefiles"
-        working-directory: src/
+        working-directory: .
+      - run: cmake -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) -S src -B build -G "Unix Makefiles"
+        working-directory: .
       - run: make
-        working-directory: src/build/
+        working-directory: build/
+      - run: python3 run_test.py
+        working-directory: .

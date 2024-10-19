@@ -1,8 +1,8 @@
-# closure (work in progress)
+# closure
 
 ![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
 
-## Syntax
+## syntax
 
 ```
 <comment>   := #[^\n]*\n
@@ -26,7 +26,7 @@
         | @ <variable> <expr>  // access a closure's env variable
 ```
 
-## Semantics
+## semantics
 
 + Reference semantics (unobservable):
   variables are references to objects;
@@ -35,22 +35,29 @@
 + Three object types, all immutable: `Void` (0), `Int` (1), `Closure` (2).
 + Variables cannot be re-bound.
 + The evaluation order of `lambda` and `letrec` is left-to-right.
-+ Simple periodic GC without compaction; using a free-list.
++ Simple periodic GC with compaction.
 + No tail-call optimization.
 
-## Dependency
+## dependency
 
 `cmake` >= 3.28.1, a reasonable version of `make`, and `clang++` >= C++20
 
-## Build (on Linux/macOS)
+## build (on Linux/macOS)
 
 ```
-cd src
 mkdir build
 cmake -DCMAKE_BUILD_TYPE:STRING=Debug \
       -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) \
-      -S . -B build \
+      -S src -B build \
       -G "Unix Makefiles"
 cd build
 make
 ```
+
+## run
+
+```
+build/closure <source-path>
+```
+
+To run all tests, do `python3 run_test.py`.

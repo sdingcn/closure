@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <deque>
 #include <utility>
 #include <string>
@@ -16,6 +17,8 @@
 #include <concepts>
 #include <type_traits>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 // ------------------------------
 // global helper(s)
@@ -363,7 +366,7 @@ struct AtNode : public ExprNode { COPY_CONTROL(AtNode);
     ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
 
     virtual std::string toString() const override {
-        return "@ " + var.toString() + " " + expr.toString();
+        return "@ " + var->toString() + " " + expr->toString();
     }
 
     std::unique_ptr<VariableNode> var;
@@ -479,7 +482,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
             argList.push_back(parseExpr());
         }
         consume(isTheToken(")"));
-        return std::make_unique<IntrinsicCallNode>(start.sl, std::move(intrinsic), std::move(argList));
+        return std::make_unique<IntrinsicCallNode>(start.sl, std::move(intrinsic.text), std::move(argList));
     };
     parseExprCall = [&]() -> std::unique_ptr<ExprCallNode> {
         auto start = consume(isTheToken("("));
@@ -543,7 +546,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
 // runtime
 // ------------------------------
 
-// every value is accessed by reference, which is its location on the heap 
+// every value is accessed by reference to its location on the heap 
 using Location = int;
 
 struct Void {
@@ -562,15 +565,6 @@ struct Integer {
     int value = 0;
 };
 
-struct String {
-    String(std::string v): value(std::move(v)) {}
-    std::string toString() const {
-        return value;
-    }
-
-    std::string value;
-};
-
 // variable environment; newer variables have larger indices
 using Env = std::vector<std::pair<std::string, Location>>;
 
@@ -584,6 +578,7 @@ std::optional<Location> lookup(const std::string &name, const Env &env) {
 }
 
 struct Closure {
+    // a closure should copy its environment
     Closure(Env e, const LambdaNode *f): env(std::move(e)), fun(f) {}
     std::string toString() const {
         return "<closure evaluated at " + fun->sl.toString() + ">";
@@ -593,27 +588,15 @@ struct Closure {
     const LambdaNode *fun;
 };
 
-using Value = std::variant<Void, Integer, String, Closure>;
+using Value = std::variant<Void, Integer, Closure>;
 
 std::string valueToString(const Value &v) {
     if (std::holds_alternative<Void>(v)) {
         return std::get<Void>(v).toString();
     } else if (std::holds_alternative<Integer>(v)) {
         return std::get<Integer>(v).toString();
-    } else if (std::holds_alternative<String>(v)) {
-        return std::get<String>(v).toString();
     } else {
         return std::get<Closure>(v).toString();
-    }
-}
-
-using MessageValue = std::variant<Integer, String>;
-
-std::string messageValueToString(const MessageValue &v) {
-    if (std::holds_alternative<Integer>(v)) {
-        return std::get<Integer>(v).toString();
-    } else {
-        return std::get<String>(v).toString();
     }
 }
 
@@ -626,10 +609,10 @@ struct Layer {
         return frame;
     }
 
-    // one env per frame
+    // one env per frame (closure call layer)
     std::shared_ptr<Env> env;
     const ExprNode *expr;
-    // whether this is a closure call layer (a frame)
+    // whether this is a frame
     bool frame;
     // program counter inside this expr
     int pc = 0;
@@ -642,30 +625,24 @@ public:
     State(const ExprNode *e) {
         // the main frame
         stack.emplace_back(std::make_shared<Env>(), nullptr, true);
-        // the first expression
+        // the first expression (using the env of the main frame)
         stack.emplace_back(stack.back().env, e);
-    }
-    State(const std::string &s) {
-        // load from serialized state
     }
     bool isTerminated() const {
         return stack.back().expr == nullptr;
     }
-    // returns true iff the step completed without reaching the end of evaluation
+    // returns true iff the step is completed without reaching the end of evaluation
     bool step() {
-        // careful! this reference may be invalidated after modifying stack
+        // be careful! this reference may be invalidated after modifying the stack
         // so always keep stack change as the last operation
         auto &layer = stack.back();
         // main frame; end of evaluation
         if (layer.expr == nullptr) {
             return false;
         }
-        // case evaluation
+        // evaluations for every case
         if (auto inode = dynamic_cast<const IntegerNode*>(layer.expr)) {
             resultLoc = _new<Integer>(inode->val);
-            stack.pop_back();
-        } else if (auto snode = dynamic_cast<const StringNode*>(layer.expr)) {
-            resultLoc = _new<String>(snode->val);
             stack.pop_back();
         } else if (auto vnode = dynamic_cast<const VariableNode*>(layer.expr)) {
             auto loc = lookup(vnode->name, *(layer.env));
@@ -674,28 +651,12 @@ public:
             }
             resultLoc = loc.value();
             stack.pop_back();
-        } else if (auto snode = dynamic_cast<const SetNode*>(layer.expr)) {
-            // evaluate expr
-            if (layer.pc == 0) {
-                layer.pc++;
-                stack.emplace_back(layer.env, snode->expr.get());
-            // perform variable re-binding
-            } else {
-                auto loc = lookup(snode->var->name, *(layer.env));
-                if (!loc.has_value()) {
-                    panic("runtime", "undefined variable", layer.expr->sl);
-                }
-                // inherit resultLoc from last iteration
-                heap[loc.value()] = heap[resultLoc];
-                resultLoc = _new<Void>();
-                stack.pop_back();
-            }
         } else if (auto lnode = dynamic_cast<const LambdaNode*>(layer.expr)) {
             // copy the env into the closure
             resultLoc = _new<Closure>(*(layer.env), lnode);
             stack.pop_back();
         } else if (auto lnode = dynamic_cast<const LetrecNode*>(layer.expr)) {
-            // unified argument copy
+            // unified argument recording
             if (layer.pc > 1 && layer.pc <= lnode->varExprList.size() + 1) {
                 auto loc = lookup(
                     lnode->varExprList[layer.pc - 2].first->name,
@@ -705,10 +666,10 @@ public:
                 if (!loc.has_value()) {
                     panic("runtime", "undefined variable", layer.expr->sl);
                 }
-                // copy
+                // copy (inherited resultLoc)
                 heap[loc.value()] = heap[resultLoc];
             }
-            // create new locations
+            // create all new locations
             if (layer.pc == 0) {
                 layer.pc++;
                 for (const auto &[var, _] : lnode->varExprList) {
@@ -720,6 +681,8 @@ public:
             // evaluate bindings
             } else if (layer.pc <= lnode->varExprList.size()) {
                 layer.pc++;
+                // note: growing the stack might invalidate the reference "layer"
+                //       but this is fine since next time "layer" will be re-bound
                 stack.emplace_back(
                     layer.env,
                     lnode->varExprList[layer.pc - 2].second.get()
@@ -762,117 +725,6 @@ public:
                 // no need to update resultLoc: inherited
                 stack.pop_back();
             }
-        } else if (auto wnode = dynamic_cast<const WhileNode*>(layer.expr)) {
-            // evaluate condition
-            if (layer.pc == 0) {
-                layer.pc++;
-                stack.emplace_back(layer.env, wnode->cond.get());
-            // whether to evaluate body
-            } else if (layer.pc == 1) {
-                // inherited condition value
-                if (!std::holds_alternative<Integer>(heap[resultLoc])) {
-                    panic("runtime", "wrong cond type", layer.expr->sl);
-                }
-                if (std::get<Integer>(heap[resultLoc]).value) {
-                    // loop: revert the pc so next iteration will run it again
-                    layer.pc = 0;
-                    // evaluate the body
-                    stack.emplace_back(layer.env, wnode->body.get());
-                } else {
-                    // while's return value is void
-                    resultLoc = _new<Void>();
-                    stack.pop_back();
-                }
-            }
-        } else if (auto cnode = dynamic_cast<const CallNode*>(layer.expr)) {
-            if (auto callee = dynamic_cast<const IntrinsicNode*>(cnode->callee.get())) {
-                // unified argument recording
-                if (layer.pc > 1 && layer.pc <= cnode->argList.size() + 1) {
-                    std::get<std::vector<Location>>(layer.local["args"]).push_back(resultLoc);
-                }
-                // initialization
-                if (layer.pc == 0) {
-                    layer.pc++;
-                    layer.local["args"] = std::vector<Location>();
-                // evaluate arguments
-                } else if (layer.pc <= cnode->argList.size()) {
-                    layer.pc++;
-                    stack.emplace_back(
-                        layer.env,
-                        cnode->argList[layer.pc - 2].get()
-                    );
-                // intrinsic call doesn't grow the stack
-                } else {
-                    auto value = _callIntrinsic(
-                        layer.expr->sl,
-                        callee->name,
-                        // intrinsic call is pass by reference
-                        std::get<std::vector<Location>>(layer.local["args"])
-                    );
-                    resultLoc = _moveNew(std::move(value));
-                    stack.pop_back();
-                }
-            } else {
-                // unified argument recording
-                if (layer.pc > 2 && layer.pc <= cnode->argList.size() + 2) {
-                    std::get<std::vector<Location>>(layer.local["args"]).push_back(resultLoc);
-                }
-                // evaluate the callee
-                if (layer.pc == 0) {
-                    layer.pc++;
-                    stack.emplace_back(
-                        layer.env,
-                        cnode->callee.get()
-                    );
-                // initialization
-                } else if (layer.pc == 1) {
-                    layer.pc++;
-                    // inherited callee location
-                    layer.local["callee"] = resultLoc;
-                    layer.local["args"] = std::vector<Location>();
-                // evaluate arguments
-                } else if (layer.pc <= cnode->argList.size() + 1) {
-                    layer.pc++;
-                    stack.emplace_back(
-                        layer.env,
-                        cnode->argList[layer.pc - 3].get()
-                    );
-                // call
-                } else if (layer.pc == cnode->argList.size() + 2) {
-                    layer.pc++;
-                    auto &calleeLoc = std::get<Location>(layer.local["callee"]);
-                    auto &argsLoc = std::get<std::vector<Location>>(layer.local["args"]);
-                    if (!std::holds_alternative<Closure>(heap[calleeLoc])) {
-                        panic("runtime", "calling a non-callable", layer.expr->sl);
-                    }
-                    auto &callee = std::get<Closure>(heap[calleeLoc]);
-                    // types will be checked inside the closure call
-                    if (argsLoc.size() != callee.fun->varList.size()) {
-                        panic("runtime", "wrong number of arguments", layer.expr->sl);
-                    }
-                    int nArgs = argsLoc.size();
-                    // lexical scope: copy the env from the closure definition place
-                    auto newEnv = callee.env;
-                    for (int i = 0; i < nArgs; i++) {
-                        // closure call is pass by reference
-                        newEnv.push_back(std::make_pair(
-                            callee.fun->varList[i]->name,
-                            argsLoc[i]
-                        ));
-                    }
-                    // evaluation of the closure body
-                    stack.emplace_back(
-                        // new frame has new env
-                        std::make_shared<Env>(std::move(newEnv)),
-                        callee.fun->expr.get(),
-                        true
-                    );
-                // finish
-                } else {
-                    // no need to update resultLoc: inherited
-                    stack.pop_back();
-                }
-            }
         } else if (auto snode = dynamic_cast<const SequenceNode*>(layer.expr)) {
             // evaluate one-by-one
             if (layer.pc < snode->exprList.size()) {
@@ -887,26 +739,95 @@ public:
                 // no need to update resultLoc: inherited
                 stack.pop_back();
             }
-        } else if (auto qnode = dynamic_cast<const QueryNode*>(layer.expr)) {
-            // evaluate the expr
+        } else if (auto cnode = dynamic_cast<const IntrinsicCallNode*>(layer.expr)) {
+            // unified argument recording
+            if (layer.pc > 1 && layer.pc <= cnode->argList.size() + 1) {
+                // it's guaranteed to contain the vector alternative
+                std::get<std::vector<Location>>(layer.local["args"]).push_back(resultLoc);
+            }
+            // initialization
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.emplace_back(layer.env, qnode->expr.get());
-            // finish
-            } else {
-                // inherited resultLoc
-                if (!std::holds_alternative<Closure>(heap[resultLoc])) {
-                    panic("runtime", "@ wrong type", layer.expr->sl);
-                }
-                resultLoc = _new<Integer>(
-                    lookup(
-                        qnode->var->name,
-                        std::get<Closure>(heap[resultLoc]).env
-                    ).has_value() ? 1 : 0
+                layer.local["args"] = std::vector<Location>();
+            // evaluate arguments
+            } else if (layer.pc <= cnode->argList.size()) {
+                layer.pc++;
+                stack.emplace_back(
+                    layer.env,
+                    cnode->argList[layer.pc - 2].get()
                 );
+            // intrinsic call doesn't grow the stack
+            } else {
+                auto value = _callIntrinsic(
+                    layer.expr->sl,
+                    cnode->intrinsic,
+                    // intrinsic call is pass by reference
+                    std::get<std::vector<Location>>(layer.local["args"])
+                );
+                resultLoc = _moveNew(std::move(value));
                 stack.pop_back();
             }
-        } else if (auto anode = dynamic_cast<const AccessNode*>(layer.expr)) {
+        } else if (auto cnode = dynamic_cast<const ExprCallNode*>(layer.expr)) {
+            // unified argument recording
+            if (layer.pc > 2 && layer.pc <= cnode->argList.size() + 2) {
+                std::get<std::vector<Location>>(layer.local["args"]).push_back(resultLoc);
+            }
+            // evaluate the callee
+            if (layer.pc == 0) {
+                layer.pc++;
+                stack.emplace_back(
+                    layer.env,
+                    cnode->expr.get()
+                );
+            // initialization
+            } else if (layer.pc == 1) {
+                layer.pc++;
+                // inherited callee location
+                layer.local["expr"] = resultLoc;
+                layer.local["args"] = std::vector<Location>();
+            // evaluate arguments
+            } else if (layer.pc <= cnode->argList.size() + 1) {
+                layer.pc++;
+                stack.emplace_back(
+                    layer.env,
+                    cnode->argList[layer.pc - 3].get()
+                );
+            // call
+            } else if (layer.pc == cnode->argList.size() + 2) {
+                layer.pc++;
+                auto &exprLoc = std::get<Location>(layer.local["expr"]);
+                auto &argsLoc = std::get<std::vector<Location>>(layer.local["args"]);
+                if (!std::holds_alternative<Closure>(heap[exprLoc])) {
+                    panic("runtime", "calling a non-callable", layer.expr->sl);
+                }
+                auto &closure = std::get<Closure>(heap[exprLoc]);
+                // types will be checked inside the closure call
+                if (argsLoc.size() != closure.fun->varList.size()) {
+                    panic("runtime", "wrong number of arguments", layer.expr->sl);
+                }
+                int nArgs = argsLoc.size();
+                // lexical scope: copy the env from the closure definition place
+                auto newEnv = closure.env;
+                for (int i = 0; i < nArgs; i++) {
+                    // closure call is pass by reference
+                    newEnv.push_back(std::make_pair(
+                        closure.fun->varList[i]->name,
+                        argsLoc[i]
+                    ));
+                }
+                // evaluation of the closure body
+                stack.emplace_back(
+                    // new frame has new env
+                    std::make_shared<Env>(std::move(newEnv)),
+                    closure.fun->expr.get(),
+                    true
+                );
+            // finish
+            } else {
+                // no need to update resultLoc: inherited
+                stack.pop_back();
+            }
+        } else if (auto anode = dynamic_cast<const AtNode*>(layer.expr)) {
             // evaluate the expr
             if (layer.pc == 0) {
                 layer.pc++;
@@ -914,7 +835,7 @@ public:
             } else {
                 // inherited resultLoc
                 if (!std::holds_alternative<Closure>(heap[resultLoc])) {
-                    panic("runtime", "& wrong type", layer.expr->sl);
+                    panic("runtime", "@ wrong type", layer.expr->sl);
                 }
                 auto loc = lookup(
                     anode->var->name,
@@ -933,19 +854,17 @@ public:
         return true;
     }
     void execute() {
-        static constexpr int GC_INTERVAL = 10000;
+        static constexpr int GC_INTERVAL = 1000;
         int ctr = 0;
         while (step()) {
             ctr++;
             if (ctr && (ctr % GC_INTERVAL == 0)) {
-                std::cerr << "[sys] GC collected: " << _gc() << "\n";
+                _gc();
             }
         }
     }
-    Value getResult() const {
+    const Value &getResult() const {
         return heap[resultLoc];
-    }
-    void save(const std::string &filePath) {
     }
 private:
     template <typename... Alt>
@@ -1010,48 +929,26 @@ private:
                 std::get<Integer>(heap[args[0]]).value <
                 std::get<Integer>(heap[args[1]]).value ? 1 : 0
             );
-        } else if (name == ".slen") {
-            _typecheck<String>(sl, args);
-            return Integer(std::get<String>(heap[args[0]]).value.size());
-        } else if (name == ".ssub") {
-            _typecheck<String, Integer, Integer>(sl, args);
-            return String(
-                std::get<String>(heap[args[0]]).value.substr(
-                    std::get<Integer>(heap[args[1]]).value,
-                    std::get<Integer>(heap[args[2]]).value - 
-                    std::get<Integer>(heap[args[1]]).value
-                )
-            );
-        } else if (name == ".s+") {
-            _typecheck<String, String>(sl, args);
-            return String(
-                std::get<String>(heap[args[0]]).value +
-                std::get<String>(heap[args[1]]).value
-            );
-        } else if (name == ".s<") {
-            _typecheck<String, String>(sl, args);
-            return Integer(
-                std::get<String>(heap[args[0]]).value <
-                std::get<String>(heap[args[1]]).value ? 1 : 0
-            );
-        } else if (name == ".i->s") {
+        } else if (name == ".type") {
+            _typecheck<Value>(sl, args);
+            int label = -1;
+            if (std::holds_alternative<Void>(heap[args[0]])) {
+                label = 0;
+            } else if (std::holds_alternative<Integer>(heap[args[0]])) {
+                label = 1;
+            } else {
+                label = 2;
+            }
+            return Integer(label);
+        } else if (name == ".get") {
+            _typecheck<>(sl, args);
+            int v;
+            std::cin >> v;
+            return Integer(v);
+        } else if (name == ".put") {
             _typecheck<Integer>(sl, args);
-            return String(std::to_string(std::get<Integer>(heap[args[0]]).value));
-        } else if (name == ".s->i") {
-            _typecheck<String>(sl, args);
-            return Integer(std::stoi(std::get<String>(heap[args[0]]).value));
-        } else if (name == ".v?") {
-            _typecheck<Value>(sl, args);
-            return Integer(std::holds_alternative<Void>(heap[args[0]]) ? 1 : 0);
-        } else if (name == ".i?") {
-            _typecheck<Value>(sl, args);
-            return Integer(std::holds_alternative<Integer>(heap[args[0]]) ? 1 : 0);
-        } else if (name == ".s?") {
-            _typecheck<Value>(sl, args);
-            return Integer(std::holds_alternative<String>(heap[args[0]]) ? 1 : 0);
-        } else if (name == ".c?") {
-            _typecheck<Value>(sl, args);
-            return Integer(std::holds_alternative<Closure>(heap[args[0]]) ? 1 : 0);
+            std::cout << std::get<Integer>(heap[args[0]]).value << std::endl;
+            return Void();
         } else {
             panic("runtime", "unrecognized intrinsic call", sl);
             return Void();
@@ -1061,7 +958,7 @@ private:
     template <typename V, typename... Args>
     requires isAlternativeOf<V, Value>
     Location _new(Args&&... args) {
-        heap.push_back(V(std::forward<Args>(args)...));
+        heap.push_back(std::move(V(std::forward<Args>(args)...)));
         return heap.size() - 1;
     }
     Location _moveNew(Value v) {
@@ -1130,7 +1027,7 @@ private:
             }
         }
         heap.resize(i);
-        return std::make_pair(removed, relocation);
+        return std::make_pair(removed, std::move(relocation));
     }
     void _relocate(const std::unordered_map<Location, Location> &relocation) {
         auto reloc = [&relocation](Location &loc) -> void {
@@ -1176,107 +1073,41 @@ private:
         _relocate(relocation);
         return removed;
     }
-    // fields
+    // states
     std::vector<Layer> stack;
     std::vector<Value> heap;
     Location resultLoc;
 };
 
 // ------------------------------
-// tests
-// ------------------------------
-
-const std::vector<std::pair<std::string, std::string>> tests = {
-{
-R"(
-letrec (
-    leaf = lambda () lambda () 0
-    node = lambda (value left right) lambda () 1
-    # in-order DFS
-    dfs = lambda (tree)
-        if (.< (tree) 1)
-        ""
-        (.s+ (.s+ (dfs &left tree) &value tree) (dfs &right tree))
-)
-(dfs
-    (node "4"
-        (node "2"
-            (node "1" (leaf) (leaf))
-            (node "3" (leaf) (leaf)))
-        (node "5" (leaf) (leaf))))
-)"
-,
-"12345"
-}
-,
-{
-R"(
-letrec (
-    x = ""
-    r = ""
-    change = lambda (var val) set var val
-)
-[
-    set x "a"
-    set r (.s+ r x)
-    (change x "b")
-    set r (.s+ r x)
-    letrec (z = x) set z "c"
-    set r (.s+ r x)
-    r
-]
-)"
-,
-"abb"
-},
-{
-R"(
-letrec (a = 0 b = 1)
-[
-    while (.< a 100)
-        letrec (t = a) [ set a b set b (.+ t b) ]
-    a
-]
-)"
-,
-"144"
-},
-{
-R"(
-letrec (
-    sum = lambda (n)
-        if (.< n 1)
-        0
-        (.+ n (sum (.- n 1)))
-)
-(sum 10000)
-)"
-,
-"50005000"
-}
-};
-
-int test() {
-    int i = 0;
-    for (const auto &[source, result] : tests) {
-        auto tokens = lex(source);
-        auto expr = parse(std::move(tokens));
-        State state(expr.get());
-        state.execute();
-        auto r = valueToString(state.getResult());
-        if (r == result) {
-            std::cerr << "[sys] Passed test " << ++i << "\n";
-        } else {
-            std::cerr << "[sys] Failed test " << ++i << "\n";
-            return 1;
-        }
-    }
-    return 0;
-}
-
-// ------------------------------
 // main
 // ------------------------------
 
+std::string readSource(const std::string &spath) {
+    if (!std::filesystem::exists(spath)) {
+        throw std::runtime_error(spath + " does not exist.");
+    }
+    static constexpr std::size_t BLOCK = 4096;
+    std::ifstream in(spath);
+    in.exceptions(std::ios_base::badbit);
+    std::string source;
+    char buf[BLOCK];
+    while (in.read(buf, BLOCK)) {
+        source.append(buf, 0, in.gcount());
+    }
+    source.append(buf, 0, in.gcount());
+    return source;
+}
+
 int main(int argc, char **argv) {
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <source-path>\n";
+        return 1;
+    }
+    std::string source = readSource(argv[1]);
+    auto tokens = lex(source);
+    auto expr = parse(std::move(tokens));
+    State state(expr.get());
+    state.execute();
+    std::cout << valueToString(state.getResult()) << std::endl;
 }
