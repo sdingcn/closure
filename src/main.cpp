@@ -1,24 +1,22 @@
+#include <algorithm>
+#include <cctype>
+#include <concepts>
 #include <cstddef>
 #include <deque>
-#include <utility>
-#include <string>
-#include <stdexcept>
-#include <unordered_set>
-#include <unordered_map>
-#include <set>
-#include <map>
-#include <algorithm>
-#include <optional>
-#include <cctype>
-#include <functional>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <concepts>
-#include <type_traits>
-#include <iostream>
-#include <fstream>
 #include <filesystem>
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <variant>
+#include <vector>
 
 // ------------------------------
 // global helper(s)
@@ -40,7 +38,6 @@ constexpr bool isAlternativeOf = isAlternativeOfHelper<Type, Variant>::value;
 
 struct SourceLocation {
     SourceLocation(int l = 1, int c = 1): line(l), column(c) {}
-
     std::string toString() const {
         if (line <= 0 || column <= 0) {
             return "(SourceLocation N/A)";
@@ -91,7 +88,6 @@ struct SourceStream {
         sl.revert();
         std::reverse(source.begin(), source.end());
     }
-
     bool hasNext() const {
         return source.size() > 0;
     }
@@ -187,7 +183,7 @@ std::deque<Token> lex(std::string source) {
 }
 
 // ------------------------------
-// AST
+// AST and parser
 // ------------------------------
 
 #define COPY_CONTROL(CLASS)\
@@ -197,7 +193,6 @@ std::deque<Token> lex(std::string source) {
 
 struct ExprNode { COPY_CONTROL(ExprNode);
     ExprNode(SourceLocation s): sl(s) {}
-
     virtual std::string toString() const {
         return "<ExprNode>";
     }
@@ -207,7 +202,6 @@ struct ExprNode { COPY_CONTROL(ExprNode);
 
 struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
     IntegerNode(SourceLocation s, int v): ExprNode(s), val(v) {}
-
     virtual std::string toString() const override {
         return std::to_string(val);
     }
@@ -218,7 +212,6 @@ struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
 struct VariableNode : public ExprNode { COPY_CONTROL(VariableNode);
     VariableNode(SourceLocation s, std::string n):
         ExprNode(s), name(std::move(n)) {}
-
     virtual std::string toString() const override {
         return name;
     }
@@ -231,7 +224,6 @@ struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
         std::vector<std::unique_ptr<VariableNode>> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), varList(std::move(v)), expr(std::move(e)) {}
-
     virtual std::string toString() const override {
         std::string ret = "lambda (";
         for (const auto &v : varList) {
@@ -256,7 +248,6 @@ struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
         std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), varExprList(std::move(v)), expr(std::move(e)) {}
-
     virtual std::string toString() const override {
         std::string ret = "letrec (";
         for (const auto &p : varExprList) {
@@ -284,7 +275,6 @@ struct IfNode : public ExprNode { COPY_CONTROL(IfNode);
         std::unique_ptr<ExprNode> b1,
         std::unique_ptr<ExprNode> b2
     ): ExprNode(s), cond(std::move(c)), branch1(std::move(b1)), branch2(std::move(b2)) {}
-
     virtual std::string toString() const override {
         return "if " + cond->toString() + " " + branch1->toString() + " " + branch2->toString();
     }
@@ -299,7 +289,6 @@ struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
         SourceLocation s,
         std::vector<std::unique_ptr<ExprNode>> e
     ): ExprNode(s), exprList(std::move(e)) {}
-
     virtual std::string toString() const override {
         std::string ret = "{";
         for (const auto &e : exprList) {
@@ -322,7 +311,6 @@ struct IntrinsicCallNode : public ExprNode { COPY_CONTROL(IntrinsicCallNode);
         std::string i,
         std::vector<std::unique_ptr<ExprNode>> a
     ): ExprNode(s), intrinsic(std::move(i)), argList(std::move(a)) {}
-
     virtual std::string toString() const override {
         std::string ret = "(" + intrinsic;
         for (const auto &a : argList) {
@@ -343,7 +331,6 @@ struct ExprCallNode : public ExprNode { COPY_CONTROL(ExprCallNode);
         std::unique_ptr<ExprNode> e,
         std::vector<std::unique_ptr<ExprNode>> a
     ): ExprNode(s), expr(std::move(e)), argList(std::move(a)) {}
-
     virtual std::string toString() const override {
         std::string ret = "(" + expr->toString();
         for (const auto &a : argList) {
@@ -364,7 +351,6 @@ struct AtNode : public ExprNode { COPY_CONTROL(AtNode);
         std::unique_ptr<VariableNode> v,
         std::unique_ptr<ExprNode> e
     ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
-
     virtual std::string toString() const override {
         return "@ " + var->toString() + " " + expr->toString();
     }
@@ -394,7 +380,6 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
             return token.text == s;
         };
     };
-
     auto consume = [&tokens]<typename Callable>(const Callable &predicate) -> Token {
         if (tokens.size() == 0) {
             panic("parser", "incomplete token stream");
@@ -482,7 +467,9 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
             argList.push_back(parseExpr());
         }
         consume(isTheToken(")"));
-        return std::make_unique<IntrinsicCallNode>(start.sl, std::move(intrinsic.text), std::move(argList));
+        return std::make_unique<IntrinsicCallNode>(
+            start.sl, std::move(intrinsic.text), std::move(argList)
+        );
     };
     parseExprCall = [&]() -> std::unique_ptr<ExprCallNode> {
         auto start = consume(isTheToken("("));

@@ -53,18 +53,20 @@ letrec (
         | @ <variable> <expr>  // access a closure's environment variable
 ```
 
-## semantics
+## semantics and implementation details
 
 + Reference semantics (unobservable):
   variables are references to objects;
   expressions evaluate to references of objects;
   both `letrec` and `( <callee> <expr>* )` use pass-by-reference.
-+ Three object types, all immutable: `Void` (0), `Int` (1), `Closure` (2).
++ Three object types, all immutable: Void (0), Int (1), Closure (2).
   Closures can be used as records / structs as shown in the above example.
 + Variables cannot be re-bound.
 + The evaluation order of `lambda` and `letrec` is left-to-right.
 + Simple periodic garbage collection with memory compaction.
 + No tail-call optimization.
++ The language's stacks and heaps are explicit in the implementation,
+  so it should be easy to support debugging, exceptions, continuations, etc.
 
 ## dependencies
 
