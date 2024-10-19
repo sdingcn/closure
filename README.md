@@ -65,7 +65,10 @@ letrec (
 
 ## dependency
 
-`cmake` >= 3.28.1, a reasonable version of `make`, and `clang++` >= C++20
++ `cmake` >= 3.28.1
++ a reasonable version of `make`
++ `clang++` with support of C++20
++ `python3`
 
 ## build (on Linux/macOS)
 
