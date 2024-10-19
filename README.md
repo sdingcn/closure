@@ -2,6 +2,9 @@
 
 ![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
 
+This is a small functional programming language with first-class functions,
+recursions, and mark-and-sweep garbage collection with memory compaction.
+
 ## code example
 
 ```
@@ -60,10 +63,10 @@ letrec (
   Closures can be used as records / structs as shown in the above example.
 + Variables cannot be re-bound.
 + The evaluation order of `lambda` and `letrec` is left-to-right.
-+ Simple periodic GC with compaction.
++ Simple periodic garbage collection with memory compaction.
 + No tail-call optimization.
 
-## dependency
+## dependencies
 
 + `cmake` >= 3.28.1
 + a reasonable version of `make`
