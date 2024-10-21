@@ -4,6 +4,8 @@
 
 This is a small functional programming language with first-class functions,
 recursions, and mark-and-sweep garbage collection with memory compaction.
+(Immutable) records / structs could be simulated by function closures
+with the special syntax `@`, which is the origin of this language's name.
 
 ## code example
 
