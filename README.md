@@ -1,6 +1,6 @@
 # closure
 
-![](https://github.com/sdingcn/closure/actions/workflows/auto-test.yml/badge.svg)
+![](https://github.com/sdingcn/closure/actions/workflows/run_test.yml/badge.svg)
 
 This is a small functional programming language with first-class functions,
 recursions, and mark-and-sweep garbage collection with memory compaction.
