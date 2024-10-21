@@ -1,4 +1,4 @@
-name: auto-test
+name: run_test
 on: [push]
 jobs:
   test:

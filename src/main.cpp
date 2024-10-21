@@ -2,6 +2,7 @@
 #include <cctype>
 #include <concepts>
 #include <cstddef>
+#include <cstdlib>
 #include <deque>
 #include <filesystem>
 #include <fstream>
@@ -1092,9 +1093,13 @@ int main(int argc, char **argv) {
         return 1;
     }
     std::string source = readSource(argv[1]);
-    auto tokens = lex(source);
-    auto expr = parse(std::move(tokens));
-    State state(expr.get());
-    state.execute();
-    std::cout << valueToString(state.getResult()) << std::endl;
+    try {
+        auto expr = parse(lex(source));
+        State state(expr.get());
+        state.execute();
+        std::cout << valueToString(state.getResult()) << std::endl;
+    } catch (const std::runtime_error &e) {
+        std::cerr << e.what() << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
 }

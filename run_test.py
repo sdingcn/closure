@@ -24,12 +24,15 @@ if __name__ == "__main__":
                 sys.stdout.flush()
                 inpath = filepath[:-3] + "in"
                 outpath = filepath[:-3] + "out"
+                errpath = filepath[:-3] + "err"
                 with open(inpath, "r") as f:
                     res = execute(["build/closure", filepath], f.read())
                 with open(outpath, "r") as g:
-                    ref = g.read()
-                if (res[0] == 0 and res[1] == ref and res[2] == ""):
+                    out = g.read()
+                with open(errpath, "r") as h:
+                    err = h.read()
+                if ((res[0] == 0) == (err == "") and res[1] == out and res[2] == err):
                     print("passed")
                 else:
-                    sys.exit("failed")
+                    sys.exit(f"failed\nres = {res}\ntruth = {(out, err)}")
                 sys.stdout.flush()

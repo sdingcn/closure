@@ -1,0 +1,6 @@
+# a program with a runtime error
+{
+    (.put (.+ 1 2))
+    (.put (.+ (lambda () 1) (lambda () 2)))
+    (.put (.+ lambda () 1 lambda () 2))
+}
