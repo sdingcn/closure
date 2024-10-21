@@ -14,6 +14,8 @@ def execute(cmd: List[str], i: Union[None, str] = None) -> Tuple[int, str, str]:
     return (result.returncode, result.stdout, result.stderr)
 
 if __name__ == "__main__":
+    if not os.path.exists("build/closure"):
+        sys.exit("please build the project before running the tests")
     for dirpath, _, filenames in os.walk("test/"):
         for filename in filenames:
             if filename.endswith(".clo"):
@@ -29,5 +31,5 @@ if __name__ == "__main__":
                 if (res[0] == 0 and res[1] == ref and res[2] == ""):
                     print("passed")
                 else:
-                    print("failed")
+                    sys.exit("failed")
                 sys.stdout.flush()
