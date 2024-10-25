@@ -42,7 +42,8 @@ See `test/`.
   expressions evaluate to references of objects;
   both `letrec` and `( <callee> <expr>* )` use pass-by-reference.
 + Three object types, all immutable: Void (0), Int (1), Closure (2).
-  Closures can be used as records / structs as shown in the above example.
+  Closures only include statically used variables.
+  Closures can be used as records / structs as shown in `test/dfs.clo`.
 + Variables cannot be re-bound.
 + The evaluation order of `lambda` and `letrec` is left-to-right.
 + Simple periodic garbage collection with memory compaction.

@@ -196,6 +196,7 @@ struct ExprNode { COPY_CONTROL(ExprNode);
     ExprNode(SourceLocation s): sl(s) {}
     virtual std::string toString() const = 0;
     virtual void computeFreeVars() = 0;
+    virtual void staticASTCheck() const = 0;
 
     SourceLocation sl;
     std::unordered_set<std::string> freeVars;
@@ -207,6 +208,8 @@ struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
         return std::to_string(val);
     }
     virtual void computeFreeVars() override {
+    }
+    virtual void staticASTCheck() const override {
     }
 
     int val;
@@ -220,6 +223,8 @@ struct VariableNode : public ExprNode { COPY_CONTROL(VariableNode);
     }
     virtual void computeFreeVars() override {
         freeVars.insert(name);
+    }
+    virtual void staticASTCheck() const override {
     }
 
     std::string name;
@@ -248,6 +253,21 @@ struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
         freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
         for (const auto &var : varList) {
             freeVars.erase(var->name);
+        }
+    }
+    virtual void staticASTCheck() const override {
+        // check subtrees
+        for (const auto &var : varList) {
+            var->staticASTCheck();  // later may add other checks so keep this
+        }
+        expr->staticASTCheck();
+        // check this
+        std::unordered_set<std::string> varNames;
+        for (const auto &var : varList) {
+            if (varNames.contains(var->name)) {
+                panic("static AST check", "duplicate parameter names", sl);
+            }
+            varNames.insert(var->name);
         }
     }
 
@@ -287,6 +307,22 @@ struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
             freeVars.erase(ve.first->name);
         }
     }
+    virtual void staticASTCheck() const override {
+        // check subtrees
+        for (const auto &ve : varExprList) {
+            ve.first->staticASTCheck();
+            ve.second->staticASTCheck();
+        }
+        expr->staticASTCheck();
+        // check this
+        std::unordered_set<std::string> varNames;
+        for (const auto &ve : varExprList) {
+            if (varNames.contains(ve.first->name)) {
+                panic("static AST check", "duplicate binding names", sl);
+            }
+            varNames.insert(ve.first->name);
+        }
+    }
     
     std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> varExprList;
     std::unique_ptr<ExprNode> expr;
@@ -309,6 +345,11 @@ struct IfNode : public ExprNode { COPY_CONTROL(IfNode);
         freeVars.insert(branch1->freeVars.begin(), branch1->freeVars.end());
         branch2->computeFreeVars();
         freeVars.insert(branch2->freeVars.begin(), branch2->freeVars.end());
+    }
+    virtual void staticASTCheck() const override {
+        cond->staticASTCheck();
+        branch1->staticASTCheck();
+        branch2->staticASTCheck();
     }
 
     std::unique_ptr<ExprNode> cond;
@@ -339,6 +380,11 @@ struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
             freeVars.insert(e->freeVars.begin(), e->freeVars.end());
         }
     }
+    virtual void staticASTCheck() const override {
+        for (const auto &e : exprList) {
+            e->staticASTCheck();
+        }
+    }
 
     std::vector<std::unique_ptr<ExprNode>> exprList;
 };
@@ -362,6 +408,11 @@ struct IntrinsicCallNode : public ExprNode { COPY_CONTROL(IntrinsicCallNode);
         for (auto &e : argList) {
             e->computeFreeVars();
             freeVars.insert(e->freeVars.begin(), e->freeVars.end());
+        }
+    }
+    virtual void staticASTCheck() const override {
+        for (const auto &e : argList) {
+            e->staticASTCheck();
         }
     }
 
@@ -392,6 +443,12 @@ struct ExprCallNode : public ExprNode { COPY_CONTROL(ExprCallNode);
             freeVars.insert(e->freeVars.begin(), e->freeVars.end());
         }
     }
+    virtual void staticASTCheck() const override {
+        expr->staticASTCheck();
+        for (const auto &e : argList) {
+            e->staticASTCheck();
+        }
+    }
 
     std::unique_ptr<ExprNode> expr;
     std::vector<std::unique_ptr<ExprNode>> argList;
@@ -409,6 +466,10 @@ struct AtNode : public ExprNode { COPY_CONTROL(AtNode);
     virtual void computeFreeVars() override {
         expr->computeFreeVars();
         freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
+    }
+    virtual void staticASTCheck() const override {
+        var->staticASTCheck();
+        expr->staticASTCheck();
     }
 
     std::unique_ptr<VariableNode> var;
@@ -1166,6 +1227,7 @@ int main(int argc, char **argv) {
     try {
         auto expr = parse(lex(source));
         expr->computeFreeVars();
+        expr->staticASTCheck();
         State state(expr.get());
         state.execute();
         std::cout << valueToString(state.getResult()) << std::endl;
