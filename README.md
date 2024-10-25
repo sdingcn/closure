@@ -47,7 +47,7 @@ See `test/`.
 + Variables cannot be re-bound.
 + The evaluation order of `lambda` and `letrec` is left-to-right.
 + Simple periodic garbage collection with memory compaction.
-+ No tail-call optimization.
++ Tail-call optimization is fully supported.
 + The language's stacks and heaps are explicit in the implementation,
   so it should be easy to support debugging, exceptions, continuations, threads, coroutines, etc.
 

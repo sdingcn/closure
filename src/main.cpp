@@ -707,15 +707,14 @@ std::string valueToString(const Value &v) {
 // stack layer
 
 struct Layer {
-    Layer(std::shared_ptr<Env> e, const ExprNode *x, bool f = false):
-        env(std::move(e)), expr(x), frame(f) {}
-    bool isFrame() const {
-        return frame;
-    }
+    Layer(std::shared_ptr<Env> e, const ExprNode *x, bool t = false, bool f = false):
+        env(std::move(e)), expr(x), tail(t), frame(f) {}
 
     // one env per frame (closure call layer)
     std::shared_ptr<Env> env;
     const ExprNode *expr;
+    // whether this layer is in the tail position
+    bool tail;
     // whether this is a frame
     bool frame;
     // program counter inside this expr
@@ -727,10 +726,11 @@ struct Layer {
 class State {
 public:
     State(const ExprNode *e) {
-        // the main frame
-        stack.emplace_back(std::make_shared<Env>(), nullptr, true);
+        // the main frame (which cannot be removed by TCO)
+        stack.emplace_back(std::make_shared<Env>(), nullptr, false, true);
         // the first expression (using the env of the main frame)
-        stack.emplace_back(stack.back().env, e);
+        // it cannot be removed by TCO
+        stack.emplace_back(stack.back().env, e, stack.back().tail);
     }
     bool isTerminated() const {
         return stack.back().expr == nullptr;
@@ -810,7 +810,8 @@ public:
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
-                    lnode->expr.get()
+                    lnode->expr.get(),
+                    layer.tail
                 );
             // finish letrec
             } else {
@@ -818,6 +819,7 @@ public:
                 for (int i = 0; i < nParams; i++) {
                     layer.env->pop_back();
                 }
+                // this layer cannot be optimized by TCO because we need nParams to revert env
                 // no need to update resultLoc: inherited from body evaluation
                 stack.pop_back();
             }
@@ -834,9 +836,9 @@ public:
                     panic("runtime", "wrong cond type", layer.expr->sl);
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
-                    stack.emplace_back(layer.env, inode->branch1.get());
+                    stack.emplace_back(layer.env, inode->branch1.get(), layer.tail);
                 } else {
-                    stack.emplace_back(layer.env, inode->branch2.get());
+                    stack.emplace_back(layer.env, inode->branch2.get(), layer.tail);
                 }
             // finish if
             } else {
@@ -845,11 +847,18 @@ public:
             }
         } else if (auto snode = dynamic_cast<const SequenceNode*>(layer.expr)) {
             // evaluate one-by-one
-            if (layer.pc < snode->exprList.size()) {
+            if (layer.pc < snode->exprList.size() - 1) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
                     snode->exprList[layer.pc - 1].get()
+                );
+            } else if (layer.pc == snode->exprList.size() - 1) {
+                layer.pc++;
+                stack.emplace_back(
+                    layer.env,
+                    snode->exprList[layer.pc - 1].get(),
+                    layer.tail
                 );
             // finish
             } else {
@@ -933,11 +942,20 @@ public:
                         argsLoc[i]
                     ));
                 }
+                // tail call optimization
+                if (layer.tail) {
+                    while (!(stack.back().frame)) {
+                        stack.pop_back();
+                    }
+                    // pop the frame
+                    stack.pop_back();
+                }
                 // evaluation of the closure body
                 stack.emplace_back(
                     // new frame has new env
                     std::make_shared<Env>(std::move(newEnv)),
                     closure.fun->expr.get(),
+                    true,
                     true
                 );
             // finish
@@ -1102,7 +1120,7 @@ private:
         // traverse the stack
         for (const auto &layer : stack) {
             // only frames "own" the environments
-            if (layer.isFrame()) {
+            if (layer.frame) {
                 for (const auto &[_, loc] : (*(layer.env))) {
                     traverseLocation(loc);
                 }
@@ -1157,7 +1175,7 @@ private:
         // traverse the stack
         for (auto &layer : stack) {
             // only frames "own" the environments
-            if (layer.isFrame()) {
+            if (layer.frame) {
                 for (auto &[_, loc] : (*(layer.env))) {
                     reloc(loc);
                 }
