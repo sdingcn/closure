@@ -194,17 +194,19 @@ std::deque<Token> lex(std::string source) {
 
 struct ExprNode { COPY_CONTROL(ExprNode);
     ExprNode(SourceLocation s): sl(s) {}
-    virtual std::string toString() const {
-        return "<ExprNode>";
-    }
+    virtual std::string toString() const = 0;
+    virtual void computeFreeVars() = 0;
 
     SourceLocation sl;
+    std::unordered_set<std::string> freeVars;
 };
 
 struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
     IntegerNode(SourceLocation s, int v): ExprNode(s), val(v) {}
     virtual std::string toString() const override {
         return std::to_string(val);
+    }
+    virtual void computeFreeVars() override {
     }
 
     int val;
@@ -215,6 +217,9 @@ struct VariableNode : public ExprNode { COPY_CONTROL(VariableNode);
         ExprNode(s), name(std::move(n)) {}
     virtual std::string toString() const override {
         return name;
+    }
+    virtual void computeFreeVars() override {
+        freeVars.insert(name);
     }
 
     std::string name;
@@ -237,6 +242,13 @@ struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
         ret += ") ";
         ret += expr->toString();
         return ret;
+    }
+    virtual void computeFreeVars() override {
+        expr->computeFreeVars();
+        freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
+        for (const auto &var : varList) {
+            freeVars.erase(var->name);
+        }
     }
 
     std::vector<std::unique_ptr<VariableNode>> varList;
@@ -264,6 +276,17 @@ struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
         ret += expr->toString();
         return ret;
     }
+    virtual void computeFreeVars() override {
+        expr->computeFreeVars();
+        freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
+        for (auto &ve : varExprList) {
+            ve.second->computeFreeVars();
+            freeVars.insert(ve.second->freeVars.begin(), ve.second->freeVars.end());
+        }
+        for (const auto &ve : varExprList) {
+            freeVars.erase(ve.first->name);
+        }
+    }
     
     std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> varExprList;
     std::unique_ptr<ExprNode> expr;
@@ -278,6 +301,14 @@ struct IfNode : public ExprNode { COPY_CONTROL(IfNode);
     ): ExprNode(s), cond(std::move(c)), branch1(std::move(b1)), branch2(std::move(b2)) {}
     virtual std::string toString() const override {
         return "if " + cond->toString() + " " + branch1->toString() + " " + branch2->toString();
+    }
+    virtual void computeFreeVars() override {
+        cond->computeFreeVars();
+        freeVars.insert(cond->freeVars.begin(), cond->freeVars.end());
+        branch1->computeFreeVars();
+        freeVars.insert(branch1->freeVars.begin(), branch1->freeVars.end());
+        branch2->computeFreeVars();
+        freeVars.insert(branch2->freeVars.begin(), branch2->freeVars.end());
     }
 
     std::unique_ptr<ExprNode> cond;
@@ -302,6 +333,12 @@ struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
         ret += "}";
         return ret;
     }
+    virtual void computeFreeVars() override {
+        for (auto &e : exprList) {
+            e->computeFreeVars();
+            freeVars.insert(e->freeVars.begin(), e->freeVars.end());
+        }
+    }
 
     std::vector<std::unique_ptr<ExprNode>> exprList;
 };
@@ -320,6 +357,12 @@ struct IntrinsicCallNode : public ExprNode { COPY_CONTROL(IntrinsicCallNode);
         }
         ret += ")";
         return ret;
+    }
+    virtual void computeFreeVars() override {
+        for (auto &e : argList) {
+            e->computeFreeVars();
+            freeVars.insert(e->freeVars.begin(), e->freeVars.end());
+        }
     }
 
     std::string intrinsic;
@@ -341,6 +384,14 @@ struct ExprCallNode : public ExprNode { COPY_CONTROL(ExprCallNode);
         ret += ")";
         return ret;
     }
+    virtual void computeFreeVars() override {
+        expr->computeFreeVars();
+        freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
+        for (auto &e : argList) {
+            e->computeFreeVars();
+            freeVars.insert(e->freeVars.begin(), e->freeVars.end());
+        }
+    }
 
     std::unique_ptr<ExprNode> expr;
     std::vector<std::unique_ptr<ExprNode>> argList;
@@ -354,6 +405,10 @@ struct AtNode : public ExprNode { COPY_CONTROL(AtNode);
     ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
     virtual std::string toString() const override {
         return "@ " + var->toString() + " " + expr->toString();
+    }
+    virtual void computeFreeVars() override {
+        expr->computeFreeVars();
+        freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
     }
 
     std::unique_ptr<VariableNode> var;
@@ -633,26 +688,40 @@ public:
             resultLoc = _new<Integer>(inode->val);
             stack.pop_back();
         } else if (auto vnode = dynamic_cast<const VariableNode*>(layer.expr)) {
-            auto loc = lookup(vnode->name, *(layer.env));
+            auto varName = vnode->name;
+            auto loc = lookup(varName, *(layer.env));
             if (!loc.has_value()) {
-                panic("runtime", "undefined variable", layer.expr->sl);
+                panic("runtime", "undefined variable " + varName, layer.expr->sl);
             }
             resultLoc = loc.value();
             stack.pop_back();
         } else if (auto lnode = dynamic_cast<const LambdaNode*>(layer.expr)) {
-            // copy the env into the closure
-            resultLoc = _new<Closure>(*(layer.env), lnode);
+            // copy the statically used part of the env into the closure
+            Env savedEnv;
+            auto usedVars = lnode->freeVars;
+            for (auto ptr = layer.env->rbegin(); ptr != layer.env->rend(); ptr++) {
+                if (usedVars.empty()) {
+                    break;
+                }
+                if (usedVars.contains(ptr->first)) {
+                    savedEnv.push_back(*ptr);
+                    usedVars.erase(ptr->first);
+                }
+            }
+            std::reverse(savedEnv.begin(), savedEnv.end());
+            resultLoc = _new<Closure>(savedEnv, lnode);
             stack.pop_back();
         } else if (auto lnode = dynamic_cast<const LetrecNode*>(layer.expr)) {
             // unified argument recording
             if (layer.pc > 1 && layer.pc <= lnode->varExprList.size() + 1) {
+                auto varName = lnode->varExprList[layer.pc - 2].first->name;
                 auto loc = lookup(
-                    lnode->varExprList[layer.pc - 2].first->name,
+                    varName,
                     *(layer.env)
                 );
                 // this shouldn't happen since those variables are newly introduced by letrec
                 if (!loc.has_value()) {
-                    panic("runtime", "undefined variable", layer.expr->sl);
+                    panic("runtime", "undefined variable " + varName, layer.expr->sl);
                 }
                 // copy (inherited resultLoc)
                 heap[loc.value()] = heap[resultLoc];
@@ -825,12 +894,13 @@ public:
                 if (!std::holds_alternative<Closure>(heap[resultLoc])) {
                     panic("runtime", "@ wrong type", layer.expr->sl);
                 }
+                auto varName = anode->var->name;
                 auto loc = lookup(
-                    anode->var->name,
+                    varName,
                     std::get<Closure>(heap[resultLoc]).env
                 );
                 if (!loc.has_value()) {
-                    panic("runtime", "undefined variable", layer.expr->sl);
+                    panic("runtime", "undefined variable " + varName, layer.expr->sl);
                 }
                 // "access by reference"
                 resultLoc = loc.value();
@@ -1095,6 +1165,7 @@ int main(int argc, char **argv) {
     std::string source = readSource(argv[1]);
     try {
         auto expr = parse(lex(source));
+        expr->computeFreeVars();
         State state(expr.get());
         state.execute();
         std::cout << valueToString(state.getResult()) << std::endl;

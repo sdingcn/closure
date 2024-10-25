@@ -9,27 +9,7 @@ with the special syntax `@`, which is the origin of this language's name.
 
 ## code example
 
-```
-letrec (
-    leaf lambda () lambda () 0
-    node lambda (value left right) lambda () 1
-    # in-order DFS
-    dfs lambda (tree)
-        if (.< (tree) 1)
-        (.void)
-        {
-            (dfs @left tree)
-            (.put @value tree)
-            (dfs @right tree)
-        }
-)
-(dfs
-    (node 4
-        (node 2
-            (node 1 (leaf) (leaf))
-            (node 3 (leaf) (leaf)))
-        (node 5 (leaf) (leaf))))
-```
+See `test/`.
 
 ## syntax
 

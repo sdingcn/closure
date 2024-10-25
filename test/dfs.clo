@@ -1,6 +1,8 @@
 letrec (
-    leaf lambda () lambda () 0
-    node lambda (value left right) lambda () 1
+    leaf lambda ()
+        lambda () 0
+    node lambda (value left right)
+        lambda () if 0 { value left right } 1  # dummy uses ensure saving arguments to closure
     # in-order DFS
     dfs lambda (tree)
         if (.< (tree) 1)
