@@ -1127,7 +1127,7 @@ private:
             return Integer(v);
         } else if (name == ".put") {
             _typecheck<Integer>(sl, args);
-            std::cout << std::get<Integer>(heap[args[0]]).value << std::endl;
+            std::cout << std::get<Integer>(heap[args[0]]).value << '\n';
             return Void();
         } else {
             panic("runtime", "unrecognized intrinsic call", sl);
