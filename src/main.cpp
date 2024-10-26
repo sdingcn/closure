@@ -184,7 +184,7 @@ std::deque<Token> lex(std::string source) {
 }
 
 // ------------------------------
-// AST and parser
+// AST, parser, and static analysis
 // ------------------------------
 
 #define COPY_CONTROL(CLASS)\
@@ -195,11 +195,13 @@ std::deque<Token> lex(std::string source) {
 struct ExprNode { COPY_CONTROL(ExprNode);
     ExprNode(SourceLocation s): sl(s) {}
     virtual std::string toString() const = 0;
-    virtual void computeFreeVars() = 0;
     virtual void staticASTCheck() const = 0;
+    virtual void computeFreeVars() = 0;
+    virtual void computeTail(bool parentTail) = 0;
 
     SourceLocation sl;
     std::unordered_set<std::string> freeVars;
+    bool tail = false;
 };
 
 struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
@@ -207,9 +209,12 @@ struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
     virtual std::string toString() const override {
         return std::to_string(val);
     }
+    virtual void staticASTCheck() const override {
+    }
     virtual void computeFreeVars() override {
     }
-    virtual void staticASTCheck() const override {
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
     }
 
     int val;
@@ -221,10 +226,13 @@ struct VariableNode : public ExprNode { COPY_CONTROL(VariableNode);
     virtual std::string toString() const override {
         return name;
     }
+    virtual void staticASTCheck() const override {
+    }
     virtual void computeFreeVars() override {
         freeVars.insert(name);
     }
-    virtual void staticASTCheck() const override {
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
     }
 
     std::string name;
@@ -248,13 +256,6 @@ struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
         ret += expr->toString();
         return ret;
     }
-    virtual void computeFreeVars() override {
-        expr->computeFreeVars();
-        freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
-        for (const auto &var : varList) {
-            freeVars.erase(var->name);
-        }
-    }
     virtual void staticASTCheck() const override {
         // check subtrees
         for (const auto &var : varList) {
@@ -269,6 +270,20 @@ struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
             }
             varNames.insert(var->name);
         }
+    }
+    virtual void computeFreeVars() override {
+        expr->computeFreeVars();
+        freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
+        for (const auto &var : varList) {
+            freeVars.erase(var->name);
+        }
+    }
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
+        for (auto &var : varList) {
+            var->computeTail(false);
+        }
+        expr->computeTail(true);
     }
 
     std::vector<std::unique_ptr<VariableNode>> varList;
@@ -296,17 +311,6 @@ struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
         ret += expr->toString();
         return ret;
     }
-    virtual void computeFreeVars() override {
-        expr->computeFreeVars();
-        freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
-        for (auto &ve : varExprList) {
-            ve.second->computeFreeVars();
-            freeVars.insert(ve.second->freeVars.begin(), ve.second->freeVars.end());
-        }
-        for (const auto &ve : varExprList) {
-            freeVars.erase(ve.first->name);
-        }
-    }
     virtual void staticASTCheck() const override {
         // check subtrees
         for (const auto &ve : varExprList) {
@@ -323,6 +327,25 @@ struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
             varNames.insert(ve.first->name);
         }
     }
+    virtual void computeFreeVars() override {
+        expr->computeFreeVars();
+        freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
+        for (auto &ve : varExprList) {
+            ve.second->computeFreeVars();
+            freeVars.insert(ve.second->freeVars.begin(), ve.second->freeVars.end());
+        }
+        for (const auto &ve : varExprList) {
+            freeVars.erase(ve.first->name);
+        }
+    }
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
+        for (auto &ve : varExprList) {
+            ve.first->computeTail(false);
+            ve.second->computeTail(false);
+        }
+        expr->computeTail(tail);
+    }
     
     std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> varExprList;
     std::unique_ptr<ExprNode> expr;
@@ -338,6 +361,11 @@ struct IfNode : public ExprNode { COPY_CONTROL(IfNode);
     virtual std::string toString() const override {
         return "if " + cond->toString() + " " + branch1->toString() + " " + branch2->toString();
     }
+    virtual void staticASTCheck() const override {
+        cond->staticASTCheck();
+        branch1->staticASTCheck();
+        branch2->staticASTCheck();
+    }
     virtual void computeFreeVars() override {
         cond->computeFreeVars();
         freeVars.insert(cond->freeVars.begin(), cond->freeVars.end());
@@ -346,10 +374,11 @@ struct IfNode : public ExprNode { COPY_CONTROL(IfNode);
         branch2->computeFreeVars();
         freeVars.insert(branch2->freeVars.begin(), branch2->freeVars.end());
     }
-    virtual void staticASTCheck() const override {
-        cond->staticASTCheck();
-        branch1->staticASTCheck();
-        branch2->staticASTCheck();
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
+        cond->computeTail(false);
+        branch1->computeTail(tail);
+        branch2->computeTail(tail);
     }
 
     std::unique_ptr<ExprNode> cond;
@@ -374,16 +403,24 @@ struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
         ret += "}";
         return ret;
     }
+    virtual void staticASTCheck() const override {
+        for (const auto &e : exprList) {
+            e->staticASTCheck();
+        }
+    }
     virtual void computeFreeVars() override {
         for (auto &e : exprList) {
             e->computeFreeVars();
             freeVars.insert(e->freeVars.begin(), e->freeVars.end());
         }
     }
-    virtual void staticASTCheck() const override {
-        for (const auto &e : exprList) {
-            e->staticASTCheck();
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
+        int n = exprList.size();
+        for (int i = 0; i < n - 1; i++) {
+            exprList[i]->computeTail(false);
         }
+        exprList[n - 1]->computeTail(tail);
     }
 
     std::vector<std::unique_ptr<ExprNode>> exprList;
@@ -404,15 +441,21 @@ struct IntrinsicCallNode : public ExprNode { COPY_CONTROL(IntrinsicCallNode);
         ret += ")";
         return ret;
     }
+    virtual void staticASTCheck() const override {
+        for (const auto &e : argList) {
+            e->staticASTCheck();
+        }
+    }
     virtual void computeFreeVars() override {
         for (auto &e : argList) {
             e->computeFreeVars();
             freeVars.insert(e->freeVars.begin(), e->freeVars.end());
         }
     }
-    virtual void staticASTCheck() const override {
-        for (const auto &e : argList) {
-            e->staticASTCheck();
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
+        for (auto &e : argList) {
+            e->computeTail(false);
         }
     }
 
@@ -435,6 +478,12 @@ struct ExprCallNode : public ExprNode { COPY_CONTROL(ExprCallNode);
         ret += ")";
         return ret;
     }
+    virtual void staticASTCheck() const override {
+        expr->staticASTCheck();
+        for (const auto &e : argList) {
+            e->staticASTCheck();
+        }
+    }
     virtual void computeFreeVars() override {
         expr->computeFreeVars();
         freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
@@ -443,10 +492,11 @@ struct ExprCallNode : public ExprNode { COPY_CONTROL(ExprCallNode);
             freeVars.insert(e->freeVars.begin(), e->freeVars.end());
         }
     }
-    virtual void staticASTCheck() const override {
-        expr->staticASTCheck();
-        for (const auto &e : argList) {
-            e->staticASTCheck();
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
+        expr->computeTail(false);
+        for (auto &e : argList) {
+            e->computeTail(false);
         }
     }
 
@@ -463,13 +513,18 @@ struct AtNode : public ExprNode { COPY_CONTROL(AtNode);
     virtual std::string toString() const override {
         return "@ " + var->toString() + " " + expr->toString();
     }
+    virtual void staticASTCheck() const override {
+        var->staticASTCheck();
+        expr->staticASTCheck();
+    }
     virtual void computeFreeVars() override {
         expr->computeFreeVars();
         freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
     }
-    virtual void staticASTCheck() const override {
-        var->staticASTCheck();
-        expr->staticASTCheck();
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
+        var->computeTail(false);
+        expr->computeTail(false);
     }
 
     std::unique_ptr<VariableNode> var;
@@ -707,14 +762,12 @@ std::string valueToString(const Value &v) {
 // stack layer
 
 struct Layer {
-    Layer(std::shared_ptr<Env> e, const ExprNode *x, bool t = false, bool f = false):
-        env(std::move(e)), expr(x), tail(t), frame(f) {}
+    Layer(std::shared_ptr<Env> e, const ExprNode *x, bool f = false):
+        env(std::move(e)), expr(x), frame(f) {}
 
     // one env per frame (closure call layer)
     std::shared_ptr<Env> env;
     const ExprNode *expr;
-    // whether this layer is in the tail position
-    bool tail;
     // whether this is a frame
     bool frame;
     // program counter inside this expr
@@ -727,10 +780,9 @@ class State {
 public:
     State(const ExprNode *e) {
         // the main frame (which cannot be removed by TCO)
-        stack.emplace_back(std::make_shared<Env>(), nullptr, false, true);
+        stack.emplace_back(std::make_shared<Env>(), nullptr, true);
         // the first expression (using the env of the main frame)
-        // it cannot be removed by TCO
-        stack.emplace_back(stack.back().env, e, stack.back().tail);
+        stack.emplace_back(stack.back().env, e);
     }
     bool isTerminated() const {
         return stack.back().expr == nullptr;
@@ -810,8 +862,7 @@ public:
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
-                    lnode->expr.get(),
-                    layer.tail
+                    lnode->expr.get()
                 );
             // finish letrec
             } else {
@@ -836,9 +887,9 @@ public:
                     panic("runtime", "wrong cond type", layer.expr->sl);
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
-                    stack.emplace_back(layer.env, inode->branch1.get(), layer.tail);
+                    stack.emplace_back(layer.env, inode->branch1.get());
                 } else {
-                    stack.emplace_back(layer.env, inode->branch2.get(), layer.tail);
+                    stack.emplace_back(layer.env, inode->branch2.get());
                 }
             // finish if
             } else {
@@ -847,18 +898,11 @@ public:
             }
         } else if (auto snode = dynamic_cast<const SequenceNode*>(layer.expr)) {
             // evaluate one-by-one
-            if (layer.pc < snode->exprList.size() - 1) {
+            if (layer.pc < snode->exprList.size()) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
                     snode->exprList[layer.pc - 1].get()
-                );
-            } else if (layer.pc == snode->exprList.size() - 1) {
-                layer.pc++;
-                stack.emplace_back(
-                    layer.env,
-                    snode->exprList[layer.pc - 1].get(),
-                    layer.tail
                 );
             // finish
             } else {
@@ -943,7 +987,7 @@ public:
                     ));
                 }
                 // tail call optimization
-                if (layer.tail) {
+                if (cnode->tail) {
                     while (!(stack.back().frame)) {
                         stack.pop_back();
                     }
@@ -955,7 +999,6 @@ public:
                     // new frame has new env
                     std::make_shared<Env>(std::move(newEnv)),
                     closure.fun->expr.get(),
-                    true,
                     true
                 );
             // finish
@@ -1244,8 +1287,9 @@ int main(int argc, char **argv) {
     std::string source = readSource(argv[1]);
     try {
         auto expr = parse(lex(source));
-        expr->computeFreeVars();
         expr->staticASTCheck();
+        expr->computeFreeVars();
+        expr->computeTail(false);
         State state(expr.get());
         state.execute();
         std::cout << valueToString(state.getResult()) << std::endl;
