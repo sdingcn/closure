@@ -1,0 +1,78 @@
+letrec  # the list data structure and its functions
+(
+    null lambda ()
+        lambda () 0
+
+    pair lambda (head tail)
+        lambda () if 0 { head tail } 1
+
+    isnull lambda (list)
+        (.< (list) 1)
+
+    ispair lambda (list)
+        (.< 0 (list))
+
+    car lambda (list)
+        @head list
+
+    cdr lambda (list)
+        @tail list
+
+    len lambda (list)
+        if (isnull list)
+        0
+        (.+ 1 (len (cdr list)))
+
+    filter lambda (f list)
+        if (isnull list)
+        list
+        letrec
+        (
+            h (car list)
+            t (cdr list)
+            ok (f h)
+        )
+            if ok
+            (pair h (filter f t))
+            (filter f t)
+
+    concat lambda (l1 l2)
+        if (isnull l1)
+        l2
+        (pair (car l1) (concat (cdr l1) l2))
+)
+
+letrec  # IO for lists
+(
+    readlist lambda (n)
+        if (.< n 1)
+        (null)
+        (pair (.get) (readlist (.- n 1)))
+
+    writelist lambda (list)
+        if (isnull list)
+        (.void)
+        {
+            (.put (car list))
+            (writelist (cdr list))
+        }
+)
+
+letrec  # quicksort
+(
+    quicksort lambda (list)
+        if (.< (len list) 2)
+        list
+        letrec
+        (
+            pivot (car list)
+            tail (cdr list)
+            left (quicksort (filter lambda (x) (.< x pivot) tail))
+            right (quicksort (filter lambda (x) (.< (.< x pivot) 1) tail))
+        )
+            (concat left (pair pivot right))
+)
+
+letrec (n (.get))
+letrec (list (readlist n))
+(writelist (quicksort list))

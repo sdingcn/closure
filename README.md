@@ -6,7 +6,6 @@ This is an interpreted functional programming language
 with first-class functions, recursions, and garbage collection.
 Struct operations could be simulated by function closures
 using the special syntax `@`, which is the origin of this language's name.
-
 See `test/` for code examples.
 
 ## syntax
@@ -35,15 +34,15 @@ See `test/` for code examples.
 ## semantics and implementation details
 
 + Reference semantics (unobservable):
-  variables are references to (locations of) objects;
+  variables are references (locations) of objects;
   expressions evaluate to references;
   both `letrec` and `( <callee> <expr>* )` use pass-by-reference.
-+ Three object types, all immutable: Void (0), Int (1), Closure (2).
++ Three immutable object types: Void (0), Int (1), Closure (2).
   Closures only include statically used variables.
 + Variables cannot be re-bound.
 + The evaluation order of `lambda` and `letrec` is left-to-right.
 + Simple periodic garbage collection with memory compaction.
-+ Tail-call optimization is supported.
++ Full tail-call optimization.
 + The language's stacks and heaps are explicit in the implementation,
   so it should be easy to support debugging, exceptions, continuations, threads, coroutines, etc.
 
@@ -52,7 +51,7 @@ See `test/` for code examples.
 + `cmake` >= 3.28.1
 + a reasonable version of `make`
 + `clang++` with support of C++20
-+ `python3`
++ `python3` (only needed for `run_test.py`)
 
 ## build (on Linux/macOS)
 
@@ -72,4 +71,4 @@ make
 build/closure <source-path>
 ```
 
-To run all tests, do `python3 run_test.py`.
+`python3 run_test.py` runs all tests.
