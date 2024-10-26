@@ -62,7 +62,7 @@ See `test/`.
 
 ```
 mkdir build
-cmake -DCMAKE_BUILD_TYPE:STRING=Debug \
+cmake -DCMAKE_BUILD_TYPE:STRING=Release \
       -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) \
       -S src -B build \
       -G "Unix Makefiles"

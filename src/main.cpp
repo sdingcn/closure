@@ -826,7 +826,7 @@ public:
             stack.pop_back();
         } else if (auto lnode = dynamic_cast<const LetrecNode*>(layer.expr)) {
             // unified argument recording
-            if (layer.pc > 1 && layer.pc <= lnode->varExprList.size() + 1) {
+            if (layer.pc > 1 && layer.pc <= static_cast<int>(lnode->varExprList.size()) + 1) {
                 auto varName = lnode->varExprList[layer.pc - 2].first->name;
                 auto loc = lookup(
                     varName,
@@ -849,7 +849,7 @@ public:
                     ));
                 }
             // evaluate bindings
-            } else if (layer.pc <= lnode->varExprList.size()) {
+            } else if (layer.pc <= static_cast<int>(lnode->varExprList.size())) {
                 layer.pc++;
                 // note: growing the stack might invalidate the reference "layer"
                 //       but this is fine since next time "layer" will be re-bound
@@ -858,7 +858,7 @@ public:
                     lnode->varExprList[layer.pc - 2].second.get()
                 );
             // evaluate body
-            } else if (layer.pc == lnode->varExprList.size() + 1) {
+            } else if (layer.pc == static_cast<int>(lnode->varExprList.size()) + 1) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
@@ -898,7 +898,7 @@ public:
             }
         } else if (auto snode = dynamic_cast<const SequenceNode*>(layer.expr)) {
             // evaluate one-by-one
-            if (layer.pc < snode->exprList.size()) {
+            if (layer.pc < static_cast<int>(snode->exprList.size())) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
@@ -912,7 +912,7 @@ public:
             }
         } else if (auto cnode = dynamic_cast<const IntrinsicCallNode*>(layer.expr)) {
             // unified argument recording
-            if (layer.pc > 1 && layer.pc <= cnode->argList.size() + 1) {
+            if (layer.pc > 1 && layer.pc <= static_cast<int>(cnode->argList.size()) + 1) {
                 // it's guaranteed to contain the vector alternative
                 std::get<std::vector<Location>>(layer.local["args"]).push_back(resultLoc);
             }
@@ -921,7 +921,7 @@ public:
                 layer.pc++;
                 layer.local["args"] = std::vector<Location>();
             // evaluate arguments
-            } else if (layer.pc <= cnode->argList.size()) {
+            } else if (layer.pc <= static_cast<int>(cnode->argList.size())) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
@@ -940,7 +940,7 @@ public:
             }
         } else if (auto cnode = dynamic_cast<const ExprCallNode*>(layer.expr)) {
             // unified argument recording
-            if (layer.pc > 2 && layer.pc <= cnode->argList.size() + 2) {
+            if (layer.pc > 2 && layer.pc <= static_cast<int>(cnode->argList.size()) + 2) {
                 std::get<std::vector<Location>>(layer.local["args"]).push_back(resultLoc);
             }
             // evaluate the callee
@@ -957,14 +957,14 @@ public:
                 layer.local["expr"] = resultLoc;
                 layer.local["args"] = std::vector<Location>();
             // evaluate arguments
-            } else if (layer.pc <= cnode->argList.size() + 1) {
+            } else if (layer.pc <= static_cast<int>(cnode->argList.size()) + 1) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
                     cnode->argList[layer.pc - 3].get()
                 );
             // call
-            } else if (layer.pc == cnode->argList.size() + 2) {
+            } else if (layer.pc == static_cast<int>(cnode->argList.size()) + 2) {
                 layer.pc++;
                 auto &exprLoc = std::get<Location>(layer.local["expr"]);
                 auto &argsLoc = std::get<std::vector<Location>>(layer.local["args"]);
