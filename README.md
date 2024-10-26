@@ -2,14 +2,12 @@
 
 ![](https://github.com/sdingcn/closure/actions/workflows/run_test.yml/badge.svg)
 
-This is a small functional programming language with first-class functions,
-recursions, and mark-and-sweep garbage collection with memory compaction.
-(Immutable) records / structs could be simulated by function closures
-with the special syntax `@`, which is the origin of this language's name.
+This is an interpreted functional programming language
+with first-class functions, recursions, and garbage collection.
+Struct operations could be simulated by function closures
+using the special syntax `@`, which is the origin of this language's name.
 
-## code example
-
-See `test/`.
+See `test/` for code examples.
 
 ## syntax
 
@@ -20,8 +18,7 @@ See `test/`.
 <intrinsic> := .void
              | .+ | .- | .* | ./ | .% | .<
              | .type  // returns an integer representation (see below) of the object's type
-                      // an object's type never changes during its lifetime
-             | .get | .put  // gets an integer / puts an integer with a newline
+             | .get | .put  // integer IO (.put prints one integer per line)
 <vepair>    := <variable> <expr>
 
 <expr> := <integer>
@@ -32,22 +29,21 @@ See `test/`.
         | { <expr>+ }  // sequenced evaluation
         | ( <intrinsic> <expr>* )
         | ( <expr> <expr>* )
-        | @ <variable> <expr>  // access a closure's environment variable
+        | @ <variable> <expr>  // accesses a closure's environment variable
 ```
 
 ## semantics and implementation details
 
 + Reference semantics (unobservable):
-  variables are references to objects;
-  expressions evaluate to references of objects;
+  variables are references to (locations of) objects;
+  expressions evaluate to references;
   both `letrec` and `( <callee> <expr>* )` use pass-by-reference.
 + Three object types, all immutable: Void (0), Int (1), Closure (2).
   Closures only include statically used variables.
-  Closures can be used as records / structs as shown in `test/dfs.clo`.
 + Variables cannot be re-bound.
 + The evaluation order of `lambda` and `letrec` is left-to-right.
 + Simple periodic garbage collection with memory compaction.
-+ Tail-call optimization is fully supported.
++ Tail-call optimization is supported.
 + The language's stacks and heaps are explicit in the implementation,
   so it should be easy to support debugging, exceptions, continuations, threads, coroutines, etc.
 
