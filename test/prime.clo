@@ -1,0 +1,15 @@
+letrec (
+    eq lambda (a b) (.< (.+ (.< a b) (.< b a)) 1)
+    not lambda (n) if (eq n 0) 1 0
+    neq lambda (a b) (not (eq a b))
+    or lambda (b1 b2) (neq (.+ (eq b1 0) (eq b2 0)) 2)
+    and lambda (b1 b2) (eq (.+ (neq b1 0) (neq b2 0)) 2)
+    finddiv lambda (n d acc)
+        if (.< n (.* d d))
+        acc
+        (finddiv n (.+ d 1) (or (eq 0 (.% n d)) acc))
+    isprime lambda (n)
+        if (.< n 2)
+        0
+        (not (finddiv n 2 0))
+) (isprime (.get))
