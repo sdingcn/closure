@@ -23,8 +23,14 @@ def build() -> None:
     if os.path.exists("build"):
         shutil.rmtree("build")
     os.mkdir("build")
-    execute(["cmake", "-DCMAKE_BUILD_TYPE:STRING=Release", "-S", "src", "-B", "build"])
-    execute(["cmake", "--build", "build"])
+    gen_code, _, _, = execute(
+        ["cmake", "-DCMAKE_BUILD_TYPE:STRING=Release", "-S", "src", "-B", "build"]
+    )
+    if gen_code:
+        sys.exit("cmake failed")
+    build_code, _, _ = execute(["cmake", "--build", "build"])
+    if build_code:
+        sys.exit("cmake --build failed")
     end = time.time()
     print(f"completed in {end - start:.3f} seconds")
 
@@ -41,9 +47,11 @@ def test() -> None:
                 start = time.time()
                 res = execute(["build/closure", filepath], io["in"])
                 end = time.time()
-                if ((res[0] == 0) == (io["err"] == "") and
+                if (
+                    (res[0] == 0) == (io["err"] == "") and
                     res[1] == io["out"] and
-                    res[2] == io["err"]):
+                    res[2] == io["err"]
+                ):
                     print(f"passed in {end - start:.3f} seconds")
                 else:
                     sys.exit(f'failed\nres = {res}\ntruth = {(io["out"], io["err"])}')
