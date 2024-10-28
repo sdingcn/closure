@@ -1,6 +1,7 @@
 import json
 import os
 import os.path
+import shutil
 import subprocess
 import sys
 import time
@@ -15,9 +16,15 @@ def execute(cmd: List[str], i: Union[None, str] = None) -> Tuple[int, str, str]:
     )
     return (result.returncode, result.stdout, result.stderr)
 
-if __name__ == "__main__":
-    if not os.path.exists("build/closure"):
-        sys.exit("please build the project before running the tests")
+def build() -> None:
+    print("building the project ...")
+    if os.path.exists("build"):
+        shutil.rmtree("build")
+    os.mkdir("build")
+    execute(["cmake", "-DCMAKE_BUILD_TYPE:STRING=Release", "-S", "src", "-B", "build"])
+    execute(["cmake", "--build", "build"])
+
+def test() -> None:
     for dirpath, _, filenames in os.walk("test/"):
         for filename in filenames:
             if filename.endswith(".clo"):
@@ -37,3 +44,7 @@ if __name__ == "__main__":
                 else:
                     sys.exit(f'failed\nres = {res}\ntruth = {(io["out"], io["err"])}')
                 sys.stdout.flush()
+
+if __name__ == "__main__":
+    build()
+    test()

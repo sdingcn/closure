@@ -5,11 +5,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir build
-        working-directory: .
-      - run: cmake -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) -S src -B build -G "Unix Makefiles"
-        working-directory: .
-      - run: make
-        working-directory: build/
       - run: python3 run_test.py
         working-directory: .

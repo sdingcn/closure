@@ -49,26 +49,27 @@ See `test/` for code examples.
 ## dependencies
 
 + `cmake` >= 3.28.1
-+ a reasonable version of `make`
-+ `clang++` with support of C++20
++ a C++20 compiler (e.g. `clang++`) and a build system (e.g. `make`)
 + `python3` (only needed for `run_test.py`)
 
-## build (on Linux/macOS)
+## build (on Linux/macOS) and run
+
+### manual
 
 ```
 mkdir build
-cmake -DCMAKE_BUILD_TYPE:STRING=Release \
-      -DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++) \
-      -S src -B build \
-      -G "Unix Makefiles"
-cd build
-make
+cmake -DCMAKE_BUILD_TYPE:STRING=Release -S src -B build
+cmake --build build
 ```
-
-## run
 
 ```
 build/closure <source-path>
 ```
 
-`python3 run_test.py` runs all tests.
+### automatic
+
+The following command removes previous builds (if any), builds the interpreter, and runs all tests.
+
+```
+python3 run_test.py
+```
