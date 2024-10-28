@@ -17,12 +17,16 @@ def execute(cmd: List[str], i: Union[None, str] = None) -> Tuple[int, str, str]:
     return (result.returncode, result.stdout, result.stderr)
 
 def build() -> None:
-    print("building the project ...")
+    print("building the project ... ", end = "")
+    sys.stdout.flush()
+    start = time.time()
     if os.path.exists("build"):
         shutil.rmtree("build")
     os.mkdir("build")
     execute(["cmake", "-DCMAKE_BUILD_TYPE:STRING=Release", "-S", "src", "-B", "build"])
     execute(["cmake", "--build", "build"])
+    end = time.time()
+    print(f"completed in {end - start:.3f} seconds")
 
 def test() -> None:
     for dirpath, _, filenames in os.walk("test/"):
