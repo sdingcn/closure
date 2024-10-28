@@ -773,7 +773,7 @@ struct Layer {
     // program counter inside this expr
     int pc = 0;
     // temporary local information for evaluation
-    std::unordered_map<std::string, std::variant<Location, std::vector<Location>>> local;
+    std::vector<Location> local;
 };
 
 class State {
@@ -913,13 +913,11 @@ public:
         } else if (auto cnode = dynamic_cast<const IntrinsicCallNode*>(layer.expr)) {
             // unified argument recording
             if (layer.pc > 1 && layer.pc <= static_cast<int>(cnode->argList.size()) + 1) {
-                // it's guaranteed to contain the vector alternative
-                std::get<std::vector<Location>>(layer.local["args"]).push_back(resultLoc);
+                layer.local.push_back(resultLoc);
             }
             // initialization
             if (layer.pc == 0) {
                 layer.pc++;
-                layer.local["args"] = std::vector<Location>();
             // evaluate arguments
             } else if (layer.pc <= static_cast<int>(cnode->argList.size())) {
                 layer.pc++;
@@ -933,7 +931,7 @@ public:
                     layer.expr->sl,
                     cnode->intrinsic,
                     // intrinsic call is pass by reference
-                    std::get<std::vector<Location>>(layer.local["args"])
+                    layer.local
                 );
                 resultLoc = _moveNew(std::move(value));
                 stack.pop_back();
@@ -941,7 +939,7 @@ public:
         } else if (auto cnode = dynamic_cast<const ExprCallNode*>(layer.expr)) {
             // unified argument recording
             if (layer.pc > 2 && layer.pc <= static_cast<int>(cnode->argList.size()) + 2) {
-                std::get<std::vector<Location>>(layer.local["args"]).push_back(resultLoc);
+                layer.local.push_back(resultLoc);
             }
             // evaluate the callee
             if (layer.pc == 0) {
@@ -954,8 +952,7 @@ public:
             } else if (layer.pc == 1) {
                 layer.pc++;
                 // inherited callee location
-                layer.local["expr"] = resultLoc;
-                layer.local["args"] = std::vector<Location>();
+                layer.local.push_back(resultLoc);
             // evaluate arguments
             } else if (layer.pc <= static_cast<int>(cnode->argList.size()) + 1) {
                 layer.pc++;
@@ -966,24 +963,26 @@ public:
             // call
             } else if (layer.pc == static_cast<int>(cnode->argList.size()) + 2) {
                 layer.pc++;
-                auto &exprLoc = std::get<Location>(layer.local["expr"]);
-                auto &argsLoc = std::get<std::vector<Location>>(layer.local["args"]);
+                auto exprLoc = layer.local[0];
                 if (!std::holds_alternative<Closure>(heap[exprLoc])) {
                     panic("runtime", "calling a non-callable", layer.expr->sl);
                 }
                 auto &closure = std::get<Closure>(heap[exprLoc]);
                 // types will be checked inside the closure call
-                if (argsLoc.size() != closure.fun->varList.size()) {
+                if (
+                    static_cast<int>(layer.local.size()) - 1 !=
+                    static_cast<int>(closure.fun->varList.size())
+                ) {
                     panic("runtime", "wrong number of arguments", layer.expr->sl);
                 }
-                int nArgs = argsLoc.size();
+                int nArgs = static_cast<int>(closure.fun->varList.size());
                 // lexical scope: copy the env from the closure definition place
                 auto newEnv = closure.env;
                 for (int i = 0; i < nArgs; i++) {
                     // closure call is pass by reference
                     newEnv.push_back(std::make_pair(
                         closure.fun->varList[i]->name,
-                        argsLoc[i]
+                        layer.local[i + 1]
                     ));
                 }
                 // tail call optimization
@@ -1169,15 +1168,8 @@ private:
                 }
             }
             // but each layer can still have locals
-            for (const auto &[_, v] : layer.local) {
-                if (std::holds_alternative<Location>(v)) {
-                    traverseLocation(std::get<Location>(v));
-                } else {
-                    const auto &vec = std::get<std::vector<Location>>(v);
-                    for (const auto &loc : vec) {
-                        traverseLocation(loc);
-                    }
-                }
+            for (const auto v : layer.local) {
+                traverseLocation(v);
             }
         }
         // traverse the resultLoc
@@ -1224,15 +1216,8 @@ private:
                 }
             }
             // but each layer can still have locals
-            for (auto &[_, v] : layer.local) {
-                if (std::holds_alternative<Location>(v)) {
-                    reloc(std::get<Location>(v));
-                } else {
-                    auto &vec = std::get<std::vector<Location>>(v);
-                    for (auto &loc : vec) {
-                        reloc(loc);
-                    }
-                }
+            for (auto &v : layer.local) {
+                reloc(v);
             }
         }
         // traverse the resultLoc
