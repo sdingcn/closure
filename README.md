@@ -41,7 +41,7 @@ See `test/` for code examples.
   Closures only include statically used variables.
 + Variables cannot be re-bound.
 + The evaluation order of `lambda` and `letrec` is left-to-right.
-+ Simple periodic garbage collection with memory compaction.
++ Dynamic-threshold-based garbage collection with memory compaction.
 + Full tail-call optimization.
 + The language's stacks and heaps are explicit in the implementation,
   so it should be easy to support debugging, exceptions, continuations, threads, coroutines, etc.

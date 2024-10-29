@@ -1033,12 +1033,16 @@ public:
         return true;
     }
     void execute() {
-        static constexpr int GC_INTERVAL = 1000;
-        int ctr = 0;
+        // can choose different initial values here
+        int gc_threshold = 64;
         while (step()) {
-            ctr++;
-            if (ctr && (ctr % GC_INTERVAL == 0)) {
-                _gc();
+            int total = heap.size();
+            if (total > gc_threshold) {
+                int removed = _gc();
+                int live = total - removed;
+                // see also "Optimal heap limits for reducing browser memory use" (OOPSLA 2022)
+                // for the square root solution
+                gc_threshold = live * 2;
             }
         }
     }
