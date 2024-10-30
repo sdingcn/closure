@@ -784,13 +784,10 @@ public:
         // the first expression (using the env of the main frame)
         stack.emplace_back(stack.back().env, e);
     }
-    bool isTerminated() const {
-        return stack.back().expr == nullptr;
-    }
     // returns true iff the step is completed without reaching the end of evaluation
     bool step() {
         // be careful! this reference may be invalidated after modifying the stack
-        // so always keep stack change as the last operation
+        // so always keep stack change as the last operation(s)
         auto &layer = stack.back();
         // main frame; end of evaluation
         if (layer.expr == nullptr) {
@@ -912,18 +909,15 @@ public:
             }
         } else if (auto cnode = dynamic_cast<const IntrinsicCallNode*>(layer.expr)) {
             // unified argument recording
-            if (layer.pc > 1 && layer.pc <= static_cast<int>(cnode->argList.size()) + 1) {
+            if (layer.pc > 0 && layer.pc <= static_cast<int>(cnode->argList.size())) {
                 layer.local.push_back(resultLoc);
             }
-            // initialization
-            if (layer.pc == 0) {
-                layer.pc++;
             // evaluate arguments
-            } else if (layer.pc <= static_cast<int>(cnode->argList.size())) {
+            if (layer.pc < static_cast<int>(cnode->argList.size())) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
-                    cnode->argList[layer.pc - 2].get()
+                    cnode->argList[layer.pc - 1].get()
                 );
             // intrinsic call doesn't grow the stack
             } else {
@@ -1182,7 +1176,6 @@ private:
     }
     std::pair<int, std::unordered_map<Location, Location>>
         _sweepAndCompact(const std::unordered_set<Location> &visited) {
-        int removed = 0;
         std::unordered_map<Location, Location> relocation;
         Location n = heap.size();
         Location i{0}, j{0};
@@ -1191,19 +1184,15 @@ private:
                 if (i < j) {
                     heap[i] = std::move(heap[j]);
                     relocation[j] = i;
-                    i++;
-                    j++;
-                } else {
-                    i++;
-                    j++;
                 }
+                i++;
+                j++;
             } else {
-                removed++;
                 j++;
             }
         }
         heap.resize(i);
-        return std::make_pair(removed, std::move(relocation));
+        return std::make_pair(n - i, std::move(relocation));
     }
     void _relocate(const std::unordered_map<Location, Location> &relocation) {
         auto reloc = [&relocation](Location &loc) -> void {
