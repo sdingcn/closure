@@ -1040,7 +1040,12 @@ struct Layer {
 
 class State {
 public:
-    State(ExprNode *e): expr(e) {
+    State(std::string source) {
+        // parsing and static analysis (TODO: exceptions?)
+        expr = parse(lex(std::move(source)));
+        expr->staticASTCheck();
+        expr->computeFreeVars();
+        expr->computeTail(false);
         // pre-allocate integer literals
         std::function<void(ExprNode*)> callback = [this](ExprNode *e) -> void {
             if (auto inode = dynamic_cast<IntegerNode*>(e)) {
@@ -1582,11 +1587,7 @@ int main(int argc, char **argv) {
     }
     std::string source = readSource(argv[1]);
     try {
-        auto expr = parse(lex(source));
-        expr->staticASTCheck();
-        expr->computeFreeVars();
-        expr->computeTail(false);
-        State state(expr);
+        State state(std::move(source));
         state.execute();
         std::cout << valueToString(state.getResult()) << std::endl;
     } catch (const std::runtime_error &e) {
