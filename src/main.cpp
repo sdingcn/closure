@@ -79,7 +79,7 @@ struct SourceStream {
     SourceStream(std::string s): source(std::move(s)) {
         std::string charstr =
             "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "+-0123456789.*/%<(){}@# \t\n";
+            "+-0123456789.*/%<>=(){}@# \t\n";
         std::unordered_set<char> charset(charstr.begin(), charstr.end());
         for (char c : source) {
             if (!charset.contains(c)) {
@@ -1426,6 +1426,53 @@ private:
                 std::get<Integer>(heap[args[0]]).value <
                 std::get<Integer>(heap[args[1]]).value ? 1 : 0
             );
+        } else if (name == ".<=") {
+            _typecheck<Integer, Integer>(sl, args);
+            return Integer(
+                std::get<Integer>(heap[args[0]]).value <=
+                std::get<Integer>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".>") {
+            _typecheck<Integer, Integer>(sl, args);
+            return Integer(
+                std::get<Integer>(heap[args[0]]).value >
+                std::get<Integer>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".>=") {
+            _typecheck<Integer, Integer>(sl, args);
+            return Integer(
+                std::get<Integer>(heap[args[0]]).value >=
+                std::get<Integer>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".=") {
+            _typecheck<Integer, Integer>(sl, args);
+            return Integer(
+                std::get<Integer>(heap[args[0]]).value ==
+                std::get<Integer>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == "./=") {
+            _typecheck<Integer, Integer>(sl, args);
+            return Integer(
+                std::get<Integer>(heap[args[0]]).value !=
+                std::get<Integer>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".and") {
+            _typecheck<Integer, Integer>(sl, args);
+            return Integer(
+                std::get<Integer>(heap[args[0]]).value &&
+                std::get<Integer>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".or") {
+            _typecheck<Integer, Integer>(sl, args);
+            return Integer(
+                std::get<Integer>(heap[args[0]]).value ||
+                std::get<Integer>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".not") {
+            _typecheck<Integer>(sl, args);
+            return Integer(
+                std::get<Integer>(heap[args[0]]).value ? 0 : 1
+            );
         } else if (name == ".type") {
             _typecheck<Value>(sl, args);
             int label = -1;
@@ -1506,10 +1553,8 @@ private:
                     relocation[j] = i;
                 }
                 i++;
-                j++;
-            } else {
-                j++;
             }
+            j++;
         }
         heap.resize(i);
         return std::make_pair(n - i, std::move(relocation));

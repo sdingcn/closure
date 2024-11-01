@@ -5,7 +5,7 @@ letrec (
         lambda () if 0 { value left right } 1  # dummy uses ensure saving arguments to closure
     # in-order DFS
     dfs lambda (tree)
-        if (.< (tree) 1)
+        if (.= (tree) 0)
         (.void)
         {
             (dfs @left tree)

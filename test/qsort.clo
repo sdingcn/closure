@@ -7,10 +7,10 @@ letrec  # the list data structure and its functions
         lambda () if 0 { head tail } 1
 
     isnull lambda (list)
-        (.< (list) 1)
+        (.= (list) 0)
 
     ispair lambda (list)
-        (.< 0 (list))
+        (.= (list) 1)
 
     car lambda (list)
         @head list
@@ -68,7 +68,7 @@ letrec  # quicksort
             pivot (car list)
             tail (cdr list)
             left (quicksort (filter lambda (x) (.< x pivot) tail))
-            right (quicksort (filter lambda (x) (.< (.< x pivot) 1) tail))
+            right (quicksort (filter lambda (x) (.>= x pivot) tail))
         )
             (concat left (pair pivot right))
 )

@@ -15,7 +15,8 @@ See `test/` for code examples.
 <integer>   := [+-]?[0-9]+
 <variable>  := [a-zA-Z_][a-zA-Z0-9_]*
 <intrinsic> := .void  // generate a Void object
-             | .+ | .- | .* | ./ | .% | .<
+             | .+ | .- | .* | ./ | .% | .< | .<= | .> | .>= | .= | ./=
+             | .and | .or | .not  // no short-circuit evaluation
              | .type  // returns an integer representing the object's type (see below)
              | .get | .put  // integer IO (.put prints one integer per line)
 <vepair>    := <variable> <expr>
