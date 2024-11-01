@@ -16,9 +16,9 @@ See `test/` for code examples.
 <variable>  := [a-zA-Z_][a-zA-Z0-9_]*
 <intrinsic> := .void  // generate a Void object
              | .+ | .- | .* | ./ | .% | .< | .<= | .> | .>= | .= | ./=
-             | .and | .or | .not  // no short-circuit evaluation
+             | .and | .or | .not  // no short-circuit evaluation, use "if" for short-circuit
              | .type  // returns an integer representing the object's type (see below)
-             | .get | .put  // integer IO (.put prints one integer per line)
+             | .get | .put | .flush // integer IO (.put prints one integer per line)
 <vepair>    := <variable> <expr>
 <expr>      := <integer>
              | <variable>
@@ -39,11 +39,13 @@ See `test/` for code examples.
   Variables cannot be re-bound.
 + `letrec` and `( <callee> <expr>* )` evaluate from left to right
   and use pass-by-reference for variables.
-+ Optimizations: garbage collection with memory compaction, tail-call optimization,
-  closure environment optimization (including only statically used free variables).
++ Memory is managed by threshold-based tracing garbage collection with memory compaction.
++ Runtime optimizations: tail-call optimization,
+  closure size optimization (omitting unused environment variables),
+  literal object pre-allocation.
 + The runtime state is copyable, movable, and can be executed step-by-step.
   You can use the interpreter as a library to realize program suspension and resumption.
-  It's also straightforward to add first-class continuations to the language.
+  It's also easy to add first-class continuations to the language by copying stacks.
 
 ## dependencies
 

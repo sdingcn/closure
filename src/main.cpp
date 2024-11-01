@@ -1491,7 +1491,11 @@ private:
             return Integer(v);
         } else if (name == ".put") {
             _typecheck<Integer>(sl, args);
-            std::cout << std::get<Integer>(heap[args[0]]).value << '\n';
+            std::cout << std::get<Integer>(heap[args[0]]).value << ' ';
+            return Void();
+        } else if (name == ".flush") {
+            _typecheck<>(sl, args);
+            std::cout << std::flush;
             return Void();
         } else {
             panic("runtime", "unrecognized intrinsic call", sl);
@@ -1634,7 +1638,7 @@ int main(int argc, char **argv) {
     try {
         State state(std::move(source));
         state.execute();
-        std::cout << valueToString(state.getResult()) << std::endl;
+        std::cout << "<end-of-stdout>\n" << valueToString(state.getResult()) << std::endl;
     } catch (const std::runtime_error &e) {
         std::cerr << e.what() << std::endl;
         std::exit(EXIT_FAILURE);
