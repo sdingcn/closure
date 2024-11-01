@@ -18,7 +18,7 @@ See `test/` for code examples.
              | .+ | .- | .* | ./ | .% | .< | .<= | .> | .>= | .= | ./=
              | .and | .or | .not  // no short-circuit evaluation, use "if" for short-circuit
              | .type  // returns an integer representing the object's type (see below)
-             | .get | .put | .flush // integer IO (.put prints one integer per line)
+             | .get | .put | .flush  // integer IO
 <vepair>    := <variable> <expr>
 <expr>      := <integer>
              | <variable>

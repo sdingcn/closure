@@ -1,0 +1,2 @@
+# a program with a parsing time error
+letrec () {}
