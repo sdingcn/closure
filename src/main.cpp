@@ -39,6 +39,7 @@ constexpr bool isAlternativeOf = isAlternativeOfHelper<Type, Variant>::value;
 
 struct SourceLocation {
     SourceLocation(int l = 1, int c = 1): line(l), column(c) {}
+
     std::string toString() const {
         if (line <= 0 || column <= 0) {
             return "(SourceLocation N/A)";
@@ -89,6 +90,7 @@ struct SourceStream {
         sl.revert();
         std::reverse(source.begin(), source.end());
     }
+
     bool hasNext() const {
         return source.size() > 0;
     }
@@ -192,18 +194,17 @@ enum class TraversalMode {
     bottomUp
 };
 
-// the following macro prevents implicitly-declared move constructors and move assignment operators
-#define COPY_CONTROL(CLASS)\
-    virtual ~CLASS() {}\
+// this also prevents implicitly-declared move constructors and move assignment operators
+#define DELETE_COPY(CLASS)\
     CLASS(const CLASS &) = delete;\
     CLASS &operator=(const CLASS &) = delete
 
-struct ExprNode { COPY_CONTROL(ExprNode);
+struct ExprNode {
+    DELETE_COPY(ExprNode);
+    virtual ~ExprNode() {}
     ExprNode(SourceLocation s): sl(s) {}
-    virtual std::unique_ptr<ExprNode> deepCopy() const {
-        // if needed, use explicit deepcopy instead of copy constructors
-        throw std::runtime_error("ExprNode::deepCopy is not implemented");
-    }
+
+    virtual ExprNode *clone() const = 0;
     virtual void traverse(
         TraversalMode mode,
         std::function<void(ExprNode*)> &callback  // callback may have states
@@ -221,10 +222,20 @@ struct ExprNode { COPY_CONTROL(ExprNode);
 // every value is accessed by reference to its location on the heap 
 using Location = int;
 
-struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
+struct IntegerNode : public ExprNode {
+    DELETE_COPY(IntegerNode);
+    virtual ~IntegerNode() {}
     IntegerNode(SourceLocation s, int v): ExprNode(s), val(v) {}
+
+    // covariant return type
+    virtual IntegerNode *clone() const override {
+        auto inode = new IntegerNode(sl, val);
+        inode->freeVars = freeVars;
+        inode->tail = tail;
+        return inode;
+    }
     virtual void traverse(
-        TraversalMode mode,
+        TraversalMode,
         std::function<void(ExprNode*)> &callback
     ) override {
         callback(this);
@@ -244,11 +255,19 @@ struct IntegerNode : public ExprNode { COPY_CONTROL(IntegerNode);
     Location loc = -1;
 };
 
-struct VariableNode : public ExprNode { COPY_CONTROL(VariableNode);
-    VariableNode(SourceLocation s, std::string n):
-        ExprNode(s), name(std::move(n)) {}
+struct VariableNode : public ExprNode {
+    DELETE_COPY(VariableNode);
+    virtual ~VariableNode() {}
+    VariableNode(SourceLocation s, std::string n): ExprNode(s), name(std::move(n)) {}
+
+    virtual VariableNode *clone() const override {
+        auto vnode = new VariableNode(sl, name);
+        vnode->freeVars = freeVars;
+        vnode->tail = tail;
+        return vnode;
+    }
     virtual void traverse(
-        TraversalMode mode,
+        TraversalMode,
         std::function<void(ExprNode*)> &callback
     ) override {
         callback(this);
@@ -268,23 +287,40 @@ struct VariableNode : public ExprNode { COPY_CONTROL(VariableNode);
     std::string name;
 };
 
-struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
-    LambdaNode(SourceLocation s,
-        std::vector<std::unique_ptr<VariableNode>> v,
-        std::unique_ptr<ExprNode> e
-    ): ExprNode(s), varList(std::move(v)), expr(std::move(e)) {}
+struct LambdaNode : public ExprNode {
+    DELETE_COPY(LambdaNode);
+    virtual ~LambdaNode() {
+        for (auto v : varList) {
+            delete v;
+        }
+        delete expr;
+    }
+    LambdaNode(SourceLocation s, std::vector<VariableNode*> v, ExprNode *e):
+        ExprNode(s), varList(std::move(v)), expr(e) {}
+
+    virtual LambdaNode *clone() const override {
+        std::vector<VariableNode*> newVarList;
+        for (auto v : varList) {
+            newVarList.push_back(v->clone());
+        }
+        ExprNode *newExpr = expr->clone();
+        auto lnode = new LambdaNode(sl, std::move(newVarList), newExpr);
+        lnode->freeVars = freeVars;
+        lnode->tail = tail;
+        return lnode;
+    }
     virtual void traverse(
         TraversalMode mode,
         std::function<void(ExprNode*)> &callback
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            for (auto &var : varList) {
+            for (auto var : varList) {
                 var->traverse(mode, callback);
             }
             expr->traverse(mode, callback);
         } else {
-            for (auto &var : varList) {
+            for (auto var : varList) {
                 var->traverse(mode, callback);
             }
             expr->traverse(mode, callback);
@@ -293,7 +329,7 @@ struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
     }
     virtual std::string toString() const override {
         std::string ret = "lambda (";
-        for (const auto &v : varList) {
+        for (auto v : varList) {
             ret += v->toString();
             ret += " ";
         }
@@ -306,13 +342,13 @@ struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
     }
     virtual void staticASTCheck() const override {
         // check subtrees
-        for (const auto &var : varList) {
+        for (auto var : varList) {
             var->staticASTCheck();  // later may add other checks so keep this
         }
         expr->staticASTCheck();
         // check this
         std::unordered_set<std::string> varNames;
-        for (const auto &var : varList) {
+        for (auto var : varList) {
             if (varNames.contains(var->name)) {
                 panic("static AST check", "duplicate parameter names", sl);
             }
@@ -322,28 +358,46 @@ struct LambdaNode : public ExprNode { COPY_CONTROL(LambdaNode);
     virtual void computeFreeVars() override {
         expr->computeFreeVars();
         freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
-        for (const auto &var : varList) {
+        for (auto var : varList) {
             freeVars.erase(var->name);
         }
     }
     virtual void computeTail(bool parentTail) override {
         tail = parentTail;
-        for (auto &var : varList) {
+        for (auto var : varList) {
             var->computeTail(false);
         }
         expr->computeTail(true);
     }
 
-    std::vector<std::unique_ptr<VariableNode>> varList;
-    std::unique_ptr<ExprNode> expr;
+    std::vector<VariableNode*> varList;
+    ExprNode *expr;
 };
 
-struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
-    LetrecNode(
-        SourceLocation s,
-        std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> v,
-        std::unique_ptr<ExprNode> e
-    ): ExprNode(s), varExprList(std::move(v)), expr(std::move(e)) {}
+struct LetrecNode : public ExprNode {
+    DELETE_COPY(LetrecNode);
+    virtual ~LetrecNode() {
+        for (auto &ve : varExprList) {
+            delete ve.first;
+            delete ve.second;
+        }
+        delete expr;
+    }
+    LetrecNode(SourceLocation s, std::vector<std::pair<VariableNode*, ExprNode*>> v, ExprNode *e):
+        ExprNode(s), varExprList(std::move(v)), expr(e) {}
+
+    virtual LetrecNode *clone() const override {
+        std::vector<std::pair<VariableNode*, ExprNode*>> newVarExprList;
+        for (const auto &ve : varExprList) {
+            // the evaluation order of the two clones are irrelevant
+            newVarExprList.push_back(std::make_pair(ve.first->clone(), ve.second->clone()));
+        }
+        ExprNode *newExpr = expr->clone();
+        auto lnode = new LetrecNode(sl, std::move(newVarExprList), newExpr);
+        lnode->freeVars = freeVars;
+        lnode->tail = tail;
+        return lnode;
+    }
     virtual void traverse(
         TraversalMode mode,
         std::function<void(ExprNode*)> &callback
@@ -366,10 +420,10 @@ struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
     }
     virtual std::string toString() const override {
         std::string ret = "letrec (";
-        for (const auto &p : varExprList) {
-            ret += p.first->toString();
+        for (const auto &ve : varExprList) {
+            ret += ve.first->toString();
             ret += " ";
-            ret += p.second->toString();
+            ret += ve.second->toString();
             ret += " ";
         }
         if (ret.back() == ' ') {
@@ -402,7 +456,7 @@ struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
             ve.second->computeFreeVars();
             freeVars.insert(ve.second->freeVars.begin(), ve.second->freeVars.end());
         }
-        for (const auto &ve : varExprList) {
+        for (auto &ve : varExprList) {
             freeVars.erase(ve.first->name);
         }
     }
@@ -415,17 +469,27 @@ struct LetrecNode : public ExprNode { COPY_CONTROL(LetrecNode);
         expr->computeTail(tail);
     }
     
-    std::vector<std::pair<std::unique_ptr<VariableNode>, std::unique_ptr<ExprNode>>> varExprList;
-    std::unique_ptr<ExprNode> expr;
+    std::vector<std::pair<VariableNode*, ExprNode*>> varExprList;
+    ExprNode *expr;
 };
 
-struct IfNode : public ExprNode { COPY_CONTROL(IfNode);
-    IfNode(
-        SourceLocation s,
-        std::unique_ptr<ExprNode> c,
-        std::unique_ptr<ExprNode> b1,
-        std::unique_ptr<ExprNode> b2
-    ): ExprNode(s), cond(std::move(c)), branch1(std::move(b1)), branch2(std::move(b2)) {}
+struct IfNode : public ExprNode {
+    DELETE_COPY(IfNode);
+    virtual ~IfNode() {
+        delete cond;
+        delete branch1;
+        delete branch2;
+    }
+    IfNode(SourceLocation s, ExprNode *c, ExprNode *b1, ExprNode *b2):
+        ExprNode(s), cond(c), branch1(b1), branch2(b2) {}
+
+    virtual IfNode *clone() const override {
+        // the evaluation order of the three clones are irrelevant
+        auto inode = new IfNode(sl, cond->clone(), branch1->clone(), branch2->clone());
+        inode->freeVars = freeVars;
+        inode->tail = tail;
+        return inode;
+    }
     virtual void traverse(
         TraversalMode mode,
         std::function<void(ExprNode*)> &callback
@@ -465,27 +529,42 @@ struct IfNode : public ExprNode { COPY_CONTROL(IfNode);
         branch2->computeTail(tail);
     }
 
-    std::unique_ptr<ExprNode> cond;
-    std::unique_ptr<ExprNode> branch1;
-    std::unique_ptr<ExprNode> branch2;
+    ExprNode *cond;
+    ExprNode *branch1;
+    ExprNode *branch2;
 };
 
-struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
-    SequenceNode(
-        SourceLocation s,
-        std::vector<std::unique_ptr<ExprNode>> e
-    ): ExprNode(s), exprList(std::move(e)) {}
+struct SequenceNode : public ExprNode {
+    DELETE_COPY(SequenceNode);
+    virtual ~SequenceNode() {
+        for (auto e : exprList) {
+            delete e;
+        }
+    }
+    SequenceNode(SourceLocation s, std::vector<ExprNode*> e):
+        ExprNode(s), exprList(std::move(e)) {}
+
+    virtual SequenceNode *clone() const override {
+        std::vector<ExprNode*> newExprList;
+        for (auto e : exprList) {
+            newExprList.push_back(e->clone());
+        }
+        auto snode = new SequenceNode(sl, std::move(newExprList));
+        snode->freeVars = freeVars;
+        snode->tail = tail;
+        return snode;
+    }
     virtual void traverse(
         TraversalMode mode,
         std::function<void(ExprNode*)> &callback
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            for (auto &e : exprList) {
+            for (auto e : exprList) {
                 e->traverse(mode, callback);
             }
         } else {
-            for (auto &e : exprList) {
+            for (auto e : exprList) {
                 e->traverse(mode, callback);
             }
             callback(this);
@@ -493,7 +572,7 @@ struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
     }
     virtual std::string toString() const override {
         std::string ret = "{";
-        for (const auto &e : exprList) {
+        for (auto e : exprList) {
             ret += e->toString();
             ret += " ";
         }
@@ -504,12 +583,12 @@ struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
         return ret;
     }
     virtual void staticASTCheck() const override {
-        for (const auto &e : exprList) {
+        for (auto e : exprList) {
             e->staticASTCheck();
         }
     }
     virtual void computeFreeVars() override {
-        for (auto &e : exprList) {
+        for (auto e : exprList) {
             e->computeFreeVars();
             freeVars.insert(e->freeVars.begin(), e->freeVars.end());
         }
@@ -523,26 +602,40 @@ struct SequenceNode : public ExprNode { COPY_CONTROL(SequenceNode);
         exprList[n - 1]->computeTail(tail);
     }
 
-    std::vector<std::unique_ptr<ExprNode>> exprList;
+    std::vector<ExprNode*> exprList;
 };
 
-struct IntrinsicCallNode : public ExprNode { COPY_CONTROL(IntrinsicCallNode);
-    IntrinsicCallNode(
-        SourceLocation s,
-        std::string i,
-        std::vector<std::unique_ptr<ExprNode>> a
-    ): ExprNode(s), intrinsic(std::move(i)), argList(std::move(a)) {}
+struct IntrinsicCallNode : public ExprNode {
+    DELETE_COPY(IntrinsicCallNode);
+    virtual ~IntrinsicCallNode() {
+        for (auto a : argList) {
+            delete a;
+        }
+    }
+    IntrinsicCallNode(SourceLocation s, std::string i, std::vector<ExprNode*> a):
+        ExprNode(s), intrinsic(std::move(i)), argList(std::move(a)) {}
+
+    virtual IntrinsicCallNode *clone() const override {
+        std::vector<ExprNode*> newArgList;
+        for (auto a : argList) {
+            newArgList.push_back(a->clone());
+        }
+        auto inode = new IntrinsicCallNode(sl, intrinsic, std::move(newArgList));
+        inode->freeVars = freeVars;
+        inode->tail = tail;
+        return inode;
+    }
     virtual void traverse(
         TraversalMode mode,
         std::function<void(ExprNode*)> &callback
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            for (auto &a : argList) {
+            for (auto a : argList) {
                 a->traverse(mode, callback);
             }
         } else {
-            for (auto &a : argList) {
+            for (auto a : argList) {
                 a->traverse(mode, callback);
             }
             callback(this);
@@ -550,7 +643,7 @@ struct IntrinsicCallNode : public ExprNode { COPY_CONTROL(IntrinsicCallNode);
     }
     virtual std::string toString() const override {
         std::string ret = "(" + intrinsic;
-        for (const auto &a : argList) {
+        for (auto a : argList) {
             ret += " ";
             ret += a->toString();
         }
@@ -558,33 +651,49 @@ struct IntrinsicCallNode : public ExprNode { COPY_CONTROL(IntrinsicCallNode);
         return ret;
     }
     virtual void staticASTCheck() const override {
-        for (const auto &e : argList) {
-            e->staticASTCheck();
+        for (auto a : argList) {
+            a->staticASTCheck();
         }
     }
     virtual void computeFreeVars() override {
-        for (auto &e : argList) {
-            e->computeFreeVars();
-            freeVars.insert(e->freeVars.begin(), e->freeVars.end());
+        for (auto a : argList) {
+            a->computeFreeVars();
+            freeVars.insert(a->freeVars.begin(), a->freeVars.end());
         }
     }
     virtual void computeTail(bool parentTail) override {
         tail = parentTail;
-        for (auto &e : argList) {
-            e->computeTail(false);
+        for (auto a : argList) {
+            a->computeTail(false);
         }
     }
 
     std::string intrinsic;
-    std::vector<std::unique_ptr<ExprNode>> argList;
+    std::vector<ExprNode*> argList;
 };
 
-struct ExprCallNode : public ExprNode { COPY_CONTROL(ExprCallNode);
-    ExprCallNode(
-        SourceLocation s,
-        std::unique_ptr<ExprNode> e,
-        std::vector<std::unique_ptr<ExprNode>> a
-    ): ExprNode(s), expr(std::move(e)), argList(std::move(a)) {}
+struct ExprCallNode : public ExprNode {
+    DELETE_COPY(ExprCallNode);
+    virtual ~ExprCallNode() {
+        delete expr;
+        for (auto a : argList) {
+            delete a;
+        }
+    }
+    ExprCallNode(SourceLocation s, ExprNode *e, std::vector<ExprNode*> a):
+        ExprNode(s), expr(e), argList(std::move(a)) {}
+
+    virtual ExprCallNode *clone() const override {
+        ExprNode *newExpr = expr->clone();
+        std::vector<ExprNode*> newArgList;
+        for (auto a : argList) {
+            newArgList.push_back(a->clone());
+        }
+        auto enode = new ExprCallNode(sl, newExpr, std::move(newArgList));
+        enode->freeVars = freeVars;
+        enode->tail = tail;
+        return enode;
+    }
     virtual void traverse(
         TraversalMode mode,
         std::function<void(ExprNode*)> &callback
@@ -592,12 +701,12 @@ struct ExprCallNode : public ExprNode { COPY_CONTROL(ExprCallNode);
         if (mode == TraversalMode::topDown) {
             callback(this);
             expr->traverse(mode, callback);
-            for (auto &a : argList) {
+            for (auto a : argList) {
                 a->traverse(mode, callback);
             }
         } else {
             expr->traverse(mode, callback);
-            for (auto &a : argList) {
+            for (auto a : argList) {
                 a->traverse(mode, callback);
             }
             callback(this);
@@ -605,7 +714,7 @@ struct ExprCallNode : public ExprNode { COPY_CONTROL(ExprCallNode);
     }
     virtual std::string toString() const override {
         std::string ret = "(" + expr->toString();
-        for (const auto &a : argList) {
+        for (auto a : argList) {
             ret += " ";
             ret += a->toString();
         }
@@ -614,36 +723,45 @@ struct ExprCallNode : public ExprNode { COPY_CONTROL(ExprCallNode);
     }
     virtual void staticASTCheck() const override {
         expr->staticASTCheck();
-        for (const auto &e : argList) {
-            e->staticASTCheck();
+        for (auto a : argList) {
+            a->staticASTCheck();
         }
     }
     virtual void computeFreeVars() override {
         expr->computeFreeVars();
         freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
-        for (auto &e : argList) {
-            e->computeFreeVars();
-            freeVars.insert(e->freeVars.begin(), e->freeVars.end());
+        for (auto a : argList) {
+            a->computeFreeVars();
+            freeVars.insert(a->freeVars.begin(), a->freeVars.end());
         }
     }
     virtual void computeTail(bool parentTail) override {
         tail = parentTail;
         expr->computeTail(false);
-        for (auto &e : argList) {
-            e->computeTail(false);
+        for (auto a : argList) {
+            a->computeTail(false);
         }
     }
 
-    std::unique_ptr<ExprNode> expr;
-    std::vector<std::unique_ptr<ExprNode>> argList;
+    ExprNode *expr;
+    std::vector<ExprNode*> argList;
 };
 
-struct AtNode : public ExprNode { COPY_CONTROL(AtNode);
-    AtNode(
-        SourceLocation s,
-        std::unique_ptr<VariableNode> v,
-        std::unique_ptr<ExprNode> e
-    ): ExprNode(s), var(std::move(v)), expr(std::move(e)) {}
+struct AtNode : public ExprNode {
+    DELETE_COPY(AtNode);
+    virtual ~AtNode() {
+        delete var;
+        delete expr;
+    }
+    AtNode(SourceLocation s, VariableNode *v, ExprNode *e): ExprNode(s), var(v), expr(e) {}
+
+    virtual AtNode *clone() const override {
+        // the evaluation order of the two clones are irrelevant
+        auto anode = new AtNode(sl, var->clone(), expr->clone());
+        anode->freeVars = freeVars;
+        anode->tail = tail;
+        return anode;
+    }
     virtual void traverse(
         TraversalMode mode,
         std::function<void(ExprNode*)> &callback
@@ -675,13 +793,13 @@ struct AtNode : public ExprNode { COPY_CONTROL(AtNode);
         expr->computeTail(false);
     }
 
-    std::unique_ptr<VariableNode> var;
-    std::unique_ptr<ExprNode> expr;
+    VariableNode *var;
+    ExprNode *expr;
 };
 
-#undef COPY_CONTROL
+#undef DELETE_COPY
 
-std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
+ExprNode *parse(std::deque<Token> tokens) {
     auto isIntegerToken = [](const Token &token) {
         return token.text.size() > 0 && (
             std::isdigit(token.text[0]) ||
@@ -712,64 +830,60 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
         return token;
     };
 
-    std::function<std::unique_ptr<IntegerNode>()> parseInteger;
-    std::function<std::unique_ptr<VariableNode>()> parseVariable;
-    std::function<std::unique_ptr<LambdaNode>()> parseLambda;
-    std::function<std::unique_ptr<LetrecNode>()> parseLetrec;
-    std::function<std::unique_ptr<IfNode>()> parseIf;
-    std::function<std::unique_ptr<SequenceNode>()> parseSequence;
-    std::function<std::unique_ptr<IntrinsicCallNode>()> parseIntrinsicCall;
-    std::function<std::unique_ptr<ExprCallNode>()> parseExprCall;
-    std::function<std::unique_ptr<AtNode>()> parseAt;
-    std::function<std::unique_ptr<ExprNode>()> parseExpr;
+    std::function<IntegerNode*()> parseInteger;
+    std::function<VariableNode*()> parseVariable;
+    std::function<LambdaNode*()> parseLambda;
+    std::function<LetrecNode*()> parseLetrec;
+    std::function<IfNode*()> parseIf;
+    std::function<SequenceNode*()> parseSequence;
+    std::function<IntrinsicCallNode*()> parseIntrinsicCall;
+    std::function<ExprCallNode*()> parseExprCall;
+    std::function<AtNode*()> parseAt;
+    std::function<ExprNode*()> parseExpr;
 
-    parseInteger = [&]() -> std::unique_ptr<IntegerNode> {
+    parseInteger = [&]() -> IntegerNode* {
         auto token = consume(isIntegerToken);
-        return std::make_unique<IntegerNode>(token.sl, std::stoi(token.text));
+        return new IntegerNode(token.sl, std::stoi(token.text));
     };
-    parseVariable = [&]() -> std::unique_ptr<VariableNode> {
+    parseVariable = [&]() -> VariableNode* {
         auto token = consume(isVariableToken);
-        return std::make_unique<VariableNode>(token.sl, std::move(token.text));
+        return new VariableNode(token.sl, std::move(token.text));
     };
-    parseLambda = [&]() -> std::unique_ptr<LambdaNode> {
+    parseLambda = [&]() -> LambdaNode* {
         auto start = consume(isTheToken("lambda"));
         consume(isTheToken("("));
-        std::vector<std::unique_ptr<VariableNode>> varList;
+        std::vector<VariableNode*> varList;
         while (tokens.size() && isVariableToken(tokens[0])) {
             varList.push_back(parseVariable());
         }
         consume(isTheToken(")"));
         auto expr = parseExpr();
-        return std::make_unique<LambdaNode>(start.sl, std::move(varList), std::move(expr));
+        return new LambdaNode(start.sl, std::move(varList), expr);
     };
-    parseLetrec = [&]() -> std::unique_ptr<LetrecNode> {
+    parseLetrec = [&]() -> LetrecNode* {
         auto start = consume(isTheToken("letrec"));
         consume(isTheToken("("));
-        std::vector<std::pair<
-            std::unique_ptr<VariableNode>,
-            std::unique_ptr<ExprNode>
-        >> varExprList;
+        std::vector<std::pair<VariableNode*, ExprNode*>> varExprList;
         while (tokens.size() && isVariableToken(tokens[0])) {
+            // enforce the evaluation order of v; e
             auto v = parseVariable();
             auto e = parseExpr();
-            varExprList.emplace_back(std::move(v), std::move(e));
+            varExprList.emplace_back(v, e);
         }
         consume(isTheToken(")"));
         auto expr = parseExpr();
-        return std::make_unique<LetrecNode>(start.sl, std::move(varExprList), std::move(expr));
+        return new LetrecNode(start.sl, std::move(varExprList), expr);
     };
-    parseIf = [&]() -> std::unique_ptr<IfNode> {
+    parseIf = [&]() -> IfNode* {
         auto start = consume(isTheToken("if"));
         auto cond = parseExpr();
         auto branch1 = parseExpr();
         auto branch2 = parseExpr();
-        return std::make_unique<IfNode>(
-            start.sl, std::move(cond), std::move(branch1), std::move(branch2)
-        );
+        return new IfNode(start.sl, cond, branch1, branch2);
     };
-    parseSequence = [&]() -> std::unique_ptr<SequenceNode> {
+    parseSequence = [&]() -> SequenceNode* {
         auto start = consume(isTheToken("{"));
-        std::vector<std::unique_ptr<ExprNode>> exprList;
+        std::vector<ExprNode*> exprList;
         while (tokens.size() && tokens[0].text != "}") {
             exprList.push_back(parseExpr());
         }
@@ -777,37 +891,35 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
             panic("parser", "zero-length sequence", start.sl);
         }
         consume(isTheToken("}"));
-        return std::make_unique<SequenceNode>(start.sl, std::move(exprList));
+        return new SequenceNode(start.sl, std::move(exprList));
     };
-    parseIntrinsicCall = [&]() -> std::unique_ptr<IntrinsicCallNode> {
+    parseIntrinsicCall = [&]() -> IntrinsicCallNode* {
         auto start = consume(isTheToken("("));
         auto intrinsic = consume(isIntrinsicToken);
-        std::vector<std::unique_ptr<ExprNode>> argList;
+        std::vector<ExprNode*> argList;
         while (tokens.size() && tokens[0].text != ")") {
             argList.push_back(parseExpr());
         }
         consume(isTheToken(")"));
-        return std::make_unique<IntrinsicCallNode>(
-            start.sl, std::move(intrinsic.text), std::move(argList)
-        );
+        return new IntrinsicCallNode(start.sl, std::move(intrinsic.text), std::move(argList));
     };
-    parseExprCall = [&]() -> std::unique_ptr<ExprCallNode> {
+    parseExprCall = [&]() -> ExprCallNode* {
         auto start = consume(isTheToken("("));
         auto expr = parseExpr();
-        std::vector<std::unique_ptr<ExprNode>> argList;
+        std::vector<ExprNode*> argList;
         while (tokens.size() && tokens[0].text != ")") {
             argList.push_back(parseExpr());
         }
         consume(isTheToken(")"));
-        return std::make_unique<ExprCallNode>(start.sl, std::move(expr), std::move(argList));
+        return new ExprCallNode(start.sl, expr, std::move(argList));
     };
-    parseAt = [&]() -> std::unique_ptr<AtNode> {
+    parseAt = [&]() -> AtNode* {
         auto start = consume(isTheToken("@"));
         auto var = parseVariable();
         auto expr = parseExpr();
-        return std::make_unique<AtNode>(start.sl, std::move(var), std::move(expr));
+        return new AtNode(start.sl, var, expr);
     };
-    parseExpr = [&]() -> std::unique_ptr<ExprNode> {
+    parseExpr = [&]() -> ExprNode* {
         if (!tokens.size()) {
             panic("parser", "incomplete token stream");
             return nullptr;
@@ -855,6 +967,7 @@ std::unique_ptr<ExprNode> parse(std::deque<Token> tokens) {
 
 struct Void {
     Void() = default;
+
     std::string toString() const {
         return "<void>";
     }
@@ -862,6 +975,7 @@ struct Void {
 
 struct Integer {
     Integer(int v): value(v) {}
+
     std::string toString() const {
         return std::to_string(value);
     }
@@ -884,6 +998,7 @@ std::optional<Location> lookup(const std::string &name, const Env &env) {
 struct Closure {
     // a closure should copy its environment
     Closure(Env e, const LambdaNode *f): env(std::move(e)), fun(f) {}
+
     std::string toString() const {
         return "<closure evaluated at " + fun->sl.toString() + ">";
     }
@@ -925,7 +1040,7 @@ struct Layer {
 
 class State {
 public:
-    State(std::unique_ptr<ExprNode> &&e): expr(std::move(e)) {
+    State(ExprNode *e): expr(e) {
         // pre-allocate integer literals
         std::function<void(ExprNode*)> callback = [this](ExprNode *e) -> void {
             if (auto inode = dynamic_cast<IntegerNode*>(e)) {
@@ -937,25 +1052,52 @@ public:
         // the main frame (which cannot be removed by TCO)
         stack.emplace_back(std::make_shared<Env>(), nullptr, true);
         // the first expression (using the env of the main frame)
-        stack.emplace_back(stack.back().env, expr.get());
+        stack.emplace_back(stack.back().env, expr);
     }
-    // Note: the implicitly-declared copy constructor and copy assignment operator
-    // are defined as deleted due to the declarations of the following two (either)
-    // Note: may need copy semantics later (which needs ExprNode::deepCopy)
+    State(const State &state):
+        expr(state.expr->clone()),
+        stack(state.stack),
+        heap(state.heap),
+        numLiterals(state.numLiterals),
+        resultLoc(state.resultLoc) {
+    }
+    State &operator=(const State &state) {
+        if (this != &state) {
+            delete expr;
+            expr = state.expr->clone();
+            stack = state.stack;
+            heap = state.heap;
+            numLiterals = state.numLiterals;
+            resultLoc = state.resultLoc;
+        }
+        return *this;
+    }
     State(State &&state):
-        expr(std::move(state.expr)),
+        expr(state.expr),
         stack(std::move(state.stack)),
         heap(std::move(state.heap)),
         numLiterals(state.numLiterals),
-        resultLoc(state.resultLoc) {}
+        resultLoc(state.resultLoc) {
+        state.expr = nullptr;
+    }
     State &operator=(State &&state) {
-        expr = std::move(state.expr);
-        stack = std::move(state.stack);
-        heap = std::move(state.heap);
-        numLiterals = state.numLiterals;
-        resultLoc = state.resultLoc;
+        if (this != &state) {
+            delete expr;
+            expr = state.expr;
+            state.expr = nullptr;
+            stack = std::move(state.stack);
+            heap = std::move(state.heap);
+            numLiterals = state.numLiterals;
+            resultLoc = state.resultLoc;
+        }
         return *this;
     }
+    ~State() {
+        if (expr != nullptr) {
+            delete expr;
+        }
+    }
+
     // returns true iff the step is completed without reaching the end of evaluation
     bool step() {
         // be careful! this reference may be invalidated after modifying the stack
@@ -980,6 +1122,7 @@ public:
         } else if (auto lnode = dynamic_cast<const LambdaNode*>(layer.expr)) {
             // copy the statically used part of the env into the closure
             Env savedEnv;
+            // copy
             auto usedVars = lnode->freeVars;
             for (auto ptr = layer.env->rbegin(); ptr != layer.env->rend(); ptr++) {
                 if (usedVars.empty()) {
@@ -1024,14 +1167,14 @@ public:
                 //       but this is fine since next time "layer" will be re-bound
                 stack.emplace_back(
                     layer.env,
-                    lnode->varExprList[layer.pc - 2].second.get()
+                    lnode->varExprList[layer.pc - 2].second
                 );
             // evaluate body
             } else if (layer.pc == static_cast<int>(lnode->varExprList.size()) + 1) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
-                    lnode->expr.get()
+                    lnode->expr
                 );
             // finish letrec
             } else {
@@ -1047,7 +1190,7 @@ public:
             // evaluate condition
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.emplace_back(layer.env, inode->cond.get());
+                stack.emplace_back(layer.env, inode->cond);
             // evaluate one branch
             } else if (layer.pc == 1) {
                 layer.pc++;
@@ -1056,9 +1199,9 @@ public:
                     panic("runtime", "wrong cond type", layer.expr->sl);
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
-                    stack.emplace_back(layer.env, inode->branch1.get());
+                    stack.emplace_back(layer.env, inode->branch1);
                 } else {
-                    stack.emplace_back(layer.env, inode->branch2.get());
+                    stack.emplace_back(layer.env, inode->branch2);
                 }
             // finish if
             } else {
@@ -1071,7 +1214,7 @@ public:
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
-                    snode->exprList[layer.pc - 1].get()
+                    snode->exprList[layer.pc - 1]
                 );
             // finish
             } else {
@@ -1079,32 +1222,32 @@ public:
                 // no need to update resultLoc: inherited
                 stack.pop_back();
             }
-        } else if (auto cnode = dynamic_cast<const IntrinsicCallNode*>(layer.expr)) {
+        } else if (auto inode = dynamic_cast<const IntrinsicCallNode*>(layer.expr)) {
             // unified argument recording
-            if (layer.pc > 0 && layer.pc <= static_cast<int>(cnode->argList.size())) {
+            if (layer.pc > 0 && layer.pc <= static_cast<int>(inode->argList.size())) {
                 layer.local.push_back(resultLoc);
             }
             // evaluate arguments
-            if (layer.pc < static_cast<int>(cnode->argList.size())) {
+            if (layer.pc < static_cast<int>(inode->argList.size())) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
-                    cnode->argList[layer.pc - 1].get()
+                    inode->argList[layer.pc - 1]
                 );
             // intrinsic call doesn't grow the stack
             } else {
                 auto value = _callIntrinsic(
                     layer.expr->sl,
-                    cnode->intrinsic,
+                    inode->intrinsic,
                     // intrinsic call is pass by reference
                     layer.local
                 );
                 resultLoc = _moveNew(std::move(value));
                 stack.pop_back();
             }
-        } else if (auto cnode = dynamic_cast<const ExprCallNode*>(layer.expr)) {
+        } else if (auto enode = dynamic_cast<const ExprCallNode*>(layer.expr)) {
             // unified argument recording
-            if (layer.pc > 2 && layer.pc <= static_cast<int>(cnode->argList.size()) + 2) {
+            if (layer.pc > 2 && layer.pc <= static_cast<int>(enode->argList.size()) + 2) {
                 layer.local.push_back(resultLoc);
             }
             // evaluate the callee
@@ -1112,7 +1255,7 @@ public:
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
-                    cnode->expr.get()
+                    enode->expr
                 );
             // initialization
             } else if (layer.pc == 1) {
@@ -1120,14 +1263,14 @@ public:
                 // inherited callee location
                 layer.local.push_back(resultLoc);
             // evaluate arguments
-            } else if (layer.pc <= static_cast<int>(cnode->argList.size()) + 1) {
+            } else if (layer.pc <= static_cast<int>(enode->argList.size()) + 1) {
                 layer.pc++;
                 stack.emplace_back(
                     layer.env,
-                    cnode->argList[layer.pc - 3].get()
+                    enode->argList[layer.pc - 3]
                 );
             // call
-            } else if (layer.pc == static_cast<int>(cnode->argList.size()) + 2) {
+            } else if (layer.pc == static_cast<int>(enode->argList.size()) + 2) {
                 layer.pc++;
                 auto exprLoc = layer.local[0];
                 if (!std::holds_alternative<Closure>(heap[exprLoc])) {
@@ -1152,7 +1295,7 @@ public:
                     ));
                 }
                 // tail call optimization
-                if (cnode->tail) {
+                if (enode->tail) {
                     while (!(stack.back().frame)) {
                         stack.pop_back();
                     }
@@ -1163,7 +1306,7 @@ public:
                 stack.emplace_back(
                     // new frame has new env
                     std::make_shared<Env>(std::move(newEnv)),
-                    closure.fun->expr.get(),
+                    closure.fun->expr,
                     true
                 );
             // finish
@@ -1175,7 +1318,7 @@ public:
             // evaluate the expr
             if (layer.pc == 0) {
                 layer.pc++;
-                stack.emplace_back(layer.env, anode->expr.get());
+                stack.emplace_back(layer.env, anode->expr);
             } else {
                 // inherited resultLoc
                 if (!std::holds_alternative<Closure>(heap[resultLoc])) {
@@ -1403,8 +1546,9 @@ private:
         _relocate(relocation);
         return removed;
     }
+
     // states
-    std::unique_ptr<ExprNode> expr;
+    ExprNode *expr;
     std::vector<Layer> stack;
     std::vector<Value> heap;
     int numLiterals = 0;
@@ -1419,7 +1563,7 @@ std::string readSource(const std::string &spath) {
     if (!std::filesystem::exists(spath)) {
         throw std::runtime_error(spath + " does not exist.");
     }
-    static constexpr std::size_t BLOCK = 4096;
+    static constexpr std::size_t BLOCK = 1024;
     std::ifstream in(spath);
     in.exceptions(std::ios_base::badbit);
     std::string source;
@@ -1442,7 +1586,7 @@ int main(int argc, char **argv) {
         expr->staticASTCheck();
         expr->computeFreeVars();
         expr->computeTail(false);
-        State state(std::move(expr));
+        State state(expr);
         state.execute();
         std::cout << valueToString(state.getResult()) << std::endl;
     } catch (const std::runtime_error &e) {
