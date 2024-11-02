@@ -34,7 +34,7 @@ See `test/` for code examples.
 ## semantics and implementation details
 
 + Three object types: Void (0), Int (1), Closure (2).
-+ Variables are essentially references,
++ Variables are essentially references to objects,
   but they are indistinguishable from values because objects are immutable.
   Variables cannot be re-bound.
 + `letrec` and `( <callee> <expr>* )` evaluate from left to right
@@ -43,17 +43,22 @@ See `test/` for code examples.
 + Runtime optimizations: tail-call optimization,
   closure size optimization (omitting unused environment variables),
   literal object pre-allocation.
-+ The runtime state is copyable, movable, and can be executed step-by-step.
-  You can use the interpreter as a library to realize program suspension and resumption.
-  It's also easy to add first-class continuations to the language by copying stacks.
++ The entire runtime state (including stack, heap, etc.)
+  is copyable and movable, and can be executed step-by-step.
+  So it's easy to realize program suspension/resumption and to support
+  first-class continuations.
 
 ## dependencies
+
+This project was tested on Linux and macOS,
+but the C++ source file should compile on Windows
+if you adjust the build tools accordingly.
 
 + `clang++` with C++20 support
 + `make`
 + `python3` (only needed for `run_test.py`)
 
-## build (on Linux/macOS) and run
+## build and run
 
 ### manual
 

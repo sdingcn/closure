@@ -1634,8 +1634,8 @@ int main(int argc, char **argv) {
         std::cerr << "Usage: " << argv[0] << " <source-path>\n";
         return 1;
     }
-    std::string source = readSource(argv[1]);
     try {
+        std::string source = readSource(argv[1]);
         State state(std::move(source));
         state.execute();
         std::cout << "<end-of-stdout>\n" << valueToString(state.getResult()) << std::endl;
