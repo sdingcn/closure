@@ -49,8 +49,8 @@ See `test/` for code examples.
 
 ## dependencies
 
-+ `cmake` >= 3.28.1
-+ a C++20 compiler (e.g. `clang++`) and a build system (e.g. `make`)
++ `clang++` with C++20 support
++ `make`
 + `python3` (only needed for `run_test.py`)
 
 ## build (on Linux/macOS) and run
@@ -58,18 +58,13 @@ See `test/` for code examples.
 ### manual
 
 ```
-mkdir build
-cmake -DCMAKE_BUILD_TYPE:STRING=Release -S src -B build
-cmake --build build
-```
-
-```
-build/closure <source-path>
+make -C src/ release
+bin/closure <source-path>
 ```
 
 ### automatic
 
-The following command removes previous builds (if any), builds the interpreter, and runs all tests.
+The following command builds the interpreter and runs all tests.
 
 ```
 python3 run_test.py

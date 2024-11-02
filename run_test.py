@@ -16,21 +16,13 @@ def execute(cmd: List[str], i: Union[None, str] = None) -> Tuple[int, str, str]:
     )
     return (result.returncode, result.stdout, result.stderr)
 
-def build() -> None:
+def build(build_type: str) -> None:
     print("building the project ... ", end = "")
     sys.stdout.flush()
     start = time.time()
-    if os.path.exists("build"):
-        shutil.rmtree("build")
-    os.mkdir("build")
-    gen_code, _, _, = execute(
-        ["cmake", "-DCMAKE_BUILD_TYPE:STRING=Release", "-S", "src", "-B", "build"]
-    )
-    if gen_code:
-        sys.exit("cmake failed")
-    build_code, _, _ = execute(["cmake", "--build", "build"])
-    if build_code:
-        sys.exit("cmake --build failed")
+    code, _, _, = execute(["make", "-C", "src/", build_type])
+    if code:
+        sys.exit("make failed")
     end = time.time()
     print(f"completed in {end - start:.3f} seconds")
 
@@ -45,7 +37,7 @@ def test() -> None:
                 with open(iopath, "r") as f:
                     io = json.loads(f.read())
                 start = time.time()
-                res = execute(["build/closure", filepath], io["in"])
+                res = execute(["bin/closure", filepath], io["in"])
                 end = time.time()
                 if (
                     (res[0] == 0) == (io["err"] == "") and
@@ -55,8 +47,11 @@ def test() -> None:
                     print(f"passed in {end - start:.3f} seconds")
                 else:
                     sys.exit(f'failed\nres = {res}\ntruth = {(io["out"], io["err"])}')
-                sys.stdout.flush()
 
 if __name__ == "__main__":
-    build()
+    print("# started testing debug version")
+    build("debug")
+    test()
+    print("# started testing release version")
+    build("release")
     test()

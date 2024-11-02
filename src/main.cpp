@@ -1623,9 +1623,9 @@ std::string readSource(const std::string &spath) {
     std::string source;
     char buf[BLOCK];
     while (in.read(buf, BLOCK)) {
-        source.append(buf, 0, in.gcount());
+        source.append(buf, in.gcount());
     }
-    source.append(buf, 0, in.gcount());
+    source.append(buf, in.gcount());
     return source;
 }
 
