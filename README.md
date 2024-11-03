@@ -14,7 +14,7 @@ See `test/` for code examples.
 <comment>   := #[^\n]*\n
 <integer>   := [+-]?[0-9]+
 <variable>  := [a-zA-Z_][a-zA-Z0-9_]*
-<intrinsic> := .void  // generate a Void object
+<intrinsic> := .void  // generates a Void object
              | .+ | .- | .* | ./ | .% | .< | .<= | .> | .>= | .= | ./=
              | .and | .or | .not  // no short-circuit evaluation, use "if" for short-circuit
              | .type  // returns an integer representing the object's type (see below)
