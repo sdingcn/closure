@@ -31,9 +31,10 @@ See `test/` for code examples.
              | @ <variable> <expr>  // accesses a closure's environment variable
 ```
 
-## semantics and implementation details
+## semantics, design, and implementation
 
-+ Three object types: Void (0), Int (1), Closure (2).
++ AST-traversal based interpreter; no bytecode.
++ Three object types: Void (0), Int (1), Closure (2). Structs can be simulated by closures.
 + Variables are essentially references to objects,
   but they are indistinguishable from values because objects are immutable.
   Variables cannot be re-bound.
@@ -49,6 +50,9 @@ See `test/` for code examples.
   first-class continuations.
 
 ## dependencies
+
+The debug mode uses Clang-specific flags;
+so we use Make instead of CMake.
 
 This project was tested on Linux and macOS,
 but the C++ source file should compile on Windows
