@@ -315,15 +315,9 @@ struct LambdaNode : public ExprNode {
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            for (auto var : varList) {
-                var->traverse(mode, callback);
-            }
-            expr->traverse(mode, callback);
+            _traverseSubtree(mode, callback);
         } else {
-            for (auto var : varList) {
-                var->traverse(mode, callback);
-            }
-            expr->traverse(mode, callback);
+            _traverseSubtree(mode, callback);
             callback(this);
         }
     }
@@ -372,6 +366,13 @@ struct LambdaNode : public ExprNode {
 
     std::vector<VariableNode*> varList;
     ExprNode *expr;
+private:
+    void _traverseSubtree(TraversalMode mode, std::function<void(ExprNode*)> &callback) {
+        for (auto var : varList) {
+            var->traverse(mode, callback);
+        }
+        expr->traverse(mode, callback);
+    }
 };
 
 struct LetrecNode : public ExprNode {
@@ -404,17 +405,9 @@ struct LetrecNode : public ExprNode {
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            for (auto &ve : varExprList) {
-                ve.first->traverse(mode, callback);
-                ve.second->traverse(mode, callback);
-            }
-            expr->traverse(mode, callback);
+            _traverseSubtree(mode, callback);
         } else {
-            for (auto &ve : varExprList) {
-                ve.first->traverse(mode, callback);
-                ve.second->traverse(mode, callback);
-            }
-            expr->traverse(mode, callback);
+            _traverseSubtree(mode, callback);
             callback(this);
         }
     }
@@ -471,6 +464,14 @@ struct LetrecNode : public ExprNode {
     
     std::vector<std::pair<VariableNode*, ExprNode*>> varExprList;
     ExprNode *expr;
+private:
+    void _traverseSubtree(TraversalMode mode, std::function<void(ExprNode*)> &callback) {
+        for (auto &ve : varExprList) {
+            ve.first->traverse(mode, callback);
+            ve.second->traverse(mode, callback);
+        }
+        expr->traverse(mode, callback);
+    }
 };
 
 struct IfNode : public ExprNode {
@@ -496,13 +497,9 @@ struct IfNode : public ExprNode {
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            cond->traverse(mode, callback);
-            branch1->traverse(mode, callback);
-            branch2->traverse(mode, callback);
+            _traverseSubtree(mode, callback);
         } else {
-            cond->traverse(mode, callback);
-            branch1->traverse(mode, callback);
-            branch2->traverse(mode, callback);
+            _traverseSubtree(mode, callback);
             callback(this);
         }
     }
@@ -532,6 +529,12 @@ struct IfNode : public ExprNode {
     ExprNode *cond;
     ExprNode *branch1;
     ExprNode *branch2;
+private:
+    void _traverseSubtree(TraversalMode mode, std::function<void(ExprNode*)> &callback) {
+        cond->traverse(mode, callback);
+        branch1->traverse(mode, callback);
+        branch2->traverse(mode, callback);
+    }
 };
 
 struct SequenceNode : public ExprNode {
@@ -560,13 +563,9 @@ struct SequenceNode : public ExprNode {
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            for (auto e : exprList) {
-                e->traverse(mode, callback);
-            }
+            _traverseSubtree(mode, callback);
         } else {
-            for (auto e : exprList) {
-                e->traverse(mode, callback);
-            }
+            _traverseSubtree(mode, callback);
             callback(this);
         }
     }
@@ -603,6 +602,12 @@ struct SequenceNode : public ExprNode {
     }
 
     std::vector<ExprNode*> exprList;
+private:
+    void _traverseSubtree(TraversalMode mode, std::function<void(ExprNode*)> &callback) {
+        for (auto e : exprList) {
+            e->traverse(mode, callback);
+        }
+    }
 };
 
 struct IntrinsicCallNode : public ExprNode {
@@ -631,13 +636,9 @@ struct IntrinsicCallNode : public ExprNode {
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            for (auto a : argList) {
-                a->traverse(mode, callback);
-            }
+            _traverseSubtree(mode, callback);
         } else {
-            for (auto a : argList) {
-                a->traverse(mode, callback);
-            }
+            _traverseSubtree(mode, callback);
             callback(this);
         }
     }
@@ -670,6 +671,12 @@ struct IntrinsicCallNode : public ExprNode {
 
     std::string intrinsic;
     std::vector<ExprNode*> argList;
+private:
+    void _traverseSubtree(TraversalMode mode, std::function<void(ExprNode*)> &callback) {
+        for (auto a : argList) {
+            a->traverse(mode, callback);
+        }
+    }
 };
 
 struct ExprCallNode : public ExprNode {
@@ -700,15 +707,9 @@ struct ExprCallNode : public ExprNode {
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            expr->traverse(mode, callback);
-            for (auto a : argList) {
-                a->traverse(mode, callback);
-            }
+            _traverseSubtree(mode, callback);
         } else {
-            expr->traverse(mode, callback);
-            for (auto a : argList) {
-                a->traverse(mode, callback);
-            }
+            _traverseSubtree(mode, callback);
             callback(this);
         }
     }
@@ -745,6 +746,13 @@ struct ExprCallNode : public ExprNode {
 
     ExprNode *expr;
     std::vector<ExprNode*> argList;
+private:
+    void _traverseSubtree(TraversalMode mode, std::function<void(ExprNode*)> &callback) {
+        expr->traverse(mode, callback);
+        for (auto a : argList) {
+            a->traverse(mode, callback);
+        }
+    }
 };
 
 struct AtNode : public ExprNode {
@@ -768,11 +776,9 @@ struct AtNode : public ExprNode {
     ) override {
         if (mode == TraversalMode::topDown) {
             callback(this);
-            var->traverse(mode, callback);
-            expr->traverse(mode, callback);
+            _traverseSubtree(mode, callback);
         } else {
-            var->traverse(mode, callback);
-            expr->traverse(mode, callback);
+            _traverseSubtree(mode, callback);
             callback(this);
         }
     }
@@ -795,6 +801,11 @@ struct AtNode : public ExprNode {
 
     VariableNode *var;
     ExprNode *expr;
+private:
+    void _traverseSubtree(TraversalMode mode, std::function<void(ExprNode*)> &callback) {
+        var->traverse(mode, callback);
+        expr->traverse(mode, callback);
+    }
 };
 
 #undef DELETE_COPY
@@ -1662,7 +1673,7 @@ std::string readSource(const std::string &spath) {
 int main(int argc, char **argv) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <source-path>\n";
-        return 1;
+        std::exit(EXIT_FAILURE);
     }
     try {
         std::string source = readSource(argv[1]);
