@@ -24,7 +24,7 @@ def build(build_type: str) -> None:
     if code:
         sys.exit("make failed")
     end = time.time()
-    print(f"completed in {end - start:.3f} seconds")
+    print(f"OK ({end - start:.3f} seconds)")
 
 def test() -> None:
     for dirpath, _, filenames in os.walk("test/"):
@@ -44,9 +44,9 @@ def test() -> None:
                     res[1] == io["out"] and
                     res[2] == io["err"]
                 ):
-                    print(f"passed in {end - start:.3f} seconds")
+                    print(f"OK ({end - start:.3f} seconds)")
                 else:
-                    sys.exit(f'failed\nres = {res}\ntruth = {(io["out"], io["err"])}')
+                    sys.exit(f'failed\nresult = {res}\ntruth = {(io["out"], io["err"])}')
 
 if __name__ == "__main__":
     print("# started testing debug version")
@@ -55,3 +55,4 @@ if __name__ == "__main__":
     print("# started testing release version")
     build("release")
     test()
+    print("passed all tests")

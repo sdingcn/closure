@@ -44,6 +44,8 @@ See `test/` for code examples.
 + Runtime optimizations: tail-call optimization,
   closure size optimization (omitting unused environment variables),
   literal object pre-allocation.
+  Note: tail-call optimization can make stack traces in error messages hard to understand;
+  to aid debugging, use additional `letrec` to rewrite tail calls.
 + The entire runtime state (including stack, heap, etc.)
   is copyable and movable, and can be executed step-by-step.
   So it's easy to realize program suspension/resumption and to support

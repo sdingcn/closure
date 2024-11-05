@@ -1120,6 +1120,7 @@ public:
             auto varName = vnode->name;
             auto loc = lookup(varName, *(layer.env));
             if (!loc.has_value()) {
+                _errorStack();
                 panic("runtime", "undefined variable " + varName, layer.expr->sl);
             }
             resultLoc = loc.value();
@@ -1151,6 +1152,7 @@ public:
                 );
                 // this shouldn't happen since those variables are newly introduced by letrec
                 if (!loc.has_value()) {
+                    _errorStack();
                     panic("runtime", "undefined variable " + varName, layer.expr->sl);
                 }
                 // copy (inherited resultLoc)
@@ -1201,6 +1203,7 @@ public:
                 layer.pc++;
                 // inherited condition value
                 if (!std::holds_alternative<Integer>(heap[resultLoc])) {
+                    _errorStack();
                     panic("runtime", "wrong cond type", layer.expr->sl);
                 }
                 if (std::get<Integer>(heap[resultLoc]).value) {
@@ -1279,6 +1282,7 @@ public:
                 layer.pc++;
                 auto exprLoc = layer.local[0];
                 if (!std::holds_alternative<Closure>(heap[exprLoc])) {
+                    _errorStack();
                     panic("runtime", "calling a non-callable", layer.expr->sl);
                 }
                 auto &closure = std::get<Closure>(heap[exprLoc]);
@@ -1287,6 +1291,7 @@ public:
                     static_cast<int>(layer.local.size()) - 1 !=
                     static_cast<int>(closure.fun->varList.size())
                 ) {
+                    _errorStack();
                     panic("runtime", "wrong number of arguments", layer.expr->sl);
                 }
                 int nArgs = static_cast<int>(closure.fun->varList.size());
@@ -1327,6 +1332,7 @@ public:
             } else {
                 // inherited resultLoc
                 if (!std::holds_alternative<Closure>(heap[resultLoc])) {
+                    _errorStack();
                     panic("runtime", "@ wrong type", layer.expr->sl);
                 }
                 auto varName = anode->var->name;
@@ -1335,6 +1341,7 @@ public:
                     std::get<Closure>(heap[resultLoc]).env
                 );
                 if (!loc.has_value()) {
+                    _errorStack();
                     panic("runtime", "undefined variable " + varName, layer.expr->sl);
                 }
                 // "access by reference"
@@ -1342,6 +1349,7 @@ public:
                 stack.pop_back();
             }
         } else {
+            _errorStack();
             panic("runtime", "unrecognized AST node", layer.expr->sl);
         }
         return true;
@@ -1380,6 +1388,7 @@ private:
             } ()
         ));
         if (!ok) {
+            _errorStack();
             panic("runtime", "type error on intrinsic call", sl);
         }
     }
@@ -1498,6 +1507,7 @@ private:
             std::cout << std::flush;
             return Void();
         } else {
+            _errorStack();
             panic("runtime", "unrecognized intrinsic call", sl);
             return Void();
         }
@@ -1599,6 +1609,26 @@ private:
         const auto &[removed, relocation] = _sweepAndCompact(visited);
         _relocate(relocation);
         return removed;
+    }
+    std::vector<SourceLocation> _getFrameSLs() {
+        std::vector<SourceLocation> frameSLs;
+        for (const auto &l : stack) {
+            if (l.frame) {
+                if (l.expr == nullptr) {  // main frame
+                    frameSLs.emplace_back(1, 1);
+                } else {
+                    frameSLs.push_back(l.expr->sl);
+                }
+            }
+        }
+        return frameSLs;
+    }
+    void _errorStack() {
+        auto frameSLs = _getFrameSLs();
+        std::cerr << "\n>>> stack trace printed below\n";
+        for (auto sl : frameSLs) {
+            std::cerr << "calling expression at " << sl.toString() << "\n";
+        }
     }
 
     // states

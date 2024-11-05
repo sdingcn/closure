@@ -1,6 +1,9 @@
 # a program with a runtime error
-{
-    (.put (.+ 1 2))
-    (.put (.+ (lambda () 1) (lambda () 2)))
-    (.put (.+ lambda () 1 lambda () 2))
-}
+(lambda ()
+    letrec (
+        culprit lambda () (.put (.+ lambda () 1 lambda () 2))
+    ) {
+        (.put (.+ 1 2))
+        (.put (.+ (lambda () 1) (lambda () 2)))
+        letrec (temp (culprit)) temp
+    })
