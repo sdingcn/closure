@@ -33,11 +33,11 @@ def test() -> None:
                 filepath = os.path.join(dirpath, filename)
                 print(f"running test {filepath} ... ", end = "")
                 sys.stdout.flush()
-                iopath = filepath[:-3] + "io"
+                iopath = filepath[:-3] + "json"
                 with open(iopath, "r") as f:
                     io = json.loads(f.read())
                 start = time.time()
-                res = execute(["bin/closure", filepath], io["in"])
+                res = execute(["bin/clocalc", filepath], io["in"])
                 end = time.time()
                 if (
                     (res[0] == 0) == (io["err"] == "") and

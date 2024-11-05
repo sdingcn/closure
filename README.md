@@ -1,8 +1,8 @@
-# closure
+# clocalc
 
-![](https://github.com/sdingcn/closure/actions/workflows/run_test.yml/badge.svg)
+![](https://github.com/sdingcn/clocalc/actions/workflows/run_test.yml/badge.svg)
 
-This is an interpreted functional programming language
+**Clo**sure **calc**ulus is an interpreted functional programming language
 with first-class functions.
 Structs could be simulated by function closures
 with the help of the special syntax `@`.
@@ -70,7 +70,7 @@ if you adjust the build tools accordingly.
 
 ```
 make -C src/ release
-bin/closure <source-path>
+bin/clocalc <source-path>
 ```
 
 ### automatic
