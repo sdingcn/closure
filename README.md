@@ -50,7 +50,7 @@ See `test/*.clo` for code examples.
 
 ## dependencies
 
-The debug mode uses Clang-specific flags;
+The debug mode uses Clang-specific flags,
 so we use Make instead of CMake.
 This project was tested on Linux and macOS,
 but the C++ source file should compile on Windows
@@ -67,4 +67,4 @@ make -C src/ release
 bin/clocalc <source-path>
 ```
 
-Use `python3 run_test.py` to build the interpreter and runs all tests.
+Use `python3 run_test.py` to build the interpreter and run all tests.

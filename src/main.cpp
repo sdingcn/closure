@@ -210,7 +210,6 @@ struct ExprNode {
         std::function<void(ExprNode*)> &callback  // callback may have states
     ) = 0;
     virtual std::string toString() const = 0;
-    virtual void staticASTCheck() const = 0;
     virtual void computeFreeVars() = 0;
     virtual void computeTail(bool parentTail) = 0;
 
@@ -243,8 +242,6 @@ struct IntegerNode : public ExprNode {
     virtual std::string toString() const override {
         return std::to_string(val);
     }
-    virtual void staticASTCheck() const override {
-    }
     virtual void computeFreeVars() override {
     }
     virtual void computeTail(bool parentTail) override {
@@ -274,8 +271,6 @@ struct VariableNode : public ExprNode {
     }
     virtual std::string toString() const override {
         return name;
-    }
-    virtual void staticASTCheck() const override {
     }
     virtual void computeFreeVars() override {
         freeVars.insert(name);
@@ -333,21 +328,6 @@ struct LambdaNode : public ExprNode {
         ret += ") ";
         ret += expr->toString();
         return ret;
-    }
-    virtual void staticASTCheck() const override {
-        // check subtrees
-        for (auto var : varList) {
-            var->staticASTCheck();  // later may add other checks so keep this
-        }
-        expr->staticASTCheck();
-        // check this
-        std::unordered_set<std::string> varNames;
-        for (auto var : varList) {
-            if (varNames.contains(var->name)) {
-                panic("static AST check", "duplicate parameter names", sl);
-            }
-            varNames.insert(var->name);
-        }
     }
     virtual void computeFreeVars() override {
         expr->computeFreeVars();
@@ -426,22 +406,6 @@ struct LetrecNode : public ExprNode {
         ret += expr->toString();
         return ret;
     }
-    virtual void staticASTCheck() const override {
-        // check subtrees
-        for (const auto &ve : varExprList) {
-            ve.first->staticASTCheck();
-            ve.second->staticASTCheck();
-        }
-        expr->staticASTCheck();
-        // check this
-        std::unordered_set<std::string> varNames;
-        for (const auto &ve : varExprList) {
-            if (varNames.contains(ve.first->name)) {
-                panic("static AST check", "duplicate binding names", sl);
-            }
-            varNames.insert(ve.first->name);
-        }
-    }
     virtual void computeFreeVars() override {
         expr->computeFreeVars();
         freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
@@ -505,11 +469,6 @@ struct IfNode : public ExprNode {
     }
     virtual std::string toString() const override {
         return "if " + cond->toString() + " " + branch1->toString() + " " + branch2->toString();
-    }
-    virtual void staticASTCheck() const override {
-        cond->staticASTCheck();
-        branch1->staticASTCheck();
-        branch2->staticASTCheck();
     }
     virtual void computeFreeVars() override {
         cond->computeFreeVars();
@@ -581,11 +540,6 @@ struct SequenceNode : public ExprNode {
         ret += "}";
         return ret;
     }
-    virtual void staticASTCheck() const override {
-        for (auto e : exprList) {
-            e->staticASTCheck();
-        }
-    }
     virtual void computeFreeVars() override {
         for (auto e : exprList) {
             e->computeFreeVars();
@@ -650,11 +604,6 @@ struct IntrinsicCallNode : public ExprNode {
         }
         ret += ")";
         return ret;
-    }
-    virtual void staticASTCheck() const override {
-        for (auto a : argList) {
-            a->staticASTCheck();
-        }
     }
     virtual void computeFreeVars() override {
         for (auto a : argList) {
@@ -722,12 +671,6 @@ struct ExprCallNode : public ExprNode {
         ret += ")";
         return ret;
     }
-    virtual void staticASTCheck() const override {
-        expr->staticASTCheck();
-        for (auto a : argList) {
-            a->staticASTCheck();
-        }
-    }
     virtual void computeFreeVars() override {
         expr->computeFreeVars();
         freeVars.insert(expr->freeVars.begin(), expr->freeVars.end());
@@ -784,10 +727,6 @@ struct AtNode : public ExprNode {
     }
     virtual std::string toString() const override {
         return "@ " + var->toString() + " " + expr->toString();
-    }
-    virtual void staticASTCheck() const override {
-        var->staticASTCheck();
-        expr->staticASTCheck();
     }
     virtual void computeFreeVars() override {
         expr->computeFreeVars();
@@ -1054,16 +993,35 @@ public:
     State(std::string source) {
         // parsing and static analysis (TODO: exceptions?)
         expr = parse(lex(std::move(source)));
-        expr->staticASTCheck();
+        std::function<void(ExprNode*)> checkDuplicate = [](ExprNode *e) -> void {
+            if (auto lnode = dynamic_cast<LambdaNode*>(e)) {
+                std::unordered_set<std::string> varNames;
+                for (auto var : lnode->varList) {
+                    if (varNames.contains(var->name)) {
+                        panic("sema", "duplicate parameter names", lnode->sl);
+                    }
+                    varNames.insert(var->name);
+                }
+            } else if (auto lnode = dynamic_cast<LetrecNode*>(e)) {
+                std::unordered_set<std::string> varNames;
+                for (const auto &ve : lnode->varExprList) {
+                    if (varNames.contains(ve.first->name)) {
+                        panic("sema", "duplicate binding names", lnode->sl);
+                    }
+                    varNames.insert(ve.first->name);
+                }
+            }
+        };
+        expr->traverse(TraversalMode::topDown, checkDuplicate);
         expr->computeFreeVars();
         expr->computeTail(false);
         // pre-allocate integer literals
-        std::function<void(ExprNode*)> callback = [this](ExprNode *e) -> void {
+        std::function<void(ExprNode*)> preAllocate = [this](ExprNode *e) -> void {
             if (auto inode = dynamic_cast<IntegerNode*>(e)) {
                 inode->loc = this->_new<Integer>(inode->val);
             }
         };
-        expr->traverse(TraversalMode::topDown, callback);
+        expr->traverse(TraversalMode::topDown, preAllocate);
         numLiterals = heap.size();
         // the main frame (which cannot be removed by TCO)
         stack.emplace_back(std::make_shared<Env>(), nullptr, true);
