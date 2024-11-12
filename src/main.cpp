@@ -224,7 +224,7 @@ using Location = int;
 struct IntegerNode : public ExprNode {
     DELETE_COPY(IntegerNode);
     virtual ~IntegerNode() {}
-    IntegerNode(SourceLocation s, int v): ExprNode(s), val(v) {}
+    IntegerNode(SourceLocation s, std::string v): ExprNode(s), val(v) {}
 
     // covariant return type
     virtual IntegerNode *clone() const override {
@@ -240,7 +240,7 @@ struct IntegerNode : public ExprNode {
         callback(this);
     }
     virtual std::string toString() const override {
-        return std::to_string(val);
+        return val;
     }
     virtual void computeFreeVars() override {
     }
@@ -248,7 +248,7 @@ struct IntegerNode : public ExprNode {
         tail = parentTail;
     }
 
-    int val;
+    std::string val;
     Location loc = -1;
 };
 
@@ -793,7 +793,7 @@ ExprNode *parse(std::deque<Token> tokens) {
 
     parseInteger = [&]() -> IntegerNode* {
         auto token = consume(isIntegerToken);
-        return new IntegerNode(token.sl, std::stoi(token.text));
+        return new IntegerNode(token.sl, token.text);
     };
     parseVariable = [&]() -> VariableNode* {
         auto token = consume(isVariableToken);
@@ -1018,7 +1018,7 @@ public:
         // pre-allocate integer literals
         std::function<void(ExprNode*)> preAllocate = [this](ExprNode *e) -> void {
             if (auto inode = dynamic_cast<IntegerNode*>(e)) {
-                inode->loc = this->_new<Integer>(inode->val);
+                inode->loc = this->_new<Integer>(std::stoi(inode->val));
             }
         };
         expr->traverse(TraversalMode::topDown, preAllocate);
