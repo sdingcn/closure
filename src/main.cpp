@@ -75,11 +75,66 @@ void panic(
 // lexer
 // ------------------------------
 
+std::string quote(std::string s) {
+    std::string r;
+    r += '\"';
+    for (char c : s) {
+        if (c == '\\') {
+            r += "\\\\";
+        } else if (c == '\"') {
+            r += "\\\"";
+        } else {
+            r += c;
+        }
+    }
+    r += '\"';
+    return r;
+}
+
+std::string unquote(std::string s) {
+    int n = s.size();
+    if (!((n >= 2) &&
+          (s[0] == '\"') &&
+          (s[n - 1] == '\"'))) {
+        panic("unquote", "invalid quoted string");
+    }
+    s = s.substr(1, n - 2);
+    std::reverse(s.begin(), s.end());
+    std::string r;
+    while (s.size()) {
+        char c = s.back();
+        s.pop_back();
+        if (c == '\\') {
+            if (s.size()) {
+                char c1 = s.back();
+                s.pop_back();
+                if (c1 == '\\') {
+                    r += '\\';
+                } else if (c1 == '"') {
+                    r += '"';
+                } else if (c1 == 't') {
+                    r += '\t';
+                } else if (c1 == 'n') {
+                    r += '\n';
+                } else {
+                    panic("unquote", "invalid escape sequence");
+                }
+            } else {
+                panic("unquote", "incomplete escape sequence");
+            }
+        } else {
+            r += c;
+        }
+    }
+    return r;
+}
+
 struct SourceStream {
     SourceStream(std::string s): source(std::move(s)) {
         std::string charstr =
-            "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "+-0123456789.*/%<>=(){}@# \t\n";
+            "`1234567890-=~!@#$%^&*()_+"
+            "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
+            "[]\\;',./{}|:\"<>? \t\n";
         std::unordered_set<char> charset(charstr.begin(), charstr.end());
         for (char c : source) {
             if (!charset.contains(c)) {
@@ -138,8 +193,36 @@ std::deque<Token> lex(std::string source) {
             if (ss.peekNext() == '-' || ss.peekNext() == '+') {
                 text += ss.popNext();
             }
+            bool hasDigit = false;
             while (ss.hasNext() && std::isdigit(ss.peekNext())) {
+                hasDigit = true;
                 text += ss.popNext();
+            }
+            if (!hasDigit) {
+                panic("lexer", "incomplete integer literal", startsl);
+            }
+        // string literal
+        } else if (ss.peekNext() == '"') {
+            text += ss.popNext();
+            bool complete = false;
+            bool escape = false;
+            while (ss.hasNext()) {
+                if ((!escape) && ss.peekNext() == '"') {
+                    text += ss.popNext();
+                    complete = true;
+                    break;
+                } else {
+                    char c = ss.popNext();
+                    if (c == '\\') {
+                        escape = true;
+                    } else {
+                        escape = false;
+                    }
+                    text += c;
+                }
+            }
+            if (!complete) {
+                panic("lexer", "incomplete string literal", startsl);
             }
         // variable / keyword
         } else if (std::isalpha(ss.peekNext()) || ss.peekNext() == '_') {
@@ -224,7 +307,7 @@ using Location = int;
 struct IntegerNode : public ExprNode {
     DELETE_COPY(IntegerNode);
     virtual ~IntegerNode() {}
-    IntegerNode(SourceLocation s, std::string v): ExprNode(s), val(v) {}
+    IntegerNode(SourceLocation s, std::string v): ExprNode(s), val(std::move(v)) {}
 
     // covariant return type
     virtual IntegerNode *clone() const override {
@@ -232,6 +315,37 @@ struct IntegerNode : public ExprNode {
         inode->freeVars = freeVars;
         inode->tail = tail;
         return inode;
+    }
+    virtual void traverse(
+        TraversalMode,
+        std::function<void(ExprNode*)> &callback
+    ) override {
+        callback(this);
+    }
+    virtual std::string toString() const override {
+        return val;
+    }
+    virtual void computeFreeVars() override {
+    }
+    virtual void computeTail(bool parentTail) override {
+        tail = parentTail;
+    }
+
+    std::string val;
+    Location loc = -1;
+};
+
+struct StringNode : public ExprNode {
+    DELETE_COPY(StringNode);
+    virtual ~StringNode() {}
+    StringNode(SourceLocation s, std::string v): ExprNode(s), val(std::move(v)) {}
+
+    // covariant return type
+    virtual StringNode *clone() const override {
+        auto snode = new StringNode(sl, val);
+        snode->freeVars = freeVars;
+        snode->tail = tail;
+        return snode;
     }
     virtual void traverse(
         TraversalMode,
@@ -757,6 +871,9 @@ ExprNode *parse(std::deque<Token> tokens) {
             token.text[0] == '+'
         );
     };
+    auto isStringToken = [](const Token &token) {
+        return token.text.size() > 0 && token.text[0] == '"';
+    };
     auto isIntrinsicToken = [](const Token &token) {
         return token.text.size() > 0 && token.text[0] == '.';
     };
@@ -781,6 +898,7 @@ ExprNode *parse(std::deque<Token> tokens) {
     };
 
     std::function<IntegerNode*()> parseInteger;
+    std::function<StringNode*()> parseString;
     std::function<VariableNode*()> parseVariable;
     std::function<LambdaNode*()> parseLambda;
     std::function<LetrecNode*()> parseLetrec;
@@ -794,6 +912,10 @@ ExprNode *parse(std::deque<Token> tokens) {
     parseInteger = [&]() -> IntegerNode* {
         auto token = consume(isIntegerToken);
         return new IntegerNode(token.sl, token.text);
+    };
+    parseString = [&]() -> StringNode* {  // don't unquote here: AST keeps raw tokens
+        auto token = consume(isStringToken);
+        return new StringNode(token.sl, token.text);
     };
     parseVariable = [&]() -> VariableNode* {
         auto token = consume(isVariableToken);
@@ -875,6 +997,8 @@ ExprNode *parse(std::deque<Token> tokens) {
             return nullptr;
         } else if (isIntegerToken(tokens[0])) {
             return parseInteger();
+        } else if (isStringToken(tokens[0])) {
+            return parseString();
         } else if (tokens[0].text == "lambda") {
             return parseLambda();
         } else if (tokens[0].text == "letrec") {
@@ -933,6 +1057,16 @@ struct Integer {
     int value = 0;
 };
 
+struct String {  // for string literals, this class contains the unquoted ones
+    String(std::string v): value(std::move(v)) {}
+
+    std::string toString() const {
+        return quote(value);
+    }
+
+    std::string value;
+};
+
 // variable environment; newer variables have larger indices
 using Env = std::vector<std::pair<std::string, Location>>;
 
@@ -957,13 +1091,15 @@ struct Closure {
     const LambdaNode *fun;
 };
 
-using Value = std::variant<Void, Integer, Closure>;
+using Value = std::variant<Void, Integer, String, Closure>;
 
 std::string valueToString(const Value &v) {
     if (std::holds_alternative<Void>(v)) {
         return std::get<Void>(v).toString();
     } else if (std::holds_alternative<Integer>(v)) {
         return std::get<Integer>(v).toString();
+    } else if (std::holds_alternative<String>(v)) {
+        return std::get<String>(v).toString();
     } else {
         return std::get<Closure>(v).toString();
     }
@@ -1015,10 +1151,12 @@ public:
         expr->traverse(TraversalMode::topDown, checkDuplicate);
         expr->computeFreeVars();
         expr->computeTail(false);
-        // pre-allocate integer literals
+        // pre-allocate integer literals and string literals
         std::function<void(ExprNode*)> preAllocate = [this](ExprNode *e) -> void {
             if (auto inode = dynamic_cast<IntegerNode*>(e)) {
-                inode->loc = this->_new<Integer>(std::stoi(inode->val));
+                inode->loc = this->_new<Integer>(std::stoi(inode->val));  // TODO: exceptions
+            } else if (auto snode = dynamic_cast<StringNode*>(e)) {
+                snode->loc = this->_new<String>(unquote(snode->val));
             }
         };
         expr->traverse(TraversalMode::topDown, preAllocate);
@@ -1084,6 +1222,9 @@ public:
         // evaluations for every case
         if (auto inode = dynamic_cast<const IntegerNode*>(layer.expr)) {
             resultLoc = inode->loc;
+            stack.pop_back();
+        } else if (auto snode = dynamic_cast<const StringNode*>(layer.expr)) {
+            resultLoc = snode->loc;
             stack.pop_back();
         } else if (auto vnode = dynamic_cast<const VariableNode*>(layer.expr)) {
             auto varName = vnode->name;
@@ -1388,15 +1529,23 @@ private:
             );
         } else if (name == "./") {
             _typecheck<Integer, Integer>(sl, args);
+            int d = std::get<Integer>(heap[args[1]]).value;
+            if (d == 0) {
+                panic("runtime", "division by zero", sl);
+            }
             return Integer(
                 std::get<Integer>(heap[args[0]]).value /
-                std::get<Integer>(heap[args[1]]).value
+                d
             );
         } else if (name == ".%") {
             _typecheck<Integer, Integer>(sl, args);
+            int d = std::get<Integer>(heap[args[1]]).value;
+            if (d == 0) {
+                panic("runtime", "division by zero", sl);
+            }
             return Integer(
                 std::get<Integer>(heap[args[0]]).value %
-                std::get<Integer>(heap[args[1]]).value
+                d
             );
         } else if (name == ".<") {
             _typecheck<Integer, Integer>(sl, args);
@@ -1451,6 +1600,88 @@ private:
             return Integer(
                 std::get<Integer>(heap[args[0]]).value ? 0 : 1
             );
+        } else if (name == ".s+") {
+            _typecheck<String, String>(sl, args);
+            return String(
+                std::get<String>(heap[args[0]]).value +
+                std::get<String>(heap[args[1]]).value
+            );
+        } else if (name == ".s<") {
+            _typecheck<String, String>(sl, args);
+            return Integer(
+                std::get<String>(heap[args[0]]).value <
+                std::get<String>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".s<=") {
+            _typecheck<String, String>(sl, args);
+            return Integer(
+                std::get<String>(heap[args[0]]).value <=
+                std::get<String>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".s>") {
+            _typecheck<String, String>(sl, args);
+            return Integer(
+                std::get<String>(heap[args[0]]).value >
+                std::get<String>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".s>=") {
+            _typecheck<String, String>(sl, args);
+            return Integer(
+                std::get<String>(heap[args[0]]).value >=
+                std::get<String>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".s=") {
+            _typecheck<String, String>(sl, args);
+            return Integer(
+                std::get<String>(heap[args[0]]).value ==
+                std::get<String>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".s/=") {
+            _typecheck<String, String>(sl, args);
+            return Integer(
+                std::get<String>(heap[args[0]]).value !=
+                std::get<String>(heap[args[1]]).value ? 1 : 0
+            );
+        } else if (name == ".s||") {
+            _typecheck<String>(sl, args);
+            return Integer(
+                std::get<String>(heap[args[0]]).value.size()
+            );
+        } else if (name == ".s[]") {
+            _typecheck<String, Integer, Integer>(sl, args);
+            int n = std::get<String>(heap[args[0]]).value.size();
+            int l = std::get<Integer>(heap[args[1]]).value;
+            int r = std::get<Integer>(heap[args[2]]).value;
+            if (!(
+                (0 <= l && l < n) &&
+                (0 <= r && r < n) &&
+                (l <= r)
+            )) {
+                panic("runtime", "invalid substring range", sl);
+            }
+            return String(
+                std::get<String>(heap[args[0]]).value.substr(l, r - l)
+            );
+        } else if (name == ".quote") {
+            _typecheck<String>(sl, args);
+            return String(
+                quote(std::get<String>(heap[args[0]]).value)
+            );
+        } else if (name == ".unquote") {
+            _typecheck<String>(sl, args);
+            return String(
+                unquote(std::get<String>(heap[args[0]]).value)
+            );
+        } else if (name == ".s->i") {
+            _typecheck<String>(sl, args);
+            return Integer(
+                std::stoi(std::get<String>(heap[args[0]]).value)  // TODO: exceptions
+            );
+        } else if (name == ".i->s") {
+            _typecheck<Integer>(sl, args);
+            return String(
+                std::to_string(std::get<Integer>(heap[args[0]]).value)
+            );
         } else if (name == ".type") {
             _typecheck<Value>(sl, args);
             int label = -1;
@@ -1462,14 +1693,32 @@ private:
                 label = 2;
             }
             return Integer(label);
-        } else if (name == ".get") {
+        } else if (name == ".eval") {
+            _typecheck<String>(sl, args);
+            State state(std::get<String>(heap[args[0]]).value);
+            state.execute();
+            return state.getResult();  // this should be a copy
+        } else if (name == ".getchar") {
+            _typecheck<>(sl, args);
+            auto c = std::cin.get();
+            if (std::cin.eof()) {
+                return Void();
+            } else {
+                std::string s;
+                s.push_back(static_cast<char>(c));
+                return String(s);
+            }
+        } else if (name == ".getint") {
             _typecheck<>(sl, args);
             int v;
-            std::cin >> v;
-            return Integer(v);
-        } else if (name == ".put") {
-            _typecheck<Integer>(sl, args);
-            std::cout << std::get<Integer>(heap[args[0]]).value << ' ';
+            if (std::cin >> v) {
+                return Integer(v);
+            } else {
+                return Void();
+            }
+        } else if (name == ".putstr") {
+            _typecheck<String>(sl, args);
+            std::cout << std::get<String>(heap[args[0]]).value;
             return Void();
         } else if (name == ".flush") {
             _typecheck<>(sl, args);
@@ -1596,7 +1845,7 @@ private:
         auto frameSLs = _getFrameSLs();
         std::cerr << "\n>>> stack trace printed below\n";
         for (auto sl : frameSLs) {
-            std::cerr << "calling expression at " << sl.toString() << "\n";
+            std::cerr << "calling function body at " << sl.toString() << "\n";
         }
     }
 

@@ -35,13 +35,13 @@ letrec (  # IO for lists
     readlist lambda (n)
         if (.< n 1)
         (null)
-        (pair (.get) (readlist (.- n 1)))
+        (pair (.getint) (readlist (.- n 1)))
 
     writelist lambda (list)
         if (isnull list)
         (.void)
         {
-            (.put @head list)
+            (.putstr (.s+ (.i->s @head list) " "))
             (writelist @tail list)
         }
 )
@@ -59,6 +59,6 @@ letrec (  # quicksort
             (concat left (pair pivot right))
 )
 
-letrec (n (.get))
+letrec (n (.getint))
 letrec (list (readlist n))
 (writelist (quicksort list))

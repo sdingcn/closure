@@ -1,0 +1,4 @@
+letrec (
+    left "(.+ 12 "
+    right (.unquote (.quote "13)"))
+) (.eval (.s+ left right))

@@ -4,4 +4,4 @@ letrec (
         acc
         (sum (.- n 1) (.+ acc n))
 )
-(sum (.get) 0)
+(sum (.getint) 0)

@@ -7,4 +7,4 @@ letrec (
         if (.<= n 1)
         0
         (.not (finddiv n 2 0))
-) (isprime (.get))
+) (isprime (.getint))

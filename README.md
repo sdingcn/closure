@@ -10,12 +10,17 @@ See `test/*.clo` for code examples.
 ```
 <comment>   := #[^\n]*\n
 <integer>   := [+-]?[0-9]+  // C++ int
+<string>    := "([^"] | \")*"  // see interpreter source for the supported alphabet
 <variable>  := [a-zA-Z_][a-zA-Z0-9_]*
 <intrinsic> := .void  // generates a Void object
              | .+ | .- | .* | ./ | .% | .< | .<= | .> | .>= | .= | ./=
              | .and | .or | .not  // no short-circuit; use "if" for short-circuit
-             | .type  // returns an integer; 0 for Void, 1 for Int, 2 for Closure
-             | .get | .put | .flush  // integer IO
+             | .s+ | .s< | .s<= | .s> | .s>= | .s= | .s/= | .s|| | .s[]
+             | .quote | .unquote
+             | .s->i | .i->s
+             | .type  // 0 for Void, 1 for Int, 2 for String, 3 for Closure
+             | .eval
+             | .getchar | .getint | .putstr | .flush  // IO
 <vepair>    := <variable> <expr>
 <expr>      := <integer>
              | <variable>
@@ -31,7 +36,7 @@ See `test/*.clo` for code examples.
 ## semantics and implementation
 
 + AST-traversal based interpreter; no bytecode.
-+ Three object types: Void, Int, Closure. Structs can be simulated by closures.
++ 4 object types: Void, Int, String, Closure. Structs can be simulated by closures.
 + Variables are references to objects,
   but they are indistinguishable from values because objects are immutable.
   Variables cannot be re-bound.
@@ -40,7 +45,7 @@ See `test/*.clo` for code examples.
 + Threshold-based tracing garbage collection with memory compaction.
 + Tail-call optimization,
   closure size optimization (omitting unused environment variables),
-  literal (Int) object pre-allocation.
+  literal object pre-allocation.
   Note: for debugging, use `letrec` to rewrite tail calls to get clear
   stack traces in error messages.
 + The entire runtime state (including stack, heap, etc.)
