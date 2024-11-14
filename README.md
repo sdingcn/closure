@@ -15,8 +15,7 @@ See `test/*.clo` for code examples.
 <intrinsic> := .void  // generates a Void object
              | .+ | .- | .* | ./ | .% | .< | .<= | .> | .>= | .= | ./=
              | .and | .or | .not  // no short-circuit; use "if" for short-circuit
-             | .s+ | .s< | .s<= | .s> | .s>= | .s= | .s/= | .s|| | .s[]
-             | .quote | .unquote
+             | .s+ | .s< | .s<= | .s> | .s>= | .s= | .s/= | .s|| | .s[] | .quote | .unquote
              | .s->i | .i->s
              | .type  // 0 for Void, 1 for Int, 2 for String, 3 for Closure
              | .eval
@@ -36,7 +35,7 @@ See `test/*.clo` for code examples.
 ## semantics and implementation
 
 + AST-traversal based interpreter; no bytecode.
-+ 4 object types: Void, Int, String, Closure. Structs can be simulated by closures.
++ 4 object types: Void, Integer, String, Closure. Structs can be simulated by closures.
 + Variables are references to objects,
   but they are indistinguishable from values because objects are immutable.
   Variables cannot be re-bound.

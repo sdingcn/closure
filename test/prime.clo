@@ -7,4 +7,15 @@ letrec (
         if (.<= n 1)
         0
         (.not (finddiv n 2 0))
-) (isprime (.getint))
+)
+
+letrec (
+    loop lambda ()
+        letrec (n (.getint))
+            if (.= n 0)
+            (.void)
+            {
+                (.putstr if (isprime n) "Yes\n" "No\n")
+                (loop)  # tail position
+            }
+) (loop)
