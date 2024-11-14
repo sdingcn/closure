@@ -1,0 +1,13 @@
+letrec (
+    # (Y f) = (f lambda () (Y f))
+    Y lambda (f)
+        (
+            lambda (x) (f lambda () (x x))
+            lambda (x) (f lambda () (x x))
+        )
+    product lambda (rec)
+        lambda (n)
+            if (.<= n 1)
+            1
+            (.* n ((rec) (.- n 1)))
+) ((Y product) 5)
